@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-16",
+  "verification_script": "scripts/verify.sh",
+  "verification_exit_code": 0,
+  "storage_server_tests_passed": 181,
+  "external_s3_tests_ignored_locally": 1,
+  "rust_client_tests_including_doctest_and_service": 24,
+  "typescript_unit_tests": 18,
+  "typescript_service_tests": 1,
+  "python_tests": 14,
+  "rustsec_locked_dependencies": 341,
+  "production_npm_vulnerabilities": 0,
+  "browser": {"runtime": "native Chromium WebSocket", "rows": 19, "timestamp": "9007199254740993", "receipt_type": "bigint", "server_request_queue": 64},
+  "batching": {"requests": 512, "single_wal_frames": 512, "queued_wal_frames": 4, "single_ms": 3856.7785, "queued_ms": 197.215666, "peak_pending_requests": 128, "peak_pending_bytes": 193792, "final_pending_requests": 0, "final_pending_bytes": 0, "failed": 0, "rejected": 0},
+  "scope": "Local experimental single-node evidence; no production throughput, cloud durability or HA certification"
+}

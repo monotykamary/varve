@@ -32,6 +32,8 @@
 
 These are logical admission estimates, not allocator-wide RSS or filesystem quotas. Serialization/copies, Arrow/Parquet overhead, metadata and query workers coexist. Native scans read files sequentially but bound their returned rows. A cold SQL snapshot must fit the downloaded cache because this adapter uses local Parquet paths.
 
+Service-only WebSocket, PostgreSQL-wire and ingestion settings are documented in [TRANSPORTS.md](TRANSPORTS.md). They are CLI/environment settings, not extra fields in the persisted `Config` JSON. The library also exposes [IngestConfig](INGESTION.md).
+
 ## Table defaults
 
 | Entry | Default | Meaning |

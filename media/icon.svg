@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Varve</title>
+  <desc id="desc">Three sedimentary layers form a V. First-party Varve mark on a transparent background.</desc>
+  <path d="M48 48L256 160L464 48V128L256 240L48 128Z" fill="#80c9bd"/>
+  <path d="M48 160L256 272L464 160V240L256 352L48 240Z" fill="#aba9d5"/>
+  <path d="M48 272L256 384L464 272V352L256 464L48 352Z" fill="#d99972"/>
+</svg>

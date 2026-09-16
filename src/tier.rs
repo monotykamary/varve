@@ -827,7 +827,8 @@ fn prove_owned_remote_prefix(
             ensure!(
                 local_receipt.sequence == remote_receipt.sequence
                     && local_receipt.rows == remote_receipt.rows
-                    && local_receipt.digest == remote_receipt.digest,
+                    && local_receipt.digest == remote_receipt.digest
+                    && local_receipt.group_fingerprint == remote_receipt.group_fingerprint,
                 "remote receipt {name}/{request_id} does not match local history"
             );
         }
@@ -876,6 +877,7 @@ fn prove_owned_remote_prefix(
                 && object.key == format!("wal/{sequence:020}-{}.wal", object.digest),
             "remote WAL sequence/key mismatch"
         );
+        let group_fingerprint = wal::group_fingerprint(&record)?;
         match record.operation {
             wal::Operation::CreateTable { name, config } => {
                 ensure!(
@@ -925,9 +927,69 @@ fn prove_owned_remote_prefix(
                 ensure!(
                     local_receipt.sequence == sequence
                         && local_receipt.rows == rows.len()
-                        && local_receipt.digest == digest,
+                        && local_receipt.digest == digest
+                        && local_receipt.group_fingerprint.is_none(),
                     "remote WAL receipt {table}/{request_id} does not match local history"
                 );
+            }
+            wal::Operation::AppendGroup { items } => {
+                ensure!(
+                    !items.is_empty()
+                        && items.len() <= wal::MAX_GROUP_REQUESTS
+                        && bytes.len() <= inner.config.max_batch_bytes,
+                    "remote WAL group exceeds admission bounds"
+                );
+                let mut group_rows = 0usize;
+                for wal::AppendItem {
+                    table,
+                    request_id,
+                    digest,
+                    rows,
+                    now_us: _,
+                } in items
+                {
+                    group_rows = group_rows
+                        .checked_add(rows.len())
+                        .context("remote WAL group row count overflow")?;
+                    ensure!(
+                        !rows.is_empty() && group_rows <= inner.config.max_batch_rows,
+                        "remote WAL group exceeds row budget"
+                    );
+                    crate::model::validate_request_id(&request_id)?;
+                    for row in &rows {
+                        row.validate()?;
+                    }
+                    ensure!(
+                        tables.contains(&table),
+                        "remote WAL references unknown table"
+                    );
+                    ensure!(
+                        receipts.insert((table.clone(), request_id.clone())),
+                        "duplicate remote WAL receipt"
+                    );
+                    ensure!(
+                        blake3::hash(&serde_json::to_vec(&rows)?).to_hex().as_str() == digest,
+                        "remote WAL payload digest mismatch"
+                    );
+                    let local_receipt = local
+                        .catalog
+                        .tables
+                        .get(&table)
+                        .and_then(|table| table.receipts.get(&request_id))
+                        .with_context(|| {
+                            format!("remote WAL receipt {table}/{request_id} is absent locally")
+                        })?;
+                    // A retained receipt binds the entire ordered group, even if
+                    // checkpoints removed the WAL or pruned another member's ID.
+                    ensure!(
+                        local_receipt.sequence == sequence
+                            && local_receipt.rows == rows.len()
+                            && local_receipt.digest == digest
+                            && local_receipt.group_fingerprint.is_some()
+                            && local_receipt.group_fingerprint == group_fingerprint,
+                        "remote WAL receipt {table}/{request_id} does not match local history (group proof required)"
+                    );
+                }
             }
             wal::Operation::SetPolicy { stamp, .. }
             | wal::Operation::CreateContinuousAggregate { stamp, .. }

@@ -10,3 +10,6 @@
 *.pem
 *.key
 __pycache__/
+node_modules/
+/clients/typescript/dist/
+*.tgz

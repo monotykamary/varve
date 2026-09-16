@@ -8,10 +8,10 @@ Varve v0.1 is a single-node modular Rust database for append-only numeric time-s
 
 1. Lock state and validate table, timestamps, finite values, request ID, batch size and conflicts.
 2. Precompute affected aggregate groups. Bound their working set and projected encoded metadata, including future segment-reference reservations. Check hot/WAL/disk budgets and checkpoint first when necessary.
-3. Encode one versioned, checksummed immutable WAL frame per API batch. Sync a temporary, atomically rename it in the same filesystem, then sync the directory.
+3. Encode a versioned, checksummed immutable WAL frame. Direct `Database::write` uses one append; the shared ingestion coordinator can collect independent requests into one `AppendGroup` publication with per-request receipts and a common physical sequence. Sync a temporary, atomically rename it in the same filesystem, then sync the directory.
 4. Apply rows, aggregate updates and receipt under the same state lock. Only then acknowledge `local_fsync`.
 
-There is no cross-request group-commit coordinator. Invalid/conflicting work never publishes a partial batch. Ambiguous local publication errors fence the instance; reopen replays or rejects the committed frame rather than guessing. `float_roundtrip` is enabled for JSON persistence so typed finite values survive serialization exactly. Floating-point aggregation itself is still approximate f64 arithmetic.
+HTTP and WebSocket writes share a bounded Crossbeam coordinator with one batching writer. Request/row/byte/time ceilings bound each flush; pending bytes include queued and in-flight work. `Database::write_group` stages affected rows/aggregates/receipts behind the state lock with a bounded undo log, restores the pre-publication state, publishes the grouped WAL and applies it durably. It does not clone the full catalog per group; existing checkpoints still can. Global row ordinals preserve deterministic ties within a shared physical sequence. Admission is not acknowledgment. Invalid/conflicting work never publishes a partial application batch. Ambiguous local publication errors fence the instance; reopen replays or rejects the committed frame rather than guessing. `float_roundtrip` is enabled for JSON persistence so typed finite values survive serialization exactly. Floating-point aggregation itself is still approximate f64 arithmetic.
 
 An exclusive OS file lock enforces one process per data directory. Startup removes recognized unpublished temporaries, loads the verified manifest and replays exactly the contiguous WAL tail above its checkpoint. Committed corruption, unknown formats and sequence gaps fail closed. Idempotency receipts are independent of raw expiration. Legacy receipts remain durable; opted-in timed-ID windows atomically prune receipts with a monotonic rejection floor at checkpoint, so old retries cannot silently reinsert data.
 
@@ -57,6 +57,9 @@ A conservative SQL AST planner proves relation/time pruning only for safe simple
 - `remote.rs`: reusable synchronous RemoteStore abstraction, filesystem and AWS adapters, bounded object I/O.
 - `tier.rs`: publication ownership, restore, remote locks and reachable-object vacuum.
 - `policy.rs`: deterministic-clock lifecycle orchestration.
-- `main.rs`: JSON CLI, bounded trusted-loopback HTTP and scheduler lifecycle.
+- `ingest.rs`: bounded many-producer queue, batching writer, completion receipts and drain.
+- `service.rs` / `transport.rs` / `pg_transport.rs`: authenticated HTTP/WebSocket service and opt-in loopback SCRAM PostgreSQL-wire simple queries.
+- `main.rs`: JSON CLI and service lifecycle.
+- `clients/rust` / `clients/typescript`: independent network clients; no embedded storage dependency.
 
 The interfaces are reusable without the HTTP server. Runtime/backend configuration, user-facing commands, tests and explicit production exclusions are linked from the README.

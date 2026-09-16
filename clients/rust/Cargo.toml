@@ -1,0 +1,38 @@
+[package]
+name = "varve-client"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Asynchronous Rust client for the Varve persistent protocol"
+license = "Apache-2.0"
+repository = "https://github.com/monotykamary/varve"
+homepage = "https://github.com/monotykamary/varve"
+documentation = "https://docs.rs/varve-client"
+readme = "README.md"
+keywords = ["timeseries", "database", "websocket", "async"]
+categories = ["database", "web-programming::websocket"]
+
+[features]
+default = []
+service-tests = []
+
+[dependencies]
+futures-util = { version = "0.3", features = ["sink"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-tungstenite = { version = "0.28", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
+
+[[test]]
+name = "real_service"
+path = "tests/real_service.rs"
+required-features = ["service-tests"]

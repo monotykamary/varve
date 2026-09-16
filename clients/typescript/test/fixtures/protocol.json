@@ -1,0 +1,6 @@
+{
+  "authRequest": "{\"jsonrpc\":\"2.0\",\"id\":\"auth\",\"method\":\"auth\",\"params\":{\"token\":\"test-token\"}}",
+  "authSuccess": "{\"jsonrpc\":\"2.0\",\"id\":\"auth\",\"result\":{\"protocol\":1}}",
+  "authUnauthorized": "{\"jsonrpc\":\"2.0\",\"id\":\"auth\",\"error\":{\"code\":-32001,\"message\":\"unauthorized\"}}",
+  "largeReceipt": "{\"jsonrpc\":\"2.0\",\"id\":\"REPLACE_ID\",\"result\":{\"sequence\":18446744073709551615,\"rows\":1,\"duplicate\":false,\"durability\":\"local_fsync\"}}"
+}

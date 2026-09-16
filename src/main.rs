@@ -88,7 +88,7 @@ enum Command {
         #[arg(long)]
         confirm_owner_stopped: bool,
     },
-    /// Run the HTTP service and maintenance scheduler.
+    /// Run HTTP/WebSocket, optional PostgreSQL, and the maintenance scheduler.
     Serve {
         #[arg(long, default_value = "127.0.0.1")]
         bind: IpAddr,
@@ -98,6 +98,15 @@ enum Command {
         /// Listening port. If omitted, the Railway-compatible PORT environment variable is used.
         #[arg(long)]
         port: Option<u16>,
+        /// Optional PostgreSQL simple-query port (or VARVE_PG_PORT). Disabled by default.
+        #[arg(long)]
+        pg_port: Option<u16>,
+        /// PostgreSQL bind; non-loopback is refused until TLS is implemented.
+        #[arg(long, default_value = "127.0.0.1")]
+        pg_bind: IpAddr,
+        /// Exact allowed browser Origin; repeat or use comma-separated VARVE_WS_ORIGINS.
+        #[arg(long = "ws-origin")]
+        ws_origins: Vec<String>,
         #[arg(long)]
         max_connections: Option<usize>,
         #[arg(long)]
@@ -233,6 +242,9 @@ fn run() -> Result<()> {
             bind,
             allow_remote,
             port,
+            pg_port,
+            pg_bind,
+            ws_origins,
             max_connections,
             request_workers,
             request_queue,
@@ -249,6 +261,9 @@ fn run() -> Result<()> {
             allow_remote,
             service::Overrides {
                 port,
+                pg_port,
+                pg_bind,
+                ws_origins,
                 max_connections,
                 request_workers,
                 request_queue,

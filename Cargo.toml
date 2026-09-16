@@ -1,5 +1,5 @@
 [package]
-name = "varvedb"
+name = "varve-storage"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.90"
@@ -22,7 +22,16 @@ path = "src/main.rs"
 default = []
 fault-injection = []
 
+[workspace]
+members = [".", "clients/rust"]
+resolver = "3"
+
 [dependencies]
+crossbeam-channel = "0.5"
+tokio-tungstenite = "0.28"
+pgwire = { version = "0.41", default-features = false, features = ["server-api-ring"] }
+async-trait = "0.1"
+tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = "0.3"
 sqlparser = { version = "0.61", features = ["visitor"] }
 anyhow = "1"
@@ -35,7 +44,7 @@ arrow-array = "60"
 arrow-schema = "60"
 parquet = { version = "60", default-features = false, features = ["arrow", "zstd"] }
 object_store = { version = "0.14.2", features = ["aws"] }
-tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time", "macros", "io-util"] }
 clap = { version = "4", features = ["derive"] }
 hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
@@ -43,6 +52,9 @@ http-body-util = "0.1"
 bytes = "1"
 subtle = "2"
 tempfile = "3"
+
+[dev-dependencies]
+tokio-postgres = "0.7"
 
 [profile.dev]
 debug = 0

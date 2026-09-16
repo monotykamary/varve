@@ -43,7 +43,8 @@ Varve makes that lifecycle a first-class concern **without inheriting an entire 
 - WAL-durable lifecycle controls and inspectable, pausable interval jobs through Rust and whitelisted SQL `CALL` operations.
 - Scheduled flush, time-window compaction, archive/eviction, raw/rollup expiration, and reachability-based garbage collection.
 - Asynchronous remote WAL/checkpoint publication with conditional ownership, integrity-checked restore, and coordinated remote GC/restore locks.
-- Rust API, JSON CLI, bounded HTTP service with explicit authenticated public opt-in, admission limits and Prometheus metrics.
+- Rust library, Rust and TypeScript network clients, JSON CLI, authenticated HTTP/WebSocket service, and opt-in loopback PostgreSQL-wire simple queries with SCRAM.
+- Bounded Crossbeam ingestion with one batching writer and durable group commit; explicit atomic batches and pipelined single inserts share the same queue.
 
 ## The data path
 
@@ -72,7 +73,7 @@ Varve makes that lifecycle a first-class concern **without inheriting an entire 
 
 ## Quick start
 
-Requirements: Rust/Cargo (tested with 1.98.1), a POSIX filesystem with atomic rename, directory fsync and advisory locking, and DuckDB v2 on `PATH`.
+Requirements: Rust/Cargo (tested with 1.98.1), a POSIX filesystem with atomic rename, directory fsync and advisory locking, and DuckDB v2 on `PATH`. The server crate is **`varve-storage`**; its binary and Rust library remain **`varve`**. Registry publication is recorded in the [release ledger](docs/CLIENT_INGEST_ACCEPTANCE.md).
 
 ```sh
 git clone https://github.com/monotykamary/varve.git
@@ -106,7 +107,42 @@ curl -s -H 'Content-Type: application/json' \
   http://127.0.0.1:8080/v1/query
 ```
 
-Loopback is the default. Public binding requires both `--allow-remote` and a strong `VARVE_API_TOKEN`; use TLS termination in front of it. This is one trusted operator, not authenticated multi-tenant SQL. One process owns a data directory. SIGINT/SIGTERM drain within bounded deadlines; abrupt termination recovers through the local WAL. `/ready` is a minimal nonblocking probe, and operator APIs/metrics require the configured token. See [HTTP controls](docs/CLI.md).
+Loopback is the default. Public binding requires both `--allow-remote` and a strong `VARVE_API_TOKEN`; use TLS termination in front of it. This is one trusted operator, not authenticated multi-tenant SQL. One process owns a data directory. SIGINT/SIGTERM bound network draining and join accepted ingestion; a stalled native fsync can extend total shutdown. Abrupt termination recovers through the local WAL. `/ready` is a minimal nonblocking probe, and operator APIs/metrics require the configured token. See [HTTP controls](docs/CLI.md).
+
+## Clients and persistent connections
+
+Both SDKs keep one WebSocket connection open, correlate concurrent requests, bound pending work and preserve exact timestamps. They **never silently replay a mutation** after disconnect or timeout. HTTP/1.1 already supports keep-alive; WebSocket removes repeated HTTP envelopes and permits pipelining, not zero-round-trip writes.
+
+| Client | Package | Guide |
+| --- | --- | --- |
+| Rust | `varve-client` | [API, TLS, errors and example](clients/rust/README.md) |
+| TypeScript / Node 22+ / browsers | `@monotykamary/varve` | [API, bigint timestamps and browser origins](clients/typescript/README.md) |
+
+Package publication status is tracked in the [release acceptance ledger](docs/CLIENT_INGEST_ACCEPTANCE.md). Source installation and package verification work before a registry release.
+
+```ts
+import { connect } from "@monotykamary/varve";
+
+const db = await connect("wss://your-database.example/v1/ws", {
+  token: process.env.VARVE_API_TOKEN,
+  maxPendingRequests: 32,
+});
+await db.createTable("metrics", {});
+const row = {
+  timestamp_us: BigInt(Date.now()) * 1000n,
+  tenant: "demo", series: "cpu", value: 12.5, tags: { host: "one" },
+};
+await db.insert("metrics", row, "measurement-1");
+await db.insertBatch("metrics", [row, { ...row, value: 17.5 }], "batch-1");
+console.log(await db.query("SELECT count(*) FROM metrics"));
+await db.close();
+```
+
+Use `insertBatch` / Rust `insert_batch` when you already have rows in hand. For independent single inserts, bounded concurrent calls let the server group commits; awaiting each call before submitting the next cannot exploit cross-request batching. Success still follows **local WAL fsync**, never just enqueueing.
+
+[Manual CLI/HTTP batches and retry rules](docs/BATCHING.md) · [Queue/group-commit design](docs/INGESTION.md) · [WebSocket and PostgreSQL-wire setup](docs/TRANSPORTS.md)
+
+Browsers require an explicit allowed origin. Tokens belong in the authentication frame, not the URL. The PostgreSQL-wire endpoint is disabled by default; use the transport guide for its intentionally restricted standard-client interface.
 
 ### Remote protection and archive
 
@@ -135,7 +171,7 @@ Run each statement separately through `query` or `/v1/query`. These are fixed nu
 
 ## Durability contract
 
-**An acknowledged local write is not necessarily in S3 yet.** A process crash can recover it from local WAL; permanent loss of the local disk can lose the unshipped tail. `status.unshipped_batches` reports the sequence gap to the last confirmed remote head—not a promised recovery-time bound. Upload intervals alone cannot bound the gap during an outage.
+**An acknowledged local write is not necessarily in S3 yet.** A process crash can recover it from local WAL; permanent loss of the local disk can lose the unshipped tail. `status.unshipped_batches` reports the physical WAL-sequence gap to the last confirmed remote head—not a client-request/row count or a promised recovery-time bound. Multiple inserts can share one group sequence. Upload intervals alone cannot bound the gap during an outage.
 
 The manifest atomically connects raw segments, view state, request receipts and replay position. Queries pin their files while checkpoints/compaction replace manifests. Remote heads reference only fully uploaded immutable dependencies. Remote GC preserves the current published checkpoint and WAL tail, and excludes restore with a fail-closed CAS lock. No automatic lock stealing is implemented.
 
@@ -156,7 +192,7 @@ Tests cover typed ingestion, corruption rejection, crash publication boundaries,
 ## Scope and trade-offs
 
 - DuckDB runs in a bounded subprocess per query, with copied hot rows over stdin. No zero-copy integration or persistent worker-pool performance is claimed.
-- Arbitrary SQL incremental views, updates/deletes/upserts, schema evolution, distributed transactions, automatic failover and pgwire are not implemented.
+- Arbitrary SQL incremental views, updates/deletes/upserts, schema evolution, distributed transactions and automatic failover are not implemented. PostgreSQL-wire is a loopback-only, SCRAM-authenticated simple-query subset with text result columns—not pgwire TLS, prepared parameters, COPY or PostgreSQL SQL-dialect compatibility.
 - Query workers disable disk spilling. A cold SQL snapshot must fit the configured downloaded-cache budget; use time predicates or raise the budget. Native scans process files one at a time with a bounded result budget.
 - Admission limits are logical working-set estimates, not OS-enforced RSS/filesystem quotas. Metadata bytes are checked before acknowledgment, with conservative future-segment reservations.
 - Request receipts are independent of raw expiration. Legacy IDs retain lifetime receipts; opted-in timed IDs have a bounded retry window and expired IDs are rejected, not reinserted. Receipt/group/metadata caps still refuse excess work rather than silently evict aggregate state. Plan cardinality, widths, retention and batch size; disk-backed aggregate metadata is not implemented.
@@ -176,7 +212,9 @@ The Rust library is usable without the HTTP server. These are modules in one cra
 | Conservative pruning and DuckDB execution | [`plan.rs`](src/plan.rs) · [`query.rs`](src/query.rs) |
 | Object-store adapters and publication protocol | [`remote.rs`](src/remote.rs) · [`tier.rs`](src/tier.rs) |
 | Lifecycle policy, durable controls and job runtime | [`policy.rs`](src/policy.rs) · [`control.rs`](src/control.rs) · [`job_runtime.rs`](src/job_runtime.rs) |
-| HTTP service and JSON CLI | [`service.rs`](src/service.rs) · [`main.rs`](src/main.rs) |
+| Bounded ingestion and durable group commit | [`ingest.rs`](src/ingest.rs) · [`engine.rs`](src/engine.rs) |
+| HTTP, WebSocket and PostgreSQL-wire service | [`service.rs`](src/service.rs) · [`transport.rs`](src/transport.rs) · [`pg_transport.rs`](src/pg_transport.rs) |
+| Standalone network clients and JSON CLI | [`clients/`](clients) · [`main.rs`](src/main.rs) |
 
 ## Documentation
 
@@ -188,6 +226,7 @@ The Rust library is usable without the HTTP server. These are modules in one cra
 | [Operations and recovery](docs/OPERATIONS.md) | [Railway deployment](docs/RAILWAY.md) |
 | [Evaluation results](docs/EVALUATION.md) | [Source review and regressions](docs/FINAL_REVIEW.md) |
 | [Production acceptance](docs/PRODUCTION_ACCEPTANCE.md) | [Remaining audit gaps](docs/AUDIT_RECONCILIATION.md) |
+| [Client/group-commit release](docs/CLIENT_INGEST_ACCEPTANCE.md) | [Client release review and evidence](docs/CLIENT_RELEASE_REVIEW.md) |
 | [Publication checks](docs/PUBLICATION.md) | [Design references](docs/REFERENCES.md) |
 
 ## Contributing

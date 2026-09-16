@@ -10,8 +10,7 @@ use bytes::{Bytes, BytesMut};
 use http_body_util::{BodyExt, Full};
 use hyper::body::{Body, Incoming};
 use hyper::header::{
-    AUTHORIZATION, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE, HOST, ORIGIN, TRANSFER_ENCODING,
-    WWW_AUTHENTICATE,
+    AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HOST, ORIGIN, TRANSFER_ENCODING, WWW_AUTHENTICATE,
 };
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -25,7 +24,12 @@ use tokio::runtime::Builder;
 use tokio::sync::{Semaphore, watch};
 use tokio::task::JoinSet;
 use tokio::time::{sleep, timeout};
-use varve::{Config, Database, Row, TableConfig};
+use varve::{Config, Database, IngestConfig, Ingestor, Row, TableConfig, WriteRequest};
+
+#[path = "pg_transport.rs"]
+mod pg_transport;
+#[path = "transport.rs"]
+mod transport;
 
 use crate::system_now_us;
 
@@ -42,6 +46,9 @@ type HttpResponse = Response<HttpBody>;
 
 pub struct Overrides {
     pub port: Option<u16>,
+    pub pg_port: Option<u16>,
+    pub pg_bind: IpAddr,
+    pub ws_origins: Vec<String>,
     pub max_connections: Option<usize>,
     pub request_workers: Option<usize>,
     pub request_queue: Option<usize>,
@@ -65,6 +72,9 @@ struct Settings {
     connection_timeout: Duration,
     shutdown_timeout: Duration,
     auth: Auth,
+    ingest: IngestConfig,
+    ws: transport::Settings,
+    pg: Option<pg_transport::Settings>,
 }
 
 struct Auth {
@@ -87,6 +97,8 @@ struct Metrics {
 
 struct State {
     db: Database,
+    ingestor: Ingestor,
+    ws: transport::Settings,
     auth: Auth,
     workers: Arc<Semaphore>,
     slots: Arc<Semaphore>,
@@ -287,6 +299,43 @@ impl Settings {
             request_timeout: Duration::from_millis(request_timeout_ms),
             connection_timeout: Duration::from_millis(connection_timeout_ms),
             shutdown_timeout: Duration::from_millis(shutdown_timeout_ms),
+            ingest: {
+                let defaults = IngestConfig::default();
+                IngestConfig {
+                    queue_capacity: resolve_usize(
+                        "VARVE_INGEST_QUEUE_CAPACITY",
+                        None,
+                        defaults.queue_capacity,
+                    )?,
+                    max_pending_bytes: resolve_usize(
+                        "VARVE_INGEST_MAX_PENDING_BYTES",
+                        None,
+                        defaults.max_pending_bytes,
+                    )?,
+                    max_group_requests: resolve_usize(
+                        "VARVE_INGEST_MAX_GROUP_REQUESTS",
+                        None,
+                        defaults.max_group_requests,
+                    )?,
+                    max_group_rows: resolve_usize(
+                        "VARVE_INGEST_MAX_GROUP_ROWS",
+                        None,
+                        defaults.max_group_rows,
+                    )?,
+                    max_group_bytes: resolve_usize(
+                        "VARVE_INGEST_MAX_GROUP_BYTES",
+                        None,
+                        defaults.max_group_bytes,
+                    )?,
+                    max_delay: Duration::from_millis(resolve_u64(
+                        "VARVE_INGEST_MAX_DELAY_MS",
+                        None,
+                        2,
+                    )?),
+                }
+            },
+            ws: transport::Settings::resolve(overrides.ws_origins)?,
+            pg: pg_transport::Settings::resolve(overrides.pg_port, overrides.pg_bind)?,
             auth: Auth { token_hash },
         })
     }
@@ -333,8 +382,11 @@ async fn run_server(db: Database, config: Config, settings: Settings) -> Result<
         started: Some(Instant::now()),
         ..Metrics::default()
     });
+    let ingestor = Ingestor::new(db.clone(), settings.ingest)?;
     let state = Arc::new(State {
         db: db.clone(),
+        ingestor: ingestor.clone(),
+        ws: settings.ws,
         auth: settings.auth,
         workers: Arc::new(Semaphore::new(settings.request_workers)),
         slots: Arc::new(Semaphore::new(
@@ -349,6 +401,18 @@ async fn run_server(db: Database, config: Config, settings: Settings) -> Result<
     });
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let mut tasks = JoinSet::new();
+    if let Some(pg) = settings.pg {
+        let listener = TcpListener::bind(pg.address)
+            .await
+            .context("bind PostgreSQL service")?;
+        tasks.spawn(pg_transport::serve(
+            listener,
+            pg,
+            state.clone(),
+            shutdown_rx.clone(),
+            settings.max_connections,
+        ));
+    }
     tasks.spawn(run_scheduler(
         db,
         Duration::from_millis(config.maintenance_interval_ms),
@@ -362,6 +426,12 @@ async fn run_server(db: Database, config: Config, settings: Settings) -> Result<
             signal = &mut signal => {
                 signal?;
                 break;
+            }
+            Some(joined) = tasks.join_next(), if !tasks.is_empty() => {
+                // Malformed/disconnected clients must not take down the listener.
+                if joined.is_err() {
+                    metrics.errors_total.fetch_add(1, Ordering::Relaxed);
+                }
             }
             accepted = listener.accept() => {
                 let (stream, _) = accepted.context("accept HTTP connection")?;
@@ -401,7 +471,7 @@ async fn run_server(db: Database, config: Config, settings: Settings) -> Result<
         while let Some(joined) = tasks.join_next().await {
             match joined {
                 Ok(Ok(())) => {}
-                Ok(Err(error)) => eprintln!("service task failed: {error:#}"),
+                Ok(Err(_)) => eprintln!("service connection ended with an error"),
                 Err(error) if error.is_cancelled() => {}
                 Err(error) => eprintln!("service task panicked: {error}"),
             }
@@ -411,6 +481,9 @@ async fn run_server(db: Database, config: Config, settings: Settings) -> Result<
         tasks.abort_all();
         while tasks.join_next().await.is_some() {}
     }
+    tokio::task::spawn_blocking(move || ingestor.shutdown())
+        .await
+        .context("join ingestion shutdown")??;
     Ok(())
 }
 
@@ -430,17 +503,29 @@ async fn serve_connection(
     connection_timeout: Duration,
 ) -> Result<()> {
     let metrics = Arc::clone(&state.metrics);
+    let (upgrade_tx, mut upgrade_rx) = tokio::sync::mpsc::channel(1);
+    let request_state = state.clone();
     let service = service_fn(move |request| {
-        let state = Arc::clone(&state);
-        async move { Ok::<_, Infallible>(handle_request(request, state).await) }
+        let state = Arc::clone(&request_state);
+        let upgrade_tx = upgrade_tx.clone();
+        async move {
+            let response = if request.uri().path() == "/v1/ws" {
+                transport::upgrade(request, &state, &upgrade_tx)
+            } else {
+                handle_request(request, state).await
+            };
+            Ok::<_, Infallible>(response)
+        }
     });
     let mut builder = http1::Builder::new();
     builder
         .timer(TokioTimer::new())
         .header_read_timeout(header_timeout)
-        .keep_alive(false)
+        .keep_alive(true)
         .max_headers(64);
-    let connection = builder.serve_connection(TokioIo::new(stream), service);
+    let connection = builder
+        .serve_connection(TokioIo::new(stream), service)
+        .with_upgrades();
     tokio::pin!(connection);
     tokio::select! {
         result = timeout(connection_timeout, &mut connection) => {
@@ -456,6 +541,11 @@ async fn serve_connection(
             connection.as_mut().graceful_shutdown();
             connection.await.context("drain HTTP connection")?;
         }
+    }
+    if !*shutdown.borrow()
+        && let Ok(upgrade) = upgrade_rx.try_recv()
+    {
+        transport::serve(upgrade, state, shutdown).await;
     }
     Ok(())
 }
@@ -683,11 +773,16 @@ async fn process_request(
         Route::Metrics => {
             run_blocking(&state, {
                 let metrics = Arc::clone(&state.metrics);
+                let ingestor = state.ingestor.clone();
                 move |db| {
                     let status = db.status().map_err(database_error)?;
                     Ok(text_response(
                         StatusCode::OK,
-                        render_metrics(&metrics, &status),
+                        format!(
+                            "{}{}",
+                            render_metrics(&metrics, &status),
+                            transport::ingest_metrics(&ingestor.stats())
+                        ),
                     ))
                 }
             })
@@ -705,14 +800,8 @@ async fn process_request(
         }
         Route::Write => {
             let input: WriteInput = read_json_body(request, &state).await?;
-            run_blocking(&state, move |db| {
-                let now = system_now_us().map_err(database_error)?;
-                let value = db
-                    .write(&input.table, &input.request_id, input.rows, now)
-                    .map_err(database_error)?;
-                Ok(json_response(StatusCode::OK, &value))
-            })
-            .await
+            let value = ingest(&state, input).await.map_err(database_error)?;
+            Ok(json_response(StatusCode::OK, &value))
         }
         Route::Query => {
             let input: QueryInput = read_json_body(request, &state).await?;
@@ -733,6 +822,18 @@ async fn process_request(
         }
         Route::Health => unreachable!("liveness returns before request processing"),
     }
+}
+
+async fn ingest(state: &State, input: WriteInput) -> Result<varve::WriteReceipt> {
+    let receipt = state.ingestor.submit(WriteRequest {
+        table: input.table,
+        request_id: input.request_id,
+        rows: input.rows,
+        now_us: system_now_us()?,
+    })?;
+    receipt
+        .await
+        .context("ingestion receipt unavailable; outcome may have committed")?
 }
 
 async fn query_route(state: &Arc<State>, sql: &'static str) -> Result<HttpResponse, ApiError> {
@@ -979,7 +1080,6 @@ fn response(status: StatusCode, content_type: &'static str, body: Bytes) -> Http
     Response::builder()
         .status(status)
         .header(CONTENT_TYPE, content_type)
-        .header(CONNECTION, "close")
         .header("Cache-Control", "no-store")
         .header("X-Content-Type-Options", "nosniff")
         .body(Full::new(body))

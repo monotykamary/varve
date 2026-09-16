@@ -17,6 +17,46 @@ use std::sync::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WriteRequest {
+    pub table: String,
+    pub request_id: String,
+    pub rows: Vec<Row>,
+    pub now_us: i64,
+}
+
+impl WriteRequest {
+    /// Conservative retained-allocation/escaped-JSON charge, not an RSS quota.
+    pub(crate) fn admission_bytes(&self) -> Result<usize> {
+        validate_name(&self.table)?;
+        validate_request_id(&self.request_id)?;
+        ensure!(!self.rows.is_empty(), "batch row admission limit");
+        let mut bytes = 512usize
+            .saturating_add(self.table.capacity().saturating_mul(6))
+            .saturating_add(self.request_id.capacity().saturating_mul(6))
+            .saturating_add(
+                self.rows
+                    .capacity()
+                    .saturating_mul(std::mem::size_of::<Row>()),
+            );
+        for row in &self.rows {
+            row.validate()?;
+            bytes = bytes
+                .saturating_add(row.estimated_bytes().saturating_mul(6))
+                .saturating_add(row.tenant.capacity())
+                .saturating_add(row.series.capacity());
+            for (key, value) in &row.tags {
+                bytes = bytes
+                    .saturating_add(key.capacity())
+                    .saturating_add(value.capacity());
+            }
+        }
+        ensure!(bytes < usize::MAX, "request byte accounting overflow");
+        Ok(bytes)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WriteReceipt {
     pub sequence: u64,
     pub rows: usize,
@@ -31,7 +71,12 @@ pub struct ReceiptEntry {
     pub digest: String,
     #[serde(default)]
     pub issued_us: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_fingerprint: Option<String>,
 }
+// Exactly the encoded size of the final BLAKE3 hex proof, including JSON escaping.
+const GROUP_PROOF_RESERVATION: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Segment {
@@ -156,6 +201,13 @@ pub(crate) struct Inner {
     pub query_active: AtomicUsize,
     pub jobs_running: Mutex<BTreeSet<String>>,
     _file_lock: File,
+}
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // Release at the final owner, not merely when the last duplicated or
+        // fork-inherited file description eventually closes in another process.
+        let _ = fs2::FileExt::unlock(&self._file_lock);
+    }
 }
 #[derive(Clone)]
 pub struct Database {
@@ -576,6 +628,7 @@ impl Database {
             rows: rows.len(),
             digest: digest.clone(),
             issued_us,
+            group_fingerprint: None,
         };
         let mut projected =
             append_metadata_bytes(&s, table, request_id, &receipt, &updates, sequence)?;
@@ -622,6 +675,213 @@ impl Database {
         s.metadata_bytes = actual_metadata_bytes;
         s.first_hot_us.get_or_insert(now_us);
         Ok(receipt_for(&receipt, false))
+    }
+
+    /// Commits independent requests in bounded physical WAL groups, in input order.
+    /// Validation failures are isolated; a publication failure affects all new receipts
+    /// in that physical group. Previously durable retries still succeed.
+    pub fn write_group(&self, requests: Vec<WriteRequest>) -> Vec<Result<WriteReceipt>> {
+        let mut results: Vec<_> = (0..requests.len()).map(|_| None).collect();
+        let mut group = Vec::new();
+        let mut indices = Vec::new();
+        let mut rows = 0usize;
+        let mut bytes = 128usize;
+        let config = &self.inner.config;
+        let row_limit = config.max_batch_rows.min(config.hot_max_rows);
+        let byte_limit = config
+            .max_batch_bytes
+            .min(config.hot_max_bytes)
+            .min(config.wal_max_bytes as usize)
+            .min(wal::MAX_FRAME_BYTES);
+        let flush = |group: &mut Vec<WriteRequest>,
+                     indices: &mut Vec<usize>,
+                     results: &mut Vec<Option<Result<WriteReceipt>>>| {
+            for (index, result) in std::mem::take(indices)
+                .into_iter()
+                .zip(self.write_group_chunk(std::mem::take(group)))
+            {
+                results[index] = Some(result);
+            }
+        };
+        for (index, request) in requests.into_iter().enumerate() {
+            let size = match request.admission_bytes() {
+                Ok(size) => size,
+                Err(error) => {
+                    results[index] = Some(Err(error));
+                    continue;
+                }
+            };
+            if !group.is_empty()
+                && (group.len() == wal::MAX_GROUP_REQUESTS
+                    || rows.saturating_add(request.rows.len()) > row_limit
+                    || bytes.saturating_add(size) > byte_limit)
+            {
+                flush(&mut group, &mut indices, &mut results);
+                rows = 0;
+                bytes = 128;
+            }
+            if request.rows.len() > row_limit || size.saturating_add(128) > byte_limit {
+                // Preserve single-write admission outside the conservative envelope.
+                results[index] = Some(self.write(
+                    &request.table,
+                    &request.request_id,
+                    request.rows,
+                    request.now_us,
+                ));
+            } else {
+                rows += request.rows.len();
+                bytes += size;
+                group.push(request);
+                indices.push(index);
+            }
+        }
+        if !group.is_empty() {
+            flush(&mut group, &mut indices, &mut results);
+        }
+        results
+            .into_iter()
+            .map(|result| result.expect("every input has a result"))
+            .collect()
+    }
+
+    fn write_group_chunk(&self, requests: Vec<WriteRequest>) -> Vec<Result<WriteReceipt>> {
+        let count = requests.len();
+        let run = || -> Result<Vec<Result<WriteReceipt>>> {
+            let mut s = self.lock()?;
+            healthy(&s)?;
+            let config = &self.inner.config;
+            // Durable retries/conflicts and unknown tables cannot consume new
+            // capacity. In particular an all-retry group must not force a checkpoint.
+            let mut rows = 0usize;
+            let mut bytes = 0usize;
+            let mut new_requests = 0usize;
+            for request in &requests {
+                if s.catalog
+                    .tables
+                    .get(&request.table)
+                    .is_some_and(|table| !table.receipts.contains_key(&request.request_id))
+                {
+                    rows += request.rows.len();
+                    bytes += request.admission_bytes().unwrap();
+                    new_requests += 1;
+                }
+            }
+            let receipt_count: usize = s
+                .catalog
+                .tables
+                .values()
+                .map(|table| table.receipts.len())
+                .sum();
+            if new_requests > 0
+                && (hot_count(&s).saturating_add(rows) > config.hot_max_rows
+                    || s.hot_bytes.saturating_add(bytes) > config.hot_max_bytes
+                    || s.wal_bytes.saturating_add(bytes as u64).saturating_add(128)
+                        > config.wal_max_bytes
+                    || (receipt_count.saturating_add(new_requests) > config.max_idempotency_keys
+                        && idempotency_checkpoint_due(&s)))
+            {
+                checkpoint_locked(&self.inner, &mut s)?;
+            }
+            let sequence = next_sequence(&s)?;
+            let mut items = Vec::new();
+            let mut undo = Vec::new();
+            let mut results = Vec::with_capacity(count);
+            let mut ordinal = 0usize;
+            let mut undo_bytes = 0usize;
+            let first_now = requests[0].now_us;
+            for request in requests {
+                let result = (|| -> Result<WriteReceipt> {
+                    let digest = blake3::hash(&serde_json::to_vec(&request.rows)?)
+                        .to_hex()
+                        .to_string();
+                    if let Some(receipt) = group_retry(&mut s, &request, &digest)? {
+                        return Ok(receipt);
+                    }
+                    let table = s
+                        .catalog
+                        .tables
+                        .get(&request.table)
+                        .context("unknown table")?;
+                    for row in &request.rows {
+                        if let Some(age) = table.config.late_after_us {
+                            ensure!(
+                                row.timestamp_us >= checked_cutoff(request.now_us, age),
+                                "row exceeds allowed lateness"
+                            );
+                        }
+                    }
+                    let item = wal::AppendItem {
+                        table: request.table,
+                        request_id: request.request_id,
+                        digest,
+                        rows: request.rows,
+                        now_us: Some(request.now_us),
+                    };
+                    let prepared = prepare_group_append(
+                        &s,
+                        &item,
+                        sequence,
+                        ordinal,
+                        Some(GROUP_PROOF_RESERVATION),
+                        config,
+                    )?;
+                    let working_bytes = prepared.working_bytes();
+                    ensure!(
+                        undo_bytes.saturating_add(working_bytes) <= config.metadata_max_bytes,
+                        "group rollback metadata byte budget exceeded"
+                    );
+                    undo_bytes += working_bytes;
+                    let receipt = receipt_for(&prepared.receipt, false);
+                    undo.push(apply_group_append(&mut s, prepared));
+                    ordinal += item.rows.len();
+                    items.push(item);
+                    Ok(receipt)
+                })();
+                results.push(result);
+            }
+            // Nothing provisional may reach checkpoint or become query-visible.
+            for entry in undo.into_iter().rev() {
+                undo_group_append(&mut s, entry);
+            }
+            if !items.is_empty() {
+                let record = wal::Record::new(sequence, wal::Operation::AppendGroup { items });
+                let fingerprint = wal::group_fingerprint(&record)?;
+                // Admission charged the identical JSON string length for every receipt.
+                // Compute the final proof before publication; no catalog-sized recheck.
+                ensure!(
+                    fingerprint
+                        .as_ref()
+                        .is_some_and(|proof| proof.len() == GROUP_PROOF_RESERVATION.len()),
+                    "group proof reservation mismatch"
+                );
+                let publication = commit_record(&self.inner, &mut s, &record).and_then(|()| {
+                    wal::failpoint("group_before_apply");
+                    if let Err(error) = apply_record(&mut s, record, config, fingerprint.as_deref())
+                    {
+                        s.fenced = Some(format!("durable group application failed: {error:#}"));
+                        return Err(error);
+                    }
+                    s.first_hot_us.get_or_insert(first_now);
+                    wal::failpoint("group_applied");
+                    Ok(())
+                });
+                if let Err(error) = publication {
+                    let message = format!("{error:#}");
+                    for result in &mut results {
+                        if result.as_ref().is_ok_and(|r| r.sequence == sequence) {
+                            *result = Err(anyhow::anyhow!(message.clone()));
+                        }
+                    }
+                }
+            }
+            Ok(results)
+        };
+        match run() {
+            Ok(results) => results,
+            Err(error) => (0..count)
+                .map(|_| Err(anyhow::anyhow!(format!("{error:#}"))))
+                .collect(),
+        }
     }
 
     pub fn checkpoint(&self) -> Result<()> {
@@ -1357,6 +1617,281 @@ fn apply_idempotency_checkpoint(s: &State, next: &mut Manifest) {
     }
 }
 
+struct PreparedAppend {
+    table: String,
+    request_id: String,
+    receipt: ReceiptEntry,
+    updates: BTreeMap<String, RollupRow>,
+    stored: Vec<StoredRow>,
+    bytes: usize,
+    metadata_bytes: usize,
+}
+impl PreparedAppend {
+    fn working_bytes(&self) -> usize {
+        let proof_bytes = self
+            .receipt
+            .group_fingerprint
+            .as_ref()
+            .map_or(0, String::len);
+        self.updates.iter().fold(proof_bytes, |bytes, (key, row)| {
+            bytes
+                .saturating_add(key.len().saturating_mul(2))
+                .saturating_add(row.tenant.len().saturating_mul(2))
+                .saturating_add(row.series.len().saturating_mul(2))
+                .saturating_add(
+                    row.tags
+                        .iter()
+                        .map(|(k, v)| (k.len() + v.len() + 128) * 2)
+                        .sum::<usize>(),
+                )
+                .saturating_add(1024)
+        })
+    }
+}
+struct AppendUndo {
+    table: String,
+    request_id: String,
+    rollups: BTreeMap<String, Option<RollupRow>>,
+    hot_len: Option<usize>,
+    hot_bytes: usize,
+    metadata_bytes: usize,
+}
+
+fn group_retry(
+    s: &mut State,
+    request: &WriteRequest,
+    digest: &str,
+) -> Result<Option<WriteReceipt>> {
+    let table = s
+        .catalog
+        .tables
+        .get(&request.table)
+        .context("unknown table")?;
+    let receipt = table.receipts.get(&request.request_id);
+    let floor = if let Some(window) = table.config.idempotency_window_us {
+        let issued = parse_timed_request_id(&request.request_id)?;
+        let floor = s
+            .idempotency_floors
+            .get(&request.table)
+            .copied()
+            .unwrap_or(i64::MIN)
+            .max(checked_cutoff(request.now_us, window));
+        ensure!(
+            issued >= floor,
+            "request_id is outside the idempotency window"
+        );
+        ensure!(
+            receipt.is_some()
+                || issued
+                    <= request
+                        .now_us
+                        .saturating_add(IDEMPOTENCY_MAX_FUTURE_SKEW_US),
+            "request_id issue time exceeds the future-skew limit"
+        );
+        Some(floor)
+    } else {
+        None
+    };
+    let duplicate = if let Some(receipt) = receipt {
+        ensure!(
+            receipt.digest == digest,
+            "request_id conflicts with different data"
+        );
+        Some(receipt_for(receipt, true))
+    } else {
+        None
+    };
+    if let Some(floor) = floor {
+        s.idempotency_floors.insert(request.table.clone(), floor);
+    }
+    Ok(duplicate)
+}
+
+fn prepare_group_append(
+    s: &State,
+    item: &wal::AppendItem,
+    sequence: u64,
+    ordinal: usize,
+    group_fingerprint: Option<&str>,
+    config: &Config,
+) -> Result<PreparedAppend> {
+    validate_request_id(&item.request_id)?;
+    ensure!(
+        !item.rows.is_empty()
+            && item.rows.len() <= config.max_batch_rows
+            && ordinal.saturating_add(item.rows.len()) <= u32::MAX as usize,
+        "invalid/recovery oversized WAL batch"
+    );
+    let encoded = serde_json::to_vec(&item.rows)?;
+    ensure!(
+        encoded.len() <= config.max_batch_bytes,
+        "batch byte admission limit"
+    );
+    ensure!(
+        blake3::hash(&encoded).to_hex().as_str() == item.digest,
+        "WAL batch digest mismatch"
+    );
+    let table = s
+        .catalog
+        .tables
+        .get(&item.table)
+        .context("WAL references unknown table")?;
+    ensure!(
+        !table.receipts.contains_key(&item.request_id),
+        "duplicate request in committed WAL"
+    );
+    let issued_us = if table.config.idempotency_window_us.is_some() {
+        let issued = parse_timed_request_id(&item.request_id)?;
+        ensure!(
+            table
+                .idempotency_floor_us
+                .is_none_or(|floor| issued >= floor),
+            "WAL request_id precedes the durable idempotency floor"
+        );
+        Some(issued)
+    } else {
+        None
+    };
+    for row in &item.rows {
+        row.validate()?;
+        window_start(row.timestamp_us, table.config.window_us)?;
+        ensure!(
+            table
+                .cutoff_us
+                .is_none_or(|cutoff| row.timestamp_us >= cutoff),
+            "WAL violates retention cutoff"
+        );
+    }
+    let bytes: usize = item.rows.iter().map(Row::estimated_bytes).sum();
+    ensure!(
+        s.hot_bytes.saturating_add(bytes) <= config.hot_max_bytes
+            && hot_count(s).saturating_add(item.rows.len()) <= config.hot_max_rows,
+        "group exceeds hot-tier capacity"
+    );
+    ensure!(
+        s.catalog
+            .tables
+            .values()
+            .map(|t| t.receipts.len())
+            .sum::<usize>()
+            < config.max_idempotency_keys,
+        "idempotency registry full; refusing to forget committed request IDs"
+    );
+    let stored: Vec<_> = item
+        .rows
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(index, row)| StoredRow {
+            row,
+            sequence,
+            ordinal: (ordinal + index) as u32,
+        })
+        .collect();
+    let updates = aggregate_updates(table, &stored, config.metadata_max_bytes)?;
+    let new_groups = updates
+        .keys()
+        .filter(|key| !table.rollups.contains_key(*key))
+        .count();
+    ensure!(
+        s.catalog
+            .tables
+            .values()
+            .map(|t| t.rollups.len())
+            .sum::<usize>()
+            .saturating_add(new_groups)
+            <= config.max_rollup_groups,
+        "rollup state admission limit"
+    );
+    let receipt = ReceiptEntry {
+        sequence,
+        rows: item.rows.len(),
+        digest: item.digest.clone(),
+        issued_us,
+        group_fingerprint: group_fingerprint.map(str::to_owned),
+    };
+    let projected = append_metadata_bytes(
+        s,
+        &item.table,
+        &item.request_id,
+        &receipt,
+        &updates,
+        sequence,
+    )?;
+    ensure!(
+        projected.saturating_add(
+            hot_count(s)
+                .saturating_add(item.rows.len())
+                .saturating_mul(512)
+        ) <= config.metadata_max_bytes,
+        "projected checkpoint exceeds metadata byte budget"
+    );
+    let metadata_bytes = append_metadata_bytes(
+        s,
+        &item.table,
+        &item.request_id,
+        &receipt,
+        &updates,
+        s.catalog.checkpoint_sequence,
+    )?;
+    Ok(PreparedAppend {
+        table: item.table.clone(),
+        request_id: item.request_id.clone(),
+        receipt,
+        updates,
+        stored,
+        bytes,
+        metadata_bytes,
+    })
+}
+
+fn apply_group_append(s: &mut State, prepared: PreparedAppend) -> AppendUndo {
+    let mut undo = AppendUndo {
+        table: prepared.table.clone(),
+        request_id: prepared.request_id.clone(),
+        rollups: BTreeMap::new(),
+        hot_len: s.hot.get(&prepared.table).map(Vec::len),
+        hot_bytes: s.hot_bytes,
+        metadata_bytes: s.metadata_bytes,
+    };
+    let table = s
+        .catalog
+        .tables
+        .get_mut(&prepared.table)
+        .expect("prepared table");
+    for (key, value) in prepared.updates {
+        let previous = table.rollups.insert(key.clone(), value);
+        undo.rollups.insert(key, previous);
+    }
+    table.receipts.insert(prepared.request_id, prepared.receipt);
+    s.hot
+        .entry(prepared.table)
+        .or_default()
+        .extend(prepared.stored);
+    s.hot_bytes += prepared.bytes;
+    s.metadata_bytes = prepared.metadata_bytes;
+    undo
+}
+
+fn undo_group_append(s: &mut State, undo: AppendUndo) {
+    let table = s.catalog.tables.get_mut(&undo.table).expect("staged table");
+    table.receipts.remove(&undo.request_id);
+    for (key, previous) in undo.rollups {
+        if let Some(value) = previous {
+            table.rollups.insert(key, value);
+        } else {
+            table.rollups.remove(&key);
+        }
+    }
+    if let Some(len) = undo.hot_len {
+        s.hot.get_mut(&undo.table).unwrap().truncate(len);
+    } else {
+        s.hot.remove(&undo.table);
+    }
+    s.hot_bytes = undo.hot_bytes;
+    s.metadata_bytes = undo.metadata_bytes;
+}
+
 fn receipt_for(r: &ReceiptEntry, duplicate: bool) -> WriteReceipt {
     WriteReceipt {
         sequence: r.sequence,
@@ -1390,7 +1925,23 @@ pub(crate) fn commit_record(inner: &Inner, s: &mut State, record: &wal::Record) 
 }
 
 pub(crate) fn replay(s: &mut State, record: wal::Record, config: &Config) -> Result<()> {
+    let fingerprint = wal::group_fingerprint(&record)?;
+    apply_record(s, record, config, fingerprint.as_deref())
+}
+
+fn apply_record(
+    s: &mut State,
+    record: wal::Record,
+    config: &Config,
+    group_fingerprint: Option<&str>,
+) -> Result<()> {
     ensure!(record.sequence == next_sequence(s)?, "noncontiguous replay");
+    if matches!(&record.operation, wal::Operation::AppendGroup { .. }) {
+        ensure!(
+            wal::encode(&record)?.len() <= config.max_batch_bytes,
+            "WAL group exceeds recovery byte budget"
+        );
+    }
     let mut append_applied = false;
     match record.operation {
         wal::Operation::CreateTable {
@@ -1419,78 +1970,45 @@ pub(crate) fn replay(s: &mut State, record: wal::Record, config: &Config) -> Res
             digest,
             rows,
         } => {
-            validate_request_id(&request_id)?;
-            ensure!(
-                !rows.is_empty() && rows.len() <= config.max_batch_rows,
-                "invalid/recovery oversized WAL batch"
-            );
-            ensure!(
-                blake3::hash(&serde_json::to_vec(&rows)?).to_hex().as_str() == digest,
-                "WAL batch digest mismatch"
-            );
-            let t = s
-                .catalog
-                .tables
-                .get(&table)
-                .context("WAL references unknown table")?;
-            ensure!(
-                !t.receipts.contains_key(&request_id),
-                "duplicate request in committed WAL"
-            );
-            let issued_us = if t.config.idempotency_window_us.is_some() {
-                let issued = parse_timed_request_id(&request_id)?;
-                ensure!(
-                    t.idempotency_floor_us.is_none_or(|floor| issued >= floor),
-                    "WAL request_id precedes the durable idempotency floor"
-                );
-                Some(issued)
-            } else {
-                None
-            };
-            for row in &rows {
-                row.validate()?;
-                window_start(row.timestamp_us, t.config.window_us)?;
-                ensure!(
-                    t.cutoff_us.is_none_or(|cutoff| row.timestamp_us >= cutoff),
-                    "WAL violates retention cutoff"
-                );
-            }
-            let bytes: usize = rows.iter().map(Row::estimated_bytes).sum();
-            let count = rows.len();
-            let stored: Vec<_> = rows
-                .into_iter()
-                .enumerate()
-                .map(|(ordinal, row)| StoredRow {
-                    row,
-                    sequence: record.sequence,
-                    ordinal: ordinal as u32,
-                })
-                .collect();
-            let updates = aggregate_updates(t, &stored, config.metadata_max_bytes)?;
-            let receipt = ReceiptEntry {
-                sequence: record.sequence,
-                rows: count,
+            let item = wal::AppendItem {
+                table,
+                request_id,
                 digest,
-                issued_us,
+                rows,
+                now_us: None,
             };
-            let metadata_bytes = append_metadata_bytes(
-                s,
-                &table,
-                &request_id,
-                &receipt,
-                &updates,
-                s.catalog.checkpoint_sequence,
-            )?;
-            let t = s
-                .catalog
-                .tables
-                .get_mut(&table)
-                .expect("table validated during replay");
-            t.rollups.extend(updates);
-            t.receipts.insert(request_id, receipt);
-            s.hot.entry(table).or_default().extend(stored);
-            s.hot_bytes += bytes;
-            s.metadata_bytes = metadata_bytes;
+            let prepared = prepare_group_append(s, &item, record.sequence, 0, None, config)?;
+            apply_group_append(s, prepared);
+            append_applied = true;
+        }
+        wal::Operation::AppendGroup { items } => {
+            ensure!(
+                group_fingerprint.is_some(),
+                "group proof required for replay"
+            );
+            ensure!(
+                !items.is_empty() && items.len() <= wal::MAX_GROUP_REQUESTS,
+                "invalid WAL group request count"
+            );
+            let mut ordinal = 0usize;
+            for item in items {
+                let count = item.rows.len();
+                ensure!(
+                    ordinal.saturating_add(count) <= config.max_batch_rows,
+                    "WAL group exceeds recovery row budget"
+                );
+                let prepared = prepare_group_append(
+                    s,
+                    &item,
+                    record.sequence,
+                    ordinal,
+                    group_fingerprint,
+                    config,
+                )?;
+                apply_group_append(s, prepared);
+                ordinal += count;
+                check_recovery_budget(config, s)?;
+            }
             append_applied = true;
         }
         operation @ (wal::Operation::SetPolicy { .. }
@@ -1634,6 +2152,15 @@ pub(crate) fn validate_manifest(c: &Manifest) -> Result<()> {
         );
         for (id, receipt) in &t.receipts {
             validate_request_id(id)?;
+            ensure!(
+                receipt.group_fingerprint.as_ref().is_none_or(|proof| {
+                    proof.len() == 64
+                        && proof
+                            .bytes()
+                            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                }),
+                "invalid group receipt fingerprint"
+            );
             ensure!(
                 receipt.sequence <= c.checkpoint_sequence
                     && receipt.sequence > 0
@@ -2043,6 +2570,253 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    #[cfg(unix)]
+    fn final_owner_releases_lock_despite_a_surviving_duplicate_descriptor() {
+        let temp = TempDir::new().unwrap();
+        let db = Database::open(temp.path(), Config::default()).unwrap();
+        let owner = db.clone();
+        // dup and fork retain the same open-file description behind a flock.
+        let inherited = db.inner._file_lock.try_clone().unwrap();
+        drop(db);
+        assert!(Database::open(temp.path(), Config::default()).is_err());
+        drop(owner);
+        let reopened = Database::open(temp.path(), Config::default())
+            .expect("the final database owner must release its lock explicitly");
+        drop(inherited);
+        assert!(Database::open(temp.path(), Config::default()).is_err());
+        drop(reopened);
+        assert!(Database::open(temp.path(), Config::default()).is_ok());
+    }
+
+    #[test]
+    fn group_undo_metadata_is_bounded_and_exact() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let db = Database::open(
+            temp.path(),
+            Config {
+                metadata_max_bytes: 10_000,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        db.create_table(
+            "metrics",
+            TableConfig {
+                rollup_widths_us: vec![10, 20, 30, 40, 50, 60],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let request = |id: &str| WriteRequest {
+            table: "metrics".into(),
+            request_id: id.into(),
+            now_us: 0,
+            rows: vec![Row {
+                timestamp_us: 0,
+                tenant: "t".into(),
+                series: "s".into(),
+                value: 1.0,
+                tags: BTreeMap::new(),
+            }],
+        };
+        let seed = request("seed");
+        db.write(&seed.table, &seed.request_id, seed.rows, 0)
+            .unwrap();
+        let results = db.write_group(vec![request("a"), request("b"), request("a")]);
+        assert!(results[0].is_ok());
+        assert!(format!("{:#}", results[1].as_ref().unwrap_err()).contains("rollback metadata"));
+        assert!(results[2].as_ref().unwrap().duplicate);
+        let s = db.lock().unwrap();
+        assert_eq!(s.metadata_bytes, encode_manifest(&s.catalog).unwrap().len());
+        assert_eq!(hot_count(&s), 2);
+        assert_eq!(s.catalog.tables["metrics"].receipts.len(), 2);
+        assert!(
+            s.catalog.tables["metrics"]
+                .rollups
+                .values()
+                .all(|row| row.count == 2)
+        );
+    }
+
+    #[test]
+    fn group_proof_metadata_admission_is_exact_before_publication() {
+        for short_by in [0, 1] {
+            let temp = TempDir::new().unwrap();
+            let mut config = Config::default();
+            let db = Database::open(temp.path(), config.clone()).unwrap();
+            db.create_table(
+                "metrics",
+                TableConfig {
+                    rollup_widths_us: Vec::new(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            db.checkpoint().unwrap();
+            let request = |id: &str| WriteRequest {
+                table: "metrics".into(),
+                request_id: id.into(),
+                now_us: 10,
+                rows: vec![Row {
+                    timestamp_us: 1,
+                    tenant: "t".into(),
+                    series: "s".into(),
+                    value: 1.0,
+                    tags: BTreeMap::new(),
+                }],
+            };
+            let mut s = db.lock().unwrap();
+            let before = encode_manifest(&s.catalog).unwrap();
+            let sequence = next_sequence(&s).unwrap();
+            let mut undo = Vec::new();
+            let mut required = 0;
+            for id in ["a", "b"] {
+                let request = request(id);
+                let item = wal::AppendItem {
+                    table: request.table,
+                    request_id: request.request_id,
+                    digest: blake3::hash(&serde_json::to_vec(&request.rows).unwrap())
+                        .to_hex()
+                        .to_string(),
+                    rows: request.rows,
+                    now_us: Some(request.now_us),
+                };
+                let prepared = prepare_group_append(
+                    &s,
+                    &item,
+                    sequence,
+                    undo.len(),
+                    Some(GROUP_PROOF_RESERVATION),
+                    &config,
+                )
+                .unwrap();
+                let mut legacy = prepared.receipt.clone();
+                legacy.group_fingerprint = None;
+                assert_eq!(
+                    serde_json::to_vec(&prepared.receipt).unwrap().len()
+                        - serde_json::to_vec(&legacy).unwrap().len(),
+                    87
+                );
+                // This fixture has no aggregates: the new proof still consumes working space.
+                assert_eq!(prepared.working_bytes(), 64);
+                required = append_metadata_bytes(
+                    &s,
+                    "metrics",
+                    id,
+                    &prepared.receipt,
+                    &prepared.updates,
+                    sequence,
+                )
+                .unwrap()
+                    + (hot_count(&s) + 1) * 512;
+                undo.push(apply_group_append(&mut s, prepared));
+                assert_eq!(s.metadata_bytes, encode_manifest(&s.catalog).unwrap().len());
+            }
+            for entry in undo.into_iter().rev() {
+                undo_group_append(&mut s, entry);
+            }
+            assert_eq!(encode_manifest(&s.catalog).unwrap(), before);
+            assert_eq!(s.metadata_bytes, before.len());
+            drop(s);
+            drop(db);
+            config.metadata_max_bytes = required - short_by;
+            let db = Database::open(temp.path(), config.clone()).unwrap();
+            let results = db.write_group(vec![request("a"), request("b"), request("a")]);
+            assert!(results[0].is_ok());
+            assert!(results[2].as_ref().unwrap().duplicate);
+            if short_by == 0 {
+                assert!(results[1].is_ok());
+            } else {
+                assert!(
+                    format!("{:#}", results[1].as_ref().unwrap_err())
+                        .contains("projected checkpoint exceeds metadata")
+                );
+            }
+            let bytes =
+                fs::read(temp.path().join("wal").join(format!("{sequence:020}.wal"))).unwrap();
+            let record = wal::decode(&bytes).unwrap();
+            let proof = wal::group_fingerprint(&record).unwrap().unwrap();
+            assert_ne!(proof, GROUP_PROOF_RESERVATION);
+            let check = |db: &Database| {
+                let s = db.lock().unwrap();
+                assert_eq!(s.metadata_bytes, encode_manifest(&s.catalog).unwrap().len());
+                assert_eq!(s.catalog.tables["metrics"].receipts.len(), 2 - short_by);
+                for receipt in s.catalog.tables["metrics"].receipts.values() {
+                    assert_eq!(receipt.group_fingerprint.as_deref(), Some(proof.as_str()));
+                }
+            };
+            check(&db);
+            drop(db);
+            let db = Database::open(temp.path(), config.clone()).unwrap();
+            check(&db);
+            db.checkpoint().unwrap();
+            check(&db);
+            drop(db);
+            let db = Database::open(temp.path(), config).unwrap();
+            check(&db);
+        }
+    }
+
+    #[test]
+    fn legacy_group_wal_replay_preserves_absent_clocks() {
+        let temp = TempDir::new().unwrap();
+        let db = Database::open(temp.path(), Config::default()).unwrap();
+        db.create_table("metrics", TableConfig::default()).unwrap();
+        let sequence = next_sequence(&db.lock().unwrap()).unwrap();
+        drop(db);
+        let rows = vec![Row {
+            timestamp_us: 1,
+            tenant: "t".into(),
+            series: "s".into(),
+            value: 1.0,
+            tags: BTreeMap::new(),
+        }];
+        let record = wal::Record::new(
+            sequence,
+            wal::Operation::AppendGroup {
+                items: vec![wal::AppendItem {
+                    table: "metrics".into(),
+                    request_id: "legacy-group".into(),
+                    digest: blake3::hash(&serde_json::to_vec(&rows).unwrap())
+                        .to_hex()
+                        .to_string(),
+                    rows,
+                    now_us: None,
+                }],
+            },
+        );
+        assert!(!serde_json::to_string(&record).unwrap().contains("now_us"));
+        wal::append(temp.path(), &record).unwrap();
+        let proof = wal::group_fingerprint(&record).unwrap();
+        let db = Database::open(temp.path(), Config::default()).unwrap();
+        {
+            let s = db.lock().unwrap();
+            assert_eq!(
+                s.catalog.tables["metrics"].receipts["legacy-group"].group_fingerprint,
+                proof
+            );
+            assert_eq!(s.metadata_bytes, encode_manifest(&s.catalog).unwrap().len());
+        }
+        db.checkpoint().unwrap();
+        drop(db);
+        let db = Database::open(temp.path(), Config::default()).unwrap();
+        let s = db.lock().unwrap();
+        assert_eq!(
+            s.catalog.tables["metrics"].receipts["legacy-group"].group_fingerprint,
+            proof
+        );
+        assert_eq!(s.metadata_bytes, encode_manifest(&s.catalog).unwrap().len());
+    }
+
+    #[test]
+    fn legacy_single_receipt_encoding_is_unchanged() {
+        let json = r#"{"sequence":1,"rows":1,"digest":"legacy","issued_us":null}"#;
+        let receipt: ReceiptEntry = serde_json::from_str(json).unwrap();
+        assert!(receipt.group_fingerprint.is_none());
+        assert_eq!(serde_json::to_string(&receipt).unwrap(), json);
+    }
+
+    #[test]
     fn readiness_is_nonblocking_when_state_is_busy() {
         let temporary = TempDir::new().unwrap();
         let database = Database::open(temporary.path(), Config::default()).unwrap();
@@ -2098,6 +2872,7 @@ mod tests {
             rows: 10,
             digest: "0".repeat(64),
             issued_us: Some(1_000),
+            group_fingerprint: None,
         };
         let projected = append_metadata_bytes(
             &state,
@@ -2134,6 +2909,7 @@ mod tests {
                 rows: if index < 2 { 9 + index as usize } else { 1 },
                 digest: format!("{index:064x}"),
                 issued_us: Some(1_000 + index as i64),
+                group_fingerprint: (index % 2 == 0).then(|| format!("{index:064x}")),
             };
             let key = if index % 3 == 0 {
                 existing_key.clone()

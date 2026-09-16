@@ -143,6 +143,9 @@ pub enum Operation {
         digest: String,
         rows: Vec<Row>,
     },
+    AppendGroup {
+        items: Vec<AppendItem>,
+    },
     SetPolicy {
         table: String,
         policy: LifecyclePolicy,
@@ -176,6 +179,20 @@ pub enum Operation {
         next_run_us: i64,
     },
 }
+// Format-level bounds are independent of the ingestion worker configuration.
+pub const MAX_GROUP_REQUESTS: usize = 1024;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppendItem {
+    pub table: String,
+    pub request_id: String,
+    pub digest: String,
+    pub rows: Vec<Row>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now_us: Option<i64>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Record {
@@ -191,6 +208,19 @@ impl Record {
             operation,
         }
     }
+}
+
+/// Hash the entire logical record without allocating another encoded group.
+/// Typed JSON preserves item/row order and includes sequence, membership and clocks.
+/// Absent legacy clocks stay absent when re-encoded.
+pub(crate) fn group_fingerprint(record: &Record) -> Result<Option<String>> {
+    if !matches!(record.operation, Operation::AppendGroup { .. }) {
+        return Ok(None);
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"varve/append-group-proof/v1\0");
+    serde_json::to_writer(&mut hasher, record)?;
+    Ok(Some(hasher.finalize().to_hex().to_string()))
 }
 
 pub fn encode(record: &Record) -> Result<Vec<u8>> {
