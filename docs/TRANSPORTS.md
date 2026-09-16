@@ -63,7 +63,7 @@ failure, receipt loss, result-too-large and deadlines return `-32000`: a mutatio
 | `VARVE_HTTP_MAX_BODY_BYTES` | 4 MiB | HTTP body, WS frame/message/response, PG query packet; clamped to database batch bytes and 4 MiB |
 | `VARVE_HTTP_BODY_TIMEOUT_MS` | 10000 | HTTP body, WS sends, PG packet completion after its first byte |
 | `VARVE_HTTP_REQUEST_TIMEOUT_MS` | 60000 | Per-operation accepted deadline |
-| `VARVE_HTTP_CONNECTION_TIMEOUT_MS` | 65000 | HTTP connection lifetime only; WS uses heartbeat, authenticated PG may remain idle |
+| `VARVE_HTTP_CONNECTION_TIMEOUT_MS` | 65000 | Retire HTTP keepalive; drain an active request for at most request timeout + header timeout; WS uses heartbeat, authenticated PG may remain idle |
 | `VARVE_HTTP_SHUTDOWN_TIMEOUT_MS` | 10000 | Network-task drain budget |
 | `VARVE_WS_AUTH_TIMEOUT_MS` | 5000 | WS first frame and PG startup/SCRAM deadline |
 | `VARVE_WS_MAX_PENDING` | 32 | Per-WS outstanding requests (hard maximum 1024) |
@@ -75,6 +75,8 @@ failure, receipt loss, result-too-large and deadlines return `-32000`: a mutatio
 | `VARVE_INGEST_MAX_GROUP_ROWS` | 10000 | Group row cap; engine caps still apply |
 | `VARVE_INGEST_MAX_GROUP_BYTES` | 4 MiB | Group byte cap; engine caps still apply |
 | `VARVE_INGEST_MAX_DELAY_MS` | 2 | Maximum grouping delay (0 disables intentional waiting) |
+
+Lifetime expiry disables HTTP keepalive rather than cancelling an active response immediately. A stalled drain is forcibly closed after the additional bounded grace period. `varve_http_connection_timeouts_total` counts retirement triggers, not necessarily failed requests. WebSocket upgrade and shutdown handling keep their separate bounds.
 
 The existing HTTP CLI options override their corresponding environment values.
 Global in-flight slots also cap outstanding encoded requests across connections;

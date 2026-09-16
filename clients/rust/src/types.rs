@@ -91,6 +91,15 @@ pub struct Status {
     pub wal_bytes: u64,
     pub disk_bytes: u64,
     pub metadata_bytes: usize,
+    /// Absent on older servers; zero is not substituted for an unknown counter.
+    #[serde(default)]
+    pub control_root_bytes: Option<usize>,
+    #[serde(default)]
+    pub derived_encoded_bytes: Option<usize>,
+    #[serde(default)]
+    pub derived_resident_bytes: Option<usize>,
+    #[serde(default)]
+    pub derived_working_bytes: Option<usize>,
     pub decoded_cache_bytes: usize,
     pub disk_cache_bytes: u64,
     pub tables: usize,

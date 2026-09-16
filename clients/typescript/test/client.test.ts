@@ -155,9 +155,14 @@ test("multiplexes unique IDs and accepts out-of-order responses", async () => {
   const first = decodeFrame(socket.sent[1]!);
   const second = decodeFrame(socket.sent[2]!);
   assert.notEqual(first.id, second.id);
-  socket.respond(second.id, { database_id: "db", sequence: 2 });
+  socket.respond(second.id, { database_id: "db", sequence: 2, control_root_bytes: 128, derived_encoded_bytes: 256, derived_resident_bytes: 512, derived_working_bytes: 0 });
   socket.respond(first.id, { pong: true });
-  assert.equal((await status).sequence, 2n);
+  const snapshot = await status;
+  assert.equal(snapshot.sequence, 2n);
+  assert.equal(snapshot.control_root_bytes, 128n);
+  assert.equal(snapshot.derived_encoded_bytes, 256n);
+  assert.equal(snapshot.derived_resident_bytes, 512n);
+  assert.equal(snapshot.derived_working_bytes, 0n);
   assert.deepEqual(await ping, { pong: true });
   await connected.close();
 });

@@ -1,0 +1,18 @@
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+const root='/tmp/varve-reuse.k2eXIP';
+const runtime=JSON.parse(readFileSync(root+'/runtime-driver.json','utf8'));
+const evidence='/Users/monotykamary/VCS/working-remote/open-source/varve/docs/evidence/frontier/v4';
+const prior=JSON.parse(readFileSync(evidence+'/runtime-driver.json','utf8'));
+for(const [name,expected]of Object.entries(runtime.files))assert.equal(createHash('sha256').update(readFileSync(evidence+'/driver/'+name)).digest('hex'),expected);
+assert.deepEqual(runtime.files,prior.files);
+assert.equal(runtime.python,prior.python);
+assert.equal(runtime.region,prior.region);
+assert.equal(runtime.cpu_max,prior.cpu_max);
+assert.equal(runtime.memory_max,prior.memory_max);
+assert.equal(runtime.postgres[0],prior.postgres[0]);
+assert.equal(runtime.postgres[3],prior.postgres[3]);
+assert.equal(runtime.postgres[4],0);
+assert.deepEqual(runtime.postgres.slice(5),['on','on','on']);
+console.log(JSON.stringify({driver_files_identical:true,python_identical:true,postgres_version_identical:true,extension_version:runtime.postgres[3],fresh_postgres:true,durability:'fsync/on, synchronous_commit/on, full_page_writes/on',resources_identical:true}));

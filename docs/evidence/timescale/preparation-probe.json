@@ -1,0 +1,1 @@
+[{"mode": "blocking", "rows_prepared": 1000000, "preparation_seconds": 8.092550157569349, "failure": "ServerDisconnectedError: Server disconnected"}, {"mode": "offloaded", "rows_prepared": 1000000, "preparation_seconds": 6.820747225545347, "query": [{"value": 1}]}]

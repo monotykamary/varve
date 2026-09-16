@@ -371,7 +371,7 @@ pub(crate) fn replay_control_operation(
 
 fn preflight(inner: &Inner, s: &State, projected: &mut Manifest, sequence: u64) -> Result<()> {
     projected.checkpoint_sequence = sequence;
-    check_metadata_budget(&inner.config, projected, hot_count(s))
+    check_state_catalog_budget(inner, s, projected, hot_count(s))
 }
 
 fn commit_and_replay(db: &Database, s: &mut State, operation: wal::Operation) -> Result<u64> {
@@ -469,6 +469,9 @@ fn aggregate_width(
     output: &mut BTreeMap<String, RollupRow>,
     byte_budget: usize,
 ) -> Result<()> {
+    let mut resident = output.iter().fold(0usize, |sum, (key, row)| {
+        sum.saturating_add(crate::derived::rollup_resident_bytes(key, row))
+    });
     for stored in rows {
         if cutoff_us.is_some_and(|cutoff| stored.row.timestamp_us < cutoff) {
             continue;
@@ -484,7 +487,13 @@ fn aggregate_width(
         if let Some(row) = output.get_mut(&key) {
             row.add(stored)?;
         } else {
-            output.insert(key, RollupRow::from_row(width_us, stored)?);
+            let row = RollupRow::from_row(width_us, stored)?;
+            resident = resident.saturating_add(crate::derived::rollup_resident_bytes(&key, &row));
+            ensure!(
+                resident <= byte_budget,
+                "derived backfill resident budget exceeded"
+            );
+            output.insert(key, row);
         }
         ensure!(
             serde_json::to_vec(output)?.len() <= byte_budget,
@@ -535,6 +544,7 @@ impl Database {
         let mut s = self.lock()?;
         healthy(&s)?;
         let sequence = next_sequence(&s)?;
+        let _derived_working = reserve_catalog_clone(&s, &self.inner.config)?;
         let mut projected = s.catalog.clone();
         let target = projected.tables.get_mut(table).context("unknown table")?;
         target
@@ -603,7 +613,7 @@ impl Database {
         validate_name(name)?;
         validate_name(source)?;
         ensure!(width_us > 0, "aggregate width_us must be positive");
-        let (barrier, cutoff, segments, mut backfill, pin) = {
+        let (barrier, cutoff, segments, mut backfill, pin, _backfill_working, backfill_budget) = {
             let mut s = self.lock()?;
             healthy(&s)?;
             ensure!(
@@ -619,8 +629,7 @@ impl Database {
                 .catalog
                 .tables
                 .get(source)
-                .context("unknown source table")?
-                .clone();
+                .context("unknown source table")?;
             let unique = !table.config.rollup_widths_us.contains(&width_us);
             ensure!(
                 !unique || table.config.rollup_widths_us.len() < 16,
@@ -631,14 +640,37 @@ impl Database {
                 .catalog
                 .tables
                 .get(source)
-                .context("unknown source table")?
-                .clone();
+                .context("unknown source table")?;
             let ids = table
                 .segments
                 .iter()
                 .map(|segment| segment.id.clone())
                 .collect();
             let pin = Pin::new(&self.inner, ids)?;
+            let available = self
+                .inner
+                .config
+                .derived_max_bytes
+                .saturating_sub(s.derived_resident_bytes)
+                .saturating_sub(s.derived_working.load(std::sync::atomic::Ordering::SeqCst));
+            let backfill_budget = (available / 8).min(self.inner.config.metadata_max_bytes);
+            ensure!(
+                backfill_budget > 0,
+                "derived backfill working budget exhausted"
+            );
+            let working =
+                reserve_derived(&s, &self.inner.config, backfill_budget.saturating_mul(4))?;
+            let existing_bytes = table
+                .rollups
+                .iter()
+                .filter(|(_, r)| r.width_us == width_us)
+                .fold(0usize, |sum, (key, row)| {
+                    sum.saturating_add(crate::derived::rollup_resident_bytes(key, row))
+                });
+            ensure!(
+                unique || existing_bytes <= backfill_budget,
+                "derived backfill working budget exceeded"
+            );
             let existing = if unique {
                 BTreeMap::new()
             } else {
@@ -649,7 +681,15 @@ impl Database {
                     .map(|(key, row)| (key.clone(), row.clone()))
                     .collect()
             };
-            (s.sequence, table.cutoff_us, table.segments, existing, pin)
+            (
+                s.sequence,
+                table.cutoff_us,
+                table.segments.clone(),
+                existing,
+                pin,
+                working,
+                backfill_budget,
+            )
         };
         if backfill.is_empty() {
             for descriptor in &segments {
@@ -663,13 +703,7 @@ impl Database {
                     rows.len() as u64 == descriptor.rows,
                     "backfill segment row-count mismatch"
                 );
-                aggregate_width(
-                    &rows,
-                    width_us,
-                    cutoff,
-                    &mut backfill,
-                    self.inner.config.metadata_max_bytes,
-                )?;
+                aggregate_width(&rows, width_us, cutoff, &mut backfill, backfill_budget)?;
             }
         }
         drop(pin);
@@ -686,6 +720,7 @@ impl Database {
             width_us,
             created_sequence: sequence,
         };
+        let _derived_working = reserve_catalog_clone(&s, &self.inner.config)?;
         let mut projected = s.catalog.clone();
         let table = projected
             .tables
@@ -720,6 +755,7 @@ impl Database {
         let mut s = self.lock()?;
         healthy(&s)?;
         let sequence = next_sequence(&s)?;
+        let _derived_working = reserve_catalog_clone(&s, &self.inner.config)?;
         let mut projected = s.catalog.clone();
         let aggregate = projected
             .continuous_aggregates
@@ -779,6 +815,7 @@ impl Database {
             updated_sequence: sequence,
             latest_run: None,
         };
+        let _derived_working = reserve_catalog_clone(&s, &self.inner.config)?;
         let mut projected = s.catalog.clone();
         projected.jobs.insert(name.into(), job.clone());
         let stamp = stamp_projected(&mut projected, sequence)?;
@@ -801,6 +838,7 @@ impl Database {
         let definition = s.catalog.jobs.get(name).context("job does not exist")?;
         let mut runtime = runtime_for(&s, definition);
         ensure!(!runtime.running, "cannot alter a running job");
+        let _derived_working = reserve_catalog_clone(&s, &self.inner.config)?;
         let mut projected = s.catalog.clone();
         let job = projected
             .jobs
@@ -859,6 +897,7 @@ impl Database {
             "cannot drop a running job"
         );
         let sequence = next_sequence(&s)?;
+        let _derived_working = reserve_catalog_clone(&s, &self.inner.config)?;
         let mut projected = s.catalog.clone();
         projected.jobs.remove(name);
         let stamp = stamp_projected(&mut projected, sequence)?;

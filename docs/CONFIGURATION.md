@@ -8,6 +8,9 @@
 | --- | --- | --- |
 | `hot_max_bytes` | 16 MiB | Estimated hot rows and native segment/compaction working set |
 | `metadata_max_bytes` | 32 MiB | Projected catalog bytes plus future segment-reference reservation; 1 KiB..64 MiB |
+| `derived_pages` | false | Explicit opt-in to immutable derived-state pages and manifest v2; v1 remains readable, and a published v2 root never silently downgrades. See `docs/DERIVED_STATE.md` for migration/recovery boundaries. |
+| `derived_max_bytes` | 64 MiB | Conservative derived resident/working and encoded/hydration limit; 4 KiB..512 MiB. A smaller root does not imply smaller resident memory. |
+| `derived_page_bytes` | 256 KiB | Writer page target, 4 KiB..1 MiB and no larger than `derived_max_bytes`; readers validate historical pages against the 1 MiB format cap, not the current writer target. |
 | `hot_max_rows` | 100,000 | Hot rows; checkpoint before overflow |
 | `wal_max_bytes` | 64 MiB | Committed local WAL; checkpoint before overflow |
 | `max_disk_bytes` | 512 MiB | Local directory admission budget |

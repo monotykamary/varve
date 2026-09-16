@@ -1,0 +1,16 @@
+{
+  "data": {
+    "driver": {
+      "id": "1e6cd162-015e-4a35-9ecc-4c7a8d82fceb",
+      "status": "REMOVED"
+    },
+    "timescale": {
+      "id": "75d68bf5-fc1b-48e0-9223-9f0fde4bf0f2",
+      "status": "REMOVED"
+    },
+    "varve": {
+      "id": "085a0d4d-9912-49f8-9e27-986d662e42ac",
+      "status": "REMOVED"
+    }
+  }
+}

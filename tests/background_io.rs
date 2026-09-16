@@ -314,6 +314,153 @@ fn blocked_archived_segment_fetch_does_not_block_local_ack_or_status() {
     );
 }
 
+fn direct_cold_reader_keeps_a_snapshot_without_blocking_local_work(sql: bool) {
+    let temp = TempDir::new().unwrap();
+    let (store, _) = BlockingStore::new(&temp.path().join("remote"));
+    store.block_next_put.store(false, Ordering::SeqCst);
+    let db = Database::open_with_remote(temp.path().join("local"), config(), Some(store.clone()))
+        .unwrap();
+    db.create_table("metrics", table(Some(1))).unwrap();
+    db.write("metrics", "first", vec![row(1, 1.0)], 1).unwrap();
+    assert_eq!(db.maintain(20).unwrap().evicted_files, 1);
+    let started = store.reset_get();
+    let reader = db.clone();
+    let read = std::thread::spawn(move || -> Result<usize> {
+        if sql {
+            Ok(
+                reader.query("SELECT count(*)::BIGINT AS n FROM metrics")?[0]["n"]
+                    .as_u64()
+                    .unwrap() as usize,
+            )
+        } else {
+            Ok(reader.scan("metrics", None, None, None, None)?.len())
+        }
+    });
+    if started.recv_timeout(Duration::from_secs(5)).is_err() {
+        store.release();
+        let result = read.join();
+        panic!("direct reader did not reach the blocked GET: {result:?}");
+    }
+    let writer = db.clone();
+    let (done_tx, done_rx) = mpsc::sync_channel(1);
+    let write = std::thread::spawn(move || -> Result<()> {
+        let receipt = writer.write("metrics", "second", vec![row(2, 2.0)], 2)?;
+        let status = writer.status()?;
+        writer.checkpoint()?;
+        done_tx.send((receipt.sequence, status.sequence, status.active_snapshots))?;
+        Ok(())
+    });
+    let observed = done_rx.recv_timeout(Duration::from_secs(5));
+    // Always unblock before asserting, so failures cannot strand the reader thread.
+    store.release();
+    let read_result = read.join().unwrap().unwrap();
+    write.join().unwrap().unwrap();
+    let (receipt, sequence, snapshots) =
+        observed.expect("write/status/checkpoint waited for a direct cold GET");
+    assert_eq!(receipt, sequence);
+    assert_eq!(snapshots, 1);
+    assert_eq!(
+        read_result, 1,
+        "in-flight reader must not include a later acknowledged write"
+    );
+    assert_eq!(db.scan("metrics", None, None, None, None).unwrap().len(), 2);
+    assert_eq!(db.status().unwrap().active_snapshots, 0);
+}
+
+#[test]
+fn direct_cold_sql_allows_writes_status_and_checkpoint_with_a_coherent_snapshot() {
+    direct_cold_reader_keeps_a_snapshot_without_blocking_local_work(true);
+}
+
+#[test]
+fn direct_cold_scan_allows_writes_status_and_checkpoint_with_a_coherent_snapshot() {
+    direct_cold_reader_keeps_a_snapshot_without_blocking_local_work(false);
+}
+
+fn cold_reader_pin_survives_remote_vacuum(sql: bool) {
+    let temp = TempDir::new().unwrap();
+    let (store, _) = BlockingStore::new(&temp.path().join("remote"));
+    store.block_next_put.store(false, Ordering::SeqCst);
+    let mut config = config();
+    config.segment_rows = 1;
+    let db =
+        Database::open_with_remote(temp.path().join("local"), config, Some(store.clone())).unwrap();
+    db.create_table(
+        "metrics",
+        TableConfig {
+            retention_us: Some(100),
+            ..table(Some(1))
+        },
+    )
+    .unwrap();
+    db.write("metrics", "first", vec![row(1, 1.0)], 1).unwrap();
+    assert_eq!(db.maintain(20).unwrap().evicted_files, 1);
+
+    let archived_key = store.inner.list("segments").unwrap().pop().unwrap();
+    let orphan_key = "segments/unpinned.parquet";
+    store
+        .inner
+        .put_immutable(orphan_key, b"unreachable")
+        .unwrap();
+
+    let get_started = store.reset_get();
+    let reader = db.clone();
+    let read = std::thread::spawn(move || -> Result<usize> {
+        if sql {
+            Ok(
+                reader.query("SELECT count(*)::BIGINT AS n FROM metrics")?[0]["n"]
+                    .as_u64()
+                    .unwrap() as usize,
+            )
+        } else {
+            Ok(reader.scan("metrics", None, None, None, None)?.len())
+        }
+    });
+    if get_started.recv_timeout(Duration::from_secs(5)).is_err() {
+        store.release();
+        let result = read.join();
+        panic!("reader did not reach the blocked cold GET: {result:?}");
+    }
+
+    let maintenance = db.maintain(200);
+    let keys_during_read = store.inner.list("segments");
+    store.release();
+    let read_result = read.join().unwrap();
+
+    let report = maintenance.unwrap();
+    assert_eq!(report.expired_rows, 1);
+    let keys_during_read = keys_during_read.unwrap();
+    assert!(
+        keys_during_read.contains(&archived_key),
+        "vacuum deleted the object pinned by an active reader"
+    );
+    assert!(
+        !keys_during_read.iter().any(|key| key == orphan_key),
+        "an unrelated unreachable object should not be protected"
+    );
+    assert_eq!(read_result.unwrap(), 1);
+
+    assert_eq!(db.vacuum_remote().unwrap(), 1);
+    assert!(
+        !store
+            .inner
+            .list("segments")
+            .unwrap()
+            .contains(&archived_key),
+        "a released reader pin should not prevent eventual reclamation"
+    );
+}
+
+#[test]
+fn native_cold_snapshot_pin_survives_remote_vacuum() {
+    cold_reader_pin_survives_remote_vacuum(false);
+}
+
+#[test]
+fn sql_cold_snapshot_pin_survives_remote_vacuum() {
+    cold_reader_pin_survives_remote_vacuum(true);
+}
+
 #[test]
 fn divergent_local_clone_cannot_rebind_an_owned_head() {
     let temp = TempDir::new().unwrap();

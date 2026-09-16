@@ -223,19 +223,70 @@ pub(crate) fn group_fingerprint(record: &Record) -> Result<Option<String>> {
     Ok(Some(hasher.finalize().to_hex().to_string()))
 }
 
+/// Immutable encoded bytes shared by admission and publication. Construction binds
+/// the sequence to the frame; callers cannot replace bytes after validation.
+pub(crate) struct EncodedRecord {
+    sequence: u64,
+    bytes: Vec<u8>,
+}
+
+impl EncodedRecord {
+    pub(crate) fn new(record: &Record) -> Result<Self> {
+        Ok(Self {
+            sequence: record.sequence,
+            bytes: encode(record)?,
+        })
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
 pub fn encode(record: &Record) -> Result<Vec<u8>> {
-    let payload = serde_json::to_vec(record)?;
-    ensure!(
-        payload.len() <= MAX_FRAME_BYTES - 48,
-        "WAL frame exceeds format limit"
-    );
-    let mut frame = Vec::with_capacity(payload.len() + 48);
+    encode_with_limit(record, MAX_FRAME_BYTES)
+}
+
+fn encode_with_limit(record: &Record, limit: usize) -> Result<Vec<u8>> {
+    ensure!(limit >= 48, "WAL frame exceeds format limit");
+    let mut frame = Vec::with_capacity(limit.min(4096));
     frame.extend_from_slice(MAGIC);
-    frame.extend_from_slice(&(payload.len() as u64).to_le_bytes());
-    frame.extend_from_slice(&payload);
+    frame.extend_from_slice(&0u64.to_le_bytes());
+    // Serialize directly into the bounded final frame instead of retaining a
+    // second full payload allocation. The byte format remains VARVEW01.
+    let mut writer = FrameWriter {
+        bytes: &mut frame,
+        limit: limit - 32,
+    };
+    serde_json::to_writer(&mut writer, record)?;
+    let payload_len = (frame.len() - 16) as u64;
+    frame[8..16].copy_from_slice(&payload_len.to_le_bytes());
     let hash = blake3::hash(&frame);
     frame.extend_from_slice(hash.as_bytes());
     Ok(frame)
+}
+
+struct FrameWriter<'a> {
+    bytes: &'a mut Vec<u8>,
+    limit: usize,
+}
+
+impl Write for FrameWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if bytes.len() > self.limit.saturating_sub(self.bytes.len()) {
+            return Err(std::io::Error::other("WAL frame exceeds format limit"));
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 pub fn decode(bytes: &[u8]) -> Result<Record> {
@@ -302,10 +353,20 @@ pub fn path(root: &Path, sequence: u64) -> PathBuf {
     root.join("wal").join(format!("{sequence:020}.wal"))
 }
 
+#[cfg(test)]
 pub fn append(root: &Path, record: &Record) -> Result<usize> {
-    let final_path = path(root, record.sequence);
+    append_encoded(root, &EncodedRecord::new(record)?, None)
+}
+
+pub(crate) fn append_encoded(
+    root: &Path,
+    encoded: &EncodedRecord,
+    metrics: Option<&crate::metrics::Metrics>,
+) -> Result<usize> {
+    use crate::metrics::Phase;
+    let _publication = metrics.map(|metrics| metrics.timer(Phase::WalWrite));
+    let final_path = path(root, encoded.sequence);
     ensure!(!final_path.exists(), "WAL sequence already exists");
-    let bytes = encode(record)?;
     let parent = final_path.parent().unwrap();
     let temp = parent.join(format!(".{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| {
@@ -314,17 +375,23 @@ pub fn append(root: &Path, record: &Record) -> Result<usize> {
             .create_new(true)
             .open(&temp)?;
         injected_io("wal_before_write")?;
-        file.write_all(&bytes)?;
+        file.write_all(encoded.as_bytes())?;
         injected_io("wal_before_sync")?;
-        file.sync_all()?;
+        {
+            let _sync = metrics.map(|metrics| metrics.timer(Phase::WalSync));
+            file.sync_all()?;
+        }
         failpoint("wal_synced");
         // The process lock excludes competing local publishers.
         injected_io("wal_before_rename")?;
         fs::rename(&temp, &final_path)?;
         injected_io("wal_before_dir_sync")?;
-        sync_dir(parent)?;
+        {
+            let _sync = metrics.map(|metrics| metrics.timer(Phase::WalSync));
+            sync_dir(parent)?;
+        }
         failpoint("wal_published");
-        Ok(bytes.len())
+        Ok(encoded.len())
     })();
     if result.is_err() {
         let _ = fs::remove_file(temp);
@@ -421,6 +488,57 @@ pub fn failpoint(name: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bounded_frame_encoding_is_byte_identical_to_legacy_layout() {
+        let record = Record::new(
+            9,
+            Operation::CreateTable {
+                name: "metrics_東京".into(),
+                config: TableConfig::default(),
+            },
+        );
+        let payload = serde_json::to_vec(&record).unwrap();
+        let mut legacy = Vec::new();
+        legacy.extend_from_slice(MAGIC);
+        legacy.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        legacy.extend_from_slice(&payload);
+        let hash = blake3::hash(&legacy);
+        legacy.extend_from_slice(hash.as_bytes());
+        let encoded = EncodedRecord::new(&record).unwrap();
+        assert_eq!(encoded.as_bytes(), legacy);
+        assert_eq!(encoded.len(), legacy.len());
+        assert_eq!(encode_with_limit(&record, legacy.len()).unwrap(), legacy);
+        assert!(encode_with_limit(&record, legacy.len() - 1).is_err());
+        assert!(encode_with_limit(&record, 47).is_err());
+    }
+
+    #[test]
+    fn preencoded_publication_preserves_replay_and_syncs() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir(root.path().join("wal")).unwrap();
+        let record = Record::new(
+            1,
+            Operation::CreateTable {
+                name: "metrics".into(),
+                config: TableConfig::default(),
+            },
+        );
+        let encoded = EncodedRecord::new(&record).unwrap();
+        let metrics = crate::metrics::Metrics::default();
+        assert_eq!(
+            append_encoded(root.path(), &encoded, Some(&metrics)).unwrap(),
+            encoded.len()
+        );
+        let disk = fs::read(path(root.path(), 1)).unwrap();
+        assert_eq!(disk, encoded.as_bytes());
+        assert_eq!(decode(&disk).unwrap().sequence, 1);
+        assert!(append_encoded(root.path(), &encoded, Some(&metrics)).is_err());
+        let snapshot = metrics.snapshot();
+        assert_eq!(snapshot.phases["wal_write"].count, 2);
+        assert_eq!(snapshot.phases["wal_sync"].count, 2);
+        assert_eq!(fs::read_dir(root.path().join("wal")).unwrap().count(), 1);
+    }
+
     #[test]
     fn frame_integrity_and_versions() {
         let r = Record::new(

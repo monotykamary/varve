@@ -1,0 +1,8 @@
+{
+  "at": "2026-09-16T17:51:13.335Z",
+  "expected": {
+    "varve": "8250241b-2ac5-41a8-b84f-1a97e5fb0510",
+    "timescale": "410bc818-1022-469b-a5e0-09555c77530d"
+  },
+  "reason": "Actual process restart on the same retained volumes and exact deployed images."
+}

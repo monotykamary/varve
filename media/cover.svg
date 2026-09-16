@@ -1,52 +1,80 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="400" viewBox="0 0 1100 400" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" id="still" width="1100" height="400" viewBox="0 0 1100 400" role="img" aria-labelledby="title desc">
   <title id="title">Varve — time settles into layers</title>
-  <desc id="desc">A geological cross section of a time-series database. Fresh measurements become sorted columnar layers, with asynchronous object-store recovery below. Caches accelerate reads; a local fsync does not acknowledge S3 durability. An illustrative static identity, not a performance chart.</desc>
+  <desc id="desc">A geological cross section of a time-series database. Fresh measurements become sorted columnar layers, with asynchronous object-store recovery below. Caches accelerate reads; a local fsync does not acknowledge S3 durability. An illustrative identity animation, not a performance chart. Reduced-motion viewers see the complete static composition.</desc>
   <defs>
-    <linearGradient id="paper" x2="1" y2="1"><stop stop-color="#0c1420"/><stop offset="1" stop-color="#16272c"/></linearGradient>
-    <linearGradient id="strata" x2="0" y2="1"><stop stop-color="#80c9bd" stop-opacity=".15"/><stop offset="1" stop-color="#d99972" stop-opacity=".04"/></linearGradient>
-    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#647e89" stroke-opacity=".12" stroke-width=".6"/></pattern>
+    <linearGradient id="paper" x2="1" y2="1"><stop stop-color="#080e1a"/><stop offset="1" stop-color="#102331"/></linearGradient>
+    <radialGradient id="heat"><stop stop-color="#68f2c4" stop-opacity=".28"/><stop offset=".4" stop-color="#55cdb9" stop-opacity=".07"/><stop offset="1" stop-color="#55cdb9" stop-opacity="0"/></radialGradient>
+    <linearGradient id="strata" x2="0" y2="1"><stop stop-color="#6debc8" stop-opacity=".14"/><stop offset=".55" stop-color="#5fabc3" stop-opacity=".09"/><stop offset="1" stop-color="#f1bc7c" stop-opacity=".04"/></linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#28404b" stroke-opacity=".24" stroke-width=".6"/></pattern>
+    <mask id="survey" maskUnits="userSpaceOnUse" x="536" y="96" width="410" height="236"><rect class="sweep" x="536" y="96" width="410" height="236" fill="white"/></mask>
     <clipPath id="canvas"><rect x="1" y="1" width="1098" height="398" rx="20"/></clipPath>
+    <path id="hot" pathLength="400" d="M548 145C610 120 650 153 713 139S816 111 925 130"/>
+    <path id="cache" pathLength="400" d="M548 190C614 172 652 197 713 181S830 159 925 175"/>
+    <path id="columnar" pathLength="400" d="M548 235C615 217 658 249 713 232S828 212 925 227"/>
+    <path id="archive" pathLength="400" d="M548 299C619 276 657 301 715 293S829 269 925 280"/>
   </defs>
-  <style>text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }</style>
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .sweep { animation: survey .8s .12s cubic-bezier(.2,.7,.2,1) both; }
+    .current { animation: travel 12s linear infinite; }
+    @keyframes survey { from { transform: translateX(-410px); } to { transform: translateX(0); } }
+    @keyframes travel { to { stroke-dashoffset: -440; } }
+    /* The #still view lets picture sources opt out without a duplicate SVG. */
+    :root:target .sweep,:root:target .current { animation: none; }
+    :root:target .current { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .sweep,.current { animation: none; }
+      .current { display: none; }
+    }
+  </style>
   <g clip-path="url(#canvas)">
     <rect width="1100" height="400" fill="url(#paper)"/>
     <rect x="510" width="590" height="400" fill="url(#grid)"/>
-    <path d="M510 32V368" stroke="#344650" stroke-dasharray="2 7"/>
-    <text x="44" y="53" fill="#80c9bd" font-size="11" letter-spacing="2">TIME-SERIES / RUST / LOCAL-FIRST</text>
-    <text x="40" y="128" fill="#eff4ec" font-size="66" font-weight="700" letter-spacing="-3">Varve</text>
-    <text x="44" y="163" fill="#b1c5ca" font-size="18">Time settles into layers.</text>
-    <rect x="44" y="201" width="420" height="110" rx="9" fill="#0b1620" stroke="#344650"/>
-    <circle cx="63" cy="222" r="3.5" fill="#80c9bd"/>
-    <text x="78" y="226" fill="#b1c5ca" font-size="10" letter-spacing="1.3">RUST OWNS STORAGE. DUCKDB OWNS SQL.</text>
-    <path d="M44 238H464" stroke="#344650"/>
-    <text x="63" y="266" fill="#eff4ec" font-size="14"><tspan fill="#80c9bd">SELECT</tspan> series, avg(value)</text>
-    <text x="63" y="291" fill="#eff4ec" font-size="14"><tspan fill="#80c9bd">FROM</tspan> metrics <tspan fill="#80c9bd">GROUP BY</tspan> series;</text>
-    <text x="44" y="353" fill="#849fa8" font-size="11">PARQUET · CONTINUOUS AGGREGATES · LIFECYCLE</text>
-    <text x="546" y="53" fill="#849fa8" font-size="10" letter-spacing="2">A CROSS SECTION THROUGH TIME</text>
-    <path d="M552 86H917M911 81L917 86L911 91" fill="none" stroke="#607c83"/>
-    <text x="550" y="77" fill="#849fa8" font-size="9">NEWER</text>
-    <text x="869" y="77" fill="#849fa8" font-size="9">OLDER</text>
-    <path d="M548 145C610 120 650 153 713 139S816 111 925 130V301C830 282 802 323 715 315S627 298 548 321Z" fill="url(#strata)"/>
-    <g fill="none" stroke-width="1.5">
-      <path d="M548 145C610 120 650 153 713 139S816 111 925 130" stroke="#80c9bd"/>
-      <path d="M548 151C610 126 650 159 713 145S816 117 925 136" stroke="#80c9bd" opacity=".35"/>
-      <path d="M548 190C614 172 652 197 713 181S830 159 925 175" stroke="#88b5c9"/>
-      <path d="M548 197C614 179 652 204 713 188S830 166 925 182" stroke="#88b5c9" opacity=".35"/>
-      <path d="M548 235C615 217 658 249 713 232S828 212 925 227" stroke="#aba9d5"/>
-      <path d="M548 242C615 224 658 256 713 239S828 219 925 234" stroke="#aba9d5" opacity=".4"/>
-      <path d="M548 251C615 233 658 265 713 248S828 228 925 243" stroke="#aba9d5" opacity=".25"/>
-      <path d="M548 299C619 276 657 301 715 293S829 269 925 280" stroke="#d99972"/>
-      <path d="M548 308C619 285 657 310 715 302S829 278 925 289" stroke="#d99972" opacity=".4"/>
-      <path d="M548 321C627 298 651 309 715 315S830 282 925 301" stroke="#d99972" opacity=".25"/>
+    <path d="M510 32V368" stroke="#2a414f" stroke-dasharray="2 7"/>
+    <text x="44" y="53" fill="#78b5ba" font-size="11" letter-spacing="2">TIME-SERIES / RUST / LOCAL-FIRST</text>
+    <text x="40" y="128" fill="#e8fff5" font-size="66" font-weight="700" letter-spacing="-3">Varve</text>
+    <text x="44" y="163" fill="#9fb7c3" font-size="18">Time settles into layers.</text>
+    <rect x="44" y="201" width="420" height="110" rx="9" fill="#0b1622" stroke="#29404a"/>
+    <circle cx="63" cy="222" r="3.5" fill="#75edc5"/>
+    <text x="78" y="226" fill="#c2d9df" font-size="10" letter-spacing="1.3">RUST OWNS STORAGE. DUCKDB OWNS SQL.</text>
+    <path d="M44 238H464" stroke="#29404a"/>
+    <text x="63" y="266" fill="#e8fff5" font-size="14"><tspan fill="#75edc5">SELECT</tspan> series, avg(value)</text>
+    <text x="63" y="291" fill="#e8fff5" font-size="14"><tspan fill="#75edc5">FROM</tspan> metrics <tspan fill="#75edc5">GROUP BY</tspan> series;</text>
+    <text x="44" y="353" fill="#819ba9" font-size="11">PARQUET · CONTINUOUS AGGREGATES · LIFECYCLE</text>
+    <text x="546" y="53" fill="#77a5b0" font-size="10" letter-spacing="2">A CROSS SECTION THROUGH TIME</text>
+    <path d="M552 86H917M911 81L917 86L911 91" fill="none" stroke="#477979"/>
+    <text x="550" y="77" fill="#819ba9" font-size="9">NEWER</text>
+    <text x="869" y="77" fill="#819ba9" font-size="9">OLDER</text>
+    <g mask="url(#survey)">
+      <ellipse cx="754" cy="198" rx="222" ry="137" fill="url(#heat)"/>
+      <path d="M548 145C610 120 650 153 713 139S816 111 925 130V301C830 282 802 323 715 315S627 298 548 321Z" fill="url(#strata)"/>
+      <g fill="none" stroke-width="1.5">
+        <use href="#hot" stroke="#6debc8"/>
+        <path d="M548 151C610 126 650 159 713 145S816 117 925 136" stroke="#6debc8" opacity=".35"/>
+        <use href="#cache" stroke="#5fabc3"/>
+        <path d="M548 197C614 179 652 204 713 188S830 166 925 182" stroke="#5fabc3" opacity=".35"/>
+        <use href="#columnar" stroke="#5fabc3"/>
+        <path d="M548 242C615 224 658 256 713 239S828 219 925 234" stroke="#5fabc3" opacity=".4"/>
+        <path d="M548 251C615 233 658 265 713 248S828 228 925 243" stroke="#5fabc3" opacity=".25"/>
+        <use href="#archive" stroke="#f1bc7c"/>
+        <path d="M548 308C619 285 657 310 715 302S829 278 925 289" stroke="#f1bc7c" opacity=".4"/>
+        <path d="M548 321C627 298 651 309 715 315S830 282 925 301" stroke="#f1bc7c" opacity=".25"/>
+      </g>
+      <g fill="none" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="24 416">
+        <use class="current" href="#hot" stroke="#b5ffe7" style="animation-duration:8s;animation-delay:-1s"/>
+        <use class="current" href="#cache" stroke="#b5ffe7" style="animation-delay:-4s"/>
+        <use class="current" href="#columnar" stroke="#b5ffe7" style="animation-duration:16s;animation-delay:-7s"/>
+        <use class="current" href="#archive" stroke="#f1bc7c" style="animation-duration:20s;animation-delay:-11s"/>
+      </g>
+      <path d="M558 127L575 126L582 112L591 132L600 118L609 126L632 125L644 109L652 126L673 130L687 118L701 124L714 113L726 121" fill="none" stroke="#b5ffe7" stroke-width="2"/>
+      <g fill="#6debc8"><circle cx="582" cy="112" r="3"/><circle cx="644" cy="109" r="3"/><circle cx="714" cy="113" r="3"/></g>
     </g>
-    <path d="M558 127L575 126L582 112L591 132L600 118L609 126L632 125L644 109L652 126L673 130L687 118L701 124L714 113L726 121" fill="none" stroke="#b1eee0" stroke-width="2"/>
-    <g fill="#80c9bd"><circle cx="582" cy="112" r="3"/><circle cx="644" cy="109" r="3"/><circle cx="714" cy="113" r="3"/></g>
-    <g stroke="#637c87" stroke-width="1"><path d="M938 131H951"/><path d="M938 177H951"/><path d="M938 229H951"/><path d="M938 281H951"/></g>
-    <text x="963" y="134" fill="#80c9bd" font-size="11">HOT ROWS</text>
-    <text x="963" y="180" fill="#88b5c9" font-size="11">CACHES</text>
-    <text x="963" y="232" fill="#aba9d5" font-size="11">PARQUET</text>
-    <text x="963" y="284" fill="#d99972" font-size="11">S3 / WAL</text>
-    <text x="548" y="355" fill="#849fa8" font-size="10">LOCAL FSYNC ≠ REMOTE ACK · ASYNC PUBLICATION</text>
+    <g stroke="#477979" stroke-width="1"><path d="M938 131H951"/><path d="M938 177H951"/><path d="M938 229H951"/><path d="M938 281H951"/></g>
+    <text x="963" y="134" fill="#6debc8" font-size="11">HOT ROWS</text>
+    <text x="963" y="180" fill="#5fabc3" font-size="11">CACHES</text>
+    <text x="963" y="232" fill="#5fabc3" font-size="11">PARQUET</text>
+    <text x="963" y="284" fill="#f1bc7c" font-size="11">S3 / WAL</text>
+    <text x="548" y="355" fill="#819ba9" font-size="10">LOCAL FSYNC ≠ REMOTE ACK · ASYNC PUBLICATION</text>
   </g>
-  <rect x="1" y="1" width="1098" height="398" rx="20" fill="none" stroke="#344650"/>
+  <rect x="1" y="1" width="1098" height="398" rx="20" fill="none" stroke="#36545e" stroke-opacity=".7"/>
 </svg>

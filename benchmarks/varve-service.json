@@ -1,0 +1,11 @@
+{
+  "builder": "RAILPACK",
+  "dockerfilePath": "Dockerfile",
+  "startCommand": "/usr/local/bin/varve-entrypoint sh -c 'printf %s \"$VARVE_BENCH_CONFIG\" > /data/probes/benchmark.json; exec varve --data \"${VARVE_DATA_DIR:-/data/varve}\" --config /data/probes/benchmark.json serve --bind :: --port 8080 --allow-remote'",
+  "healthcheckPath": "/ready",
+  "healthcheckTimeout": 120,
+  "numReplicas": 1,
+  "multiRegionConfig": {"asia-southeast1-eqsg3a": {"numReplicas": 1}},
+  "restartPolicyType": "NEVER",
+  "sleepApplication": false
+}

@@ -1,0 +1,30 @@
+{
+  "at": "2026-09-16T13:57:39.131Z",
+  "deployments": {
+    "driver": {
+      "id": "4640029f-ea8d-43e5-967b-986e97524152",
+      "status": "REMOVED"
+    },
+    "timescale": {
+      "id": "f7832093-2448-4689-8b9b-bcf84a1b2397",
+      "status": "REMOVED"
+    },
+    "varve": {
+      "id": "fb815cd7-9318-4342-b113-2d85d71195ac",
+      "status": "REMOVED"
+    }
+  },
+  "active_benchmark_deployments": 0,
+  "original_unchanged": true,
+  "original": {
+    "id": "dbd59af2-5c4c-4e8e-a452-72914ca69528",
+    "status": "SUCCESS"
+  },
+  "retained_benchmark_volume_ids": [
+    "720d3de6-3ce6-4007-b2a1-c3f6d2ee5232",
+    "cdd445af-7c7d-42b8-ba10-5a2055e5abc8"
+  ],
+  "public_benchmark_domains": 0,
+  "compute_stopped": true,
+  "storage_retained": true
+}

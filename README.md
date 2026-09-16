@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/monotykamary/varve/main/media/cover.svg" alt="Varve — time settles into layers: hot rows, cached reads, Parquet, and asynchronous object-store recovery" width="1100" />
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/monotykamary/varve/main/media/cover.svg#still" />
+    <img src="https://raw.githubusercontent.com/monotykamary/varve/main/media/cover.svg" alt="Varve — time settles into layers: hot rows, cached reads, Parquet, and asynchronous object-store recovery" width="1100" />
+  </picture>
 </p>
 
 <h1 align="center">Varve</h1>
@@ -192,6 +195,8 @@ The manifest atomically connects raw segments, view state, request receipts and 
 
 The [live evaluation record](docs/EVALUATION.md) covers 138 Rust tests, 14 Python tests, real S3 restore, a 100,000-row HTTPS workload and independent retention. The hosted example is experimental; the observed restart incident and production qualification gaps are documented, not hidden.
 
+The [isolated Railway comparison](docs/TIMESCALE_BENCHMARK.md), [first-principles follow-up](docs/FRONTIER.md) and [reusable execution/storage ledger](docs/REUSE.md) retain raw measurements, failed targets and recovery witnesses. Current work includes resident DuckDB workers, indexed rollups, opt-in derived-state pages, bounded maintenance and phase metrics. The latest candidate passed 297 Rust and 19 TypeScript checks and preserved 2.072M rows/backend across actual Railway restarts; its 20k-row/s target still overloaded. There is no general Timescale replacement, performance-frontier or production-readiness claim.
+
 ```sh
 scripts/verify.sh
 # Focused, self-checking mixed workload; uses small self-cleaning temporary data:
@@ -240,6 +245,7 @@ The Rust library is usable without the HTTP server. These are modules in one cra
 | [Evaluation results](docs/EVALUATION.md) | [Source review and regressions](docs/FINAL_REVIEW.md) |
 | [Production acceptance](docs/PRODUCTION_ACCEPTANCE.md) | [Remaining audit gaps](docs/AUDIT_RECONCILIATION.md) |
 | [Client/group-commit release](docs/CLIENT_INGEST_ACCEPTANCE.md) | [Client release review and evidence](docs/CLIENT_RELEASE_REVIEW.md) |
+| [Timescale comparison and evidence](docs/TIMESCALE_BENCHMARK.md) | [Timescale replacement gates](docs/TIMESCALE_READINESS.md) |
 | [Publication checks](docs/PUBLICATION.md) | [Design references](docs/REFERENCES.md) |
 
 ## Contributing

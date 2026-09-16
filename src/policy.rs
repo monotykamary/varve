@@ -1,5 +1,6 @@
 use crate::engine::*;
 use crate::model::checked_cutoff;
+use crate::segment;
 use crate::tier::{ship_with_remote_gate, vacuum_with_remote_gate};
 use anyhow::{Context, Result, ensure};
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,22 +15,12 @@ impl Database {
             .as_ref()
             .map(|_| self.lock_remote_operation())
             .transpose()?;
-        {
-            let mut s = self.lock()?;
-            healthy(&s)?;
-            checkpoint_locked(&self.inner, &mut s)?;
-        }
-        let maintenance_pin = prefetch_maintenance_segments(self, None)?;
-        let result = {
-            let mut s = self.lock()?;
-            healthy(&s)?;
-            checkpoint_locked(&self.inner, &mut s)?;
-            compact_locked(&self.inner, &mut s)
-        };
-        drop(maintenance_pin);
+        checkpoint_prepared(self)?;
+        let result = compact_prepared(self, true);
         drop(remote_gate);
         result
     }
+
     pub fn maintain(&self, now_us: i64) -> Result<MaintenanceReport> {
         let remote_gate = self
             .inner
@@ -39,32 +30,46 @@ impl Database {
             .transpose()?;
         let result = (|| {
             let mut report = MaintenanceReport::default();
-            {
+            let (checkpoint_due, checkpoint_had_hot_work) = {
                 let mut s = self.lock()?;
                 healthy(&s)?;
                 advance_idempotency_floors(&mut s, now_us);
-                let has_retention = s.catalog.tables.values().any(|table| {
-                    table.config.retention_us.is_some()
-                        || table.config.rollup_retention_us.is_some()
-                });
-                let flush_due = s.first_hot_us.is_none_or(|at| {
-                    now_us.saturating_sub(at) >= self.inner.config.flush_interval_us
-                });
-                if has_retention || flush_due {
-                    report.flushed = s.catalog.checkpoint_sequence < s.sequence;
-                    checkpoint_locked(&self.inner, &mut s)?;
-                }
+                (
+                    maintenance_checkpoint_due(&self.inner, &s, now_us),
+                    s.catalog.checkpoint_sequence != s.sequence
+                        || s.hot.values().any(|rows| !rows.is_empty()),
+                )
+            };
+            let mut checkpoint_recheck = true;
+            if checkpoint_due {
+                report.flushed = checkpoint_prepared_scheduled(self)?;
+                // A stale/contended expensive candidate is deferred for this tick.
+                // Recheck only after no initial hot work or a successful publication.
+                checkpoint_recheck = !checkpoint_had_hot_work || report.flushed;
             }
             let maintenance_pin = prefetch_maintenance_segments(self, Some(now_us))?;
+            if checkpoint_recheck {
+                let checkpoint_due = {
+                    let s = self.lock()?;
+                    healthy(&s)?;
+                    maintenance_checkpoint_due(&self.inner, &s, now_us)
+                };
+                if checkpoint_due {
+                    report.flushed |= checkpoint_prepared_scheduled(self)?;
+                }
+            }
+            {
+                let mut s = self.lock()?;
+                healthy(&s)?;
+                // A write racing after this recheck makes retention defer rather
+                // than publish over a dirty WAL tail.
+                report.expired_rows = retention_locked(&self.inner, &mut s, now_us)?;
+            }
+            drop(maintenance_pin);
+            report.compacted = compact_prepared(self, false)?;
             let (ship_due, resume_gc, vacuum_due) = {
                 let mut s = self.lock()?;
                 healthy(&s)?;
-                if s.catalog.checkpoint_sequence < s.sequence {
-                    report.flushed = true;
-                    checkpoint_locked(&self.inner, &mut s)?;
-                }
-                report.expired_rows = retention_locked(&self.inner, &mut s, now_us)?;
-                report.compacted = compact_locked(&self.inner, &mut s)?;
                 let ship_due = self.inner.remote.is_some()
                     && (s.last_ship_us.is_none_or(|at| {
                         now_us.saturating_sub(at) >= self.inner.config.ship_interval_us
@@ -80,7 +85,6 @@ impl Database {
                 let vacuum_due = s.remote_vacuum_pending || ship_due;
                 (ship_due, resume_gc, vacuum_due)
             };
-            drop(maintenance_pin);
             if let Some(gate) = remote_gate.as_ref() {
                 if !resume_gc && ship_due {
                     report.shipped_sequence = Some(ship_with_remote_gate(self, gate)?);
@@ -108,18 +112,86 @@ impl Database {
     }
 }
 
+fn has_retention(s: &State) -> bool {
+    s.catalog.tables.values().any(|table| {
+        table.config.retention_us.is_some() || table.config.rollup_retention_us.is_some()
+    })
+}
+
+fn maintenance_checkpoint_due(inner: &Inner, s: &State, now_us: i64) -> bool {
+    has_retention(s)
+        || s.first_hot_us
+            .is_none_or(|at| now_us.saturating_sub(at) >= inner.config.flush_interval_us)
+}
+
+// Select one deterministic group per preparation. Its decoded rows are bounded by
+// hot_max_rows/hot_max_bytes; later groups remain eligible for the next tick.
+fn compaction_plan(inner: &Inner, s: &State) -> BTreeMap<String, Vec<Vec<Segment>>> {
+    for (name, table) in &s.catalog.tables {
+        let mut groups: BTreeMap<(u32, i64), Vec<&Segment>> = BTreeMap::new();
+        for seg in &table.segments {
+            if seg.rows < inner.config.segment_rows as u64 {
+                groups
+                    .entry((seg.shard, seg.window_us))
+                    .or_default()
+                    .push(seg);
+            }
+        }
+        for candidates in groups.values() {
+            let mut row_count = 0usize;
+            let mut decoded_bytes = 0u64;
+            let mut count = 0;
+            for seg in candidates {
+                if row_count.saturating_add(seg.rows as usize) > inner.config.hot_max_rows
+                    || decoded_bytes
+                        .checked_add(seg.decoded_bytes)
+                        .is_none_or(|bytes| bytes > inner.config.hot_max_bytes as u64)
+                {
+                    break;
+                }
+                row_count += seg.rows as usize;
+                decoded_bytes += seg.decoded_bytes;
+                count += 1;
+            }
+            if count < inner.config.compact_min_segments
+                || row_count.div_ceil(inner.config.segment_rows) >= count
+            {
+                continue;
+            }
+            let selected = candidates[..count]
+                .iter()
+                .map(|seg| (*seg).clone())
+                .collect();
+            return BTreeMap::from([(name.clone(), vec![selected])]);
+        }
+    }
+    BTreeMap::new()
+}
+
 fn prefetch_maintenance_segments(db: &Database, now_us: Option<i64>) -> Result<Option<Pin>> {
     let (segments, pin) = {
         let s = db.lock()?;
         healthy(&s)?;
-        let segments: Vec<_> = s
-            .catalog
-            .tables
-            .values()
-            .flat_map(|table| {
-                table.segments.iter().filter(|segment| {
-                    let needed_for_retention =
-                        now_us
+        // Compaction cannot publish over a dirty checkpoint. If this tick will not
+        // checkpoint (and has no retention), there is nothing to materialize.
+        if s.catalog.checkpoint_sequence != s.sequence
+            && now_us.is_some_and(|now| !maintenance_checkpoint_due(&db.inner, &s, now))
+        {
+            return Ok(None);
+        }
+        let compaction_ids: BTreeSet<_> = compaction_plan(&db.inner, &s)
+            .into_values()
+            .flatten()
+            .flatten()
+            .map(|segment| segment.id)
+            .collect();
+        let segments: Vec<_> =
+            s.catalog
+                .tables
+                .values()
+                .flat_map(|table| {
+                    table.segments.iter().filter(|segment| {
+                        let needed_for_retention = now_us
                             .zip(table.config.retention_us)
                             .is_some_and(|(now, age)| {
                                 let cutoff = checked_cutoff(now, age)
@@ -127,12 +199,12 @@ fn prefetch_maintenance_segments(db: &Database, now_us: Option<i64>) -> Result<O
                                 segment.min_timestamp_us < cutoff
                                     && segment.max_timestamp_us >= cutoff
                             });
-                    let needed_for_compaction = segment.rows < db.inner.config.segment_rows as u64;
-                    needed_for_retention || needed_for_compaction
+                        let needed_for_compaction = compaction_ids.contains(&segment.id);
+                        needed_for_retention || needed_for_compaction
+                    })
                 })
-            })
-            .cloned()
-            .collect();
+                .cloned()
+                .collect();
         if segments.is_empty() {
             return Ok(None);
         }
@@ -174,6 +246,10 @@ fn prefetch_maintenance_segments(db: &Database, now_us: Option<i64>) -> Result<O
 }
 
 fn retention_locked(inner: &Inner, s: &mut State, now_us: i64) -> Result<u64> {
+    if !has_retention(s) || s.catalog.checkpoint_sequence != s.sequence {
+        return Ok(0);
+    }
+    let _derived_working = reserve_catalog_clone(s, &inner.config)?;
     let mut next = s.catalog.clone();
     let mut changed = false;
     let mut removed = 0;
@@ -231,72 +307,147 @@ fn retention_locked(inner: &Inner, s: &mut State, now_us: i64) -> Result<u64> {
     Ok(removed)
 }
 
-fn compact_locked(inner: &Inner, s: &mut State) -> Result<usize> {
-    if s.catalog.checkpoint_sequence != s.sequence {
+fn compact_prepared(db: &Database, allow_remote_fetch: bool) -> Result<usize> {
+    let _preparation_gate = db.lock_maintenance_preparation()?;
+    let (generation, table_name, table_config, selected, mut pin) = {
+        let s = db.lock()?;
+        healthy(&s)?;
+        if s.catalog.checkpoint_sequence != s.sequence {
+            return Ok(0);
+        }
+        let Some((table_name, groups)) = compaction_plan(&db.inner, &s).into_iter().next() else {
+            return Ok(0);
+        };
+        let selected = groups.into_iter().next().context("empty compaction plan")?;
+        let table_config = s
+            .catalog
+            .tables
+            .get(&table_name)
+            .context("compaction table disappeared")?
+            .config
+            .clone();
+        // Finish any in-flight cache eviction before publishing reader pins.
+        let _disk = lock_disk_admission(&db.inner)?;
+        let ids = selected.iter().map(|segment| segment.id.clone()).collect();
+        let pin = Pin::new(&db.inner, ids)?;
+        (s.generation, table_name, table_config, selected, pin)
+    };
+
+    #[cfg(feature = "fault-injection")]
+    db.block_maintenance_test_hook(MaintenanceHookPhase::CompactionPrepare)?;
+    if !allow_remote_fetch
+        && selected.iter().any(|segment| {
+            !db.inner.root.join(segment.key()).exists()
+                && !db
+                    .inner
+                    .root
+                    .join("cache")
+                    .join(format!("{}.parquet", segment.id))
+                    .exists()
+        })
+    {
         return Ok(0);
     }
-    let mut next = s.catalog.clone();
-    let mut compacted = 0;
-    for table in next.tables.values_mut() {
-        let mut groups: BTreeMap<(u32, i64), Vec<Segment>> = BTreeMap::new();
-        for seg in &table.segments {
-            if seg.rows < inner.config.segment_rows as u64 {
-                groups
-                    .entry((seg.shard, seg.window_us))
-                    .or_default()
-                    .push(seg.clone());
-            }
-        }
-        let mut retired = BTreeSet::new();
-        let mut replacements = Vec::new();
-        for candidates in groups.values() {
-            let mut selected = Vec::new();
-            let mut row_count = 0usize;
-            for seg in candidates {
-                if row_count.saturating_add(seg.rows as usize) > inner.config.hot_max_rows {
-                    break;
-                }
-                row_count += seg.rows as usize;
-                selected.push(seg);
-            }
-            if selected.len() < inner.config.compact_min_segments
-                || row_count.div_ceil(inner.config.segment_rows) >= selected.len()
-            {
-                continue;
-            }
+    let prepare_timer = db
+        .inner
+        .metrics
+        .timer(crate::metrics::Phase::CompactionPrepare);
+    let preparation = (|| {
+        let expected_bytes = selected
+            .iter()
+            .try_fold(0u64, |sum, segment| sum.checked_add(segment.decoded_bytes))
+            .context("compaction decoded-size overflow")?;
+        ensure!(
+            expected_bytes <= db.inner.config.hot_max_bytes as u64,
+            "compaction working set exceeds hot memory budget"
+        );
+        let mut rows = Vec::new();
+        let mut bytes = 0usize;
+        for descriptor in &selected {
+            let path = resolve_segment(&db.inner, descriptor)?;
+            let batch = segment::read(&path)?;
             ensure!(
-                selected
-                    .iter()
-                    .try_fold(0u64, |sum, seg| sum.checked_add(seg.decoded_bytes))
-                    .is_some_and(|bytes| bytes <= inner.config.hot_max_bytes as u64),
+                batch.len() as u64 == descriptor.rows,
+                "segment row-count mismatch"
+            );
+            let decoded = batch
+                .iter()
+                .map(|stored| stored.row.estimated_bytes())
+                .sum::<usize>();
+            ensure!(
+                decoded as u64 == descriptor.decoded_bytes,
+                "segment decoded-size metadata mismatch"
+            );
+            bytes = bytes
+                .checked_add(decoded)
+                .context("compaction working-set overflow")?;
+            ensure!(
+                bytes <= db.inner.config.hot_max_bytes,
                 "compaction working set exceeds hot memory budget"
             );
-            let mut rows = Vec::new();
-            let mut bytes = 0usize;
-            for seg in &selected {
-                let batch = read_segment_locked(inner, s, seg)?;
-                bytes += batch.iter().map(|r| r.row.estimated_bytes()).sum::<usize>();
-                ensure!(
-                    bytes <= inner.config.hot_max_bytes,
-                    "compaction working set exceeds hot memory budget"
-                );
-                rows.extend(batch.iter().cloned());
-            }
-            let files = write_partitioned(inner, &table.config, &rows)?;
-            for seg in selected {
-                retired.insert(seg.id.clone());
-            }
-            replacements.extend(files);
-            compacted += 1;
+            rows.extend(batch);
         }
-        table.segments.retain(|seg| !retired.contains(&seg.id));
-        table.segments.extend(replacements);
+        write_partitioned_with_pin(&db.inner, &table_config, &rows, Some(&mut pin))
+    })();
+    drop(prepare_timer);
+    let replacements = match preparation {
+        Ok(replacements) => replacements,
+        Err(error) => {
+            drop(pin);
+            let s = db.lock()?;
+            if s.fenced.is_none() {
+                cleanup_unpublished_segments(&db.inner, &s)?;
+            }
+            return Err(error);
+        }
+    };
+
+    let mut s = db.lock()?;
+    healthy(&s)?;
+    let publish_timer = db
+        .inner
+        .metrics
+        .timer(crate::metrics::Phase::CompactionPublish);
+    if s.catalog.checkpoint_sequence != s.sequence {
+        drop(publish_timer);
+        drop(pin);
+        cleanup_unpublished_segments(&db.inner, &s)?;
+        return Ok(0);
     }
-    if compacted > 0 {
-        persist_manifest(inner, s, next)?;
-        gc_locked(inner, s)?;
+    let retired: BTreeSet<_> = selected.iter().map(|segment| segment.id.as_str()).collect();
+    let current = s
+        .catalog
+        .tables
+        .get(&table_name)
+        .context("compaction table disappeared")?;
+    let inputs_match = current.config == table_config
+        && selected
+            .iter()
+            .all(|expected| current.segments.iter().any(|segment| segment == expected));
+    if !inputs_match {
+        drop(publish_timer);
+        drop(pin);
+        cleanup_unpublished_segments(&db.inner, &s)?;
+        return Ok(0);
     }
-    Ok(compacted)
+    // A newer checkpoint may append unrelated immutable descriptors. Exact input
+    // revalidation makes rebasing the replacement onto that generation safe.
+    let _generation_changed = s.generation != generation;
+    let _derived_working = reserve_catalog_clone(&s, &db.inner.config)?;
+    let mut next = s.catalog.clone();
+    let table = next
+        .tables
+        .get_mut(&table_name)
+        .context("compaction table disappeared")?;
+    table
+        .segments
+        .retain(|segment| !retired.contains(segment.id.as_str()));
+    table.segments.extend(replacements);
+    persist_manifest(&db.inner, &mut s, next)?;
+    drop(publish_timer);
+    drop(pin);
+    gc_locked(&db.inner, &mut s)?;
+    Ok(1)
 }
 
 fn archive_locked(inner: &Inner, s: &mut State, now_us: i64) -> Result<usize> {

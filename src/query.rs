@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail, ensure};
+use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashSet;
 use std::env;
@@ -12,9 +13,41 @@ use std::time::{Duration, Instant};
 
 use crate::model::{RollupRow, StoredRow, validate_name};
 
+mod workers;
+pub use workers::{QueryRuntime, QueryWorkerStats};
+
 const STDERR_LIMIT: usize = 256 * 1024;
 const MAX_QUERY_SCRIPT_BYTES: usize = 8 * 1024 * 1024;
+const MAX_QUERY_INPUT_BYTES: usize = 128 * 1024 * 1024;
+const MAX_CATALOG_SQL_BYTES: usize = 32 * 1024;
 const POLL_INTERVAL: Duration = Duration::from_millis(2);
+
+// One schema drives both ingestion paths, including unsigned tie-breakers.
+const INPUT_COLUMNS: &[(&str, &str)] = &[
+    ("kind", "VARCHAR"),
+    ("table_name", "VARCHAR"),
+    ("timestamp_us", "BIGINT"),
+    ("tenant", "VARCHAR"),
+    ("series", "VARCHAR"),
+    ("value", "DOUBLE"),
+    ("tags", "VARCHAR"),
+    ("sequence", "UBIGINT"),
+    ("ordinal", "UINTEGER"),
+    ("width_us", "BIGINT"),
+    ("bucket_us", "BIGINT"),
+    ("count", "UBIGINT"),
+    ("sum", "DOUBLE"),
+    ("min", "DOUBLE"),
+    ("max", "DOUBLE"),
+    ("first", "DOUBLE"),
+    ("last", "DOUBLE"),
+    ("first_timestamp_us", "BIGINT"),
+    ("last_timestamp_us", "BIGINT"),
+    ("first_sequence", "UBIGINT"),
+    ("first_ordinal", "UINTEGER"),
+    ("last_sequence", "UBIGINT"),
+    ("last_ordinal", "UINTEGER"),
+];
 
 #[derive(Clone, Debug)]
 pub struct QueryTable {
@@ -107,7 +140,7 @@ pub fn execute_with_catalog(
         .arg(script.path());
     let output = run_command(
         command,
-        Some(input),
+        (!input.is_empty()).then_some(input),
         options.timeout_ms,
         options.max_output_bytes,
     )?;
@@ -211,6 +244,17 @@ fn build_query(
     catalog: &QueryCatalog,
     worker: &Path,
 ) -> Result<(String, Vec<u8>)> {
+    build_query_mode(tables, sql, options, catalog, worker, true)
+}
+
+fn build_query_mode(
+    tables: &[QueryTable],
+    sql: &str,
+    options: &QueryOptions,
+    catalog: &QueryCatalog,
+    worker: &Path,
+    inline_catalog: bool,
+) -> Result<(String, Vec<u8>)> {
     let mut table_names = HashSet::new();
     let mut exposed_relations = HashSet::new();
     for table in tables {
@@ -226,7 +270,26 @@ fn build_query(
     validate_catalog(catalog, tables, &mut exposed_relations)?;
 
     let mut allowed_paths = Vec::new();
-    allowed_paths.push(quote_literal("/dev/stdin"));
+    let literal_catalog = if inline_catalog
+        && tables
+            .iter()
+            .all(|table| table.hot.is_empty() && table.rollups.is_empty())
+    {
+        catalog_literals(catalog)?
+    } else {
+        None
+    };
+    let has_input = literal_catalog.is_none()
+        && (tables
+            .iter()
+            .any(|table| !table.hot.is_empty() || !table.rollups.is_empty())
+            || catalog
+                .relations
+                .iter()
+                .any(|relation| !relation.rows.is_empty()));
+    if has_input {
+        allowed_paths.push(quote_literal("/dev/stdin"));
+    }
     for table in tables {
         for path in &table.files {
             allowed_paths.push(quote_path(path)?);
@@ -251,24 +314,51 @@ fn build_query(
     setup.push_str(
         "CREATE TEMP TABLE __varve_version_gate AS SELECT CASE WHEN starts_with(version(), 'v2.') THEN 1 ELSE error('DuckDB v2 is required') END AS ok; ",
     );
-    setup.push_str(
-        "CREATE TEMP TABLE __varve_input AS SELECT * FROM read_json('/dev/stdin', format = 'newline_delimited', auto_detect = false, columns = {kind: 'VARCHAR', table_name: 'VARCHAR', timestamp_us: 'BIGINT', tenant: 'VARCHAR', series: 'VARCHAR', value: 'DOUBLE', tags: 'VARCHAR', sequence: 'UBIGINT', ordinal: 'UINTEGER', width_us: 'BIGINT', bucket_us: 'BIGINT', count: 'UBIGINT', sum: 'DOUBLE', min: 'DOUBLE', max: 'DOUBLE', first: 'DOUBLE', last: 'DOUBLE', first_timestamp_us: 'BIGINT', last_timestamp_us: 'BIGINT', first_sequence: 'UBIGINT', first_ordinal: 'UINTEGER', last_sequence: 'UBIGINT', last_ordinal: 'UINTEGER'}); ",
-    );
+    if has_input {
+        setup.push_str("CREATE TEMP TABLE __varve_input AS SELECT * FROM read_json('/dev/stdin', format = 'newline_delimited', auto_detect = false, columns = {");
+        for (index, (name, kind)) in INPUT_COLUMNS.iter().enumerate() {
+            if index > 0 {
+                setup.push(',');
+            }
+            setup.push_str(&format!(
+                "{}: {}",
+                quote_identifier(name),
+                quote_literal(kind)
+            ));
+        }
+        setup.push_str("}); ");
+    } else {
+        setup.push_str("CREATE TEMP TABLE __varve_input (");
+        for (index, (name, kind)) in INPUT_COLUMNS.iter().enumerate() {
+            if index > 0 {
+                setup.push(',');
+            }
+            setup.push_str(&format!("{} {kind}", quote_identifier(name)));
+        }
+        setup.push_str("); ");
+    }
 
     let mut input = Vec::new();
-    append_json_line(&mut input, &json!({"kind": "sentinel"}))?;
     for table in tables {
         append_table_views(&mut setup, table)?;
         append_table_input(&mut input, table)?;
     }
-    for relation in &catalog.relations {
-        append_catalog_macro(&mut setup, relation)?;
-        append_catalog_input(&mut input, relation)?;
+    if let Some(literals) = &literal_catalog {
+        setup.push_str(literals);
+    } else {
+        for relation in &catalog.relations {
+            append_catalog_macro(&mut setup, relation)?;
+            append_catalog_input(&mut input, relation)?;
+        }
     }
     for alias in &catalog.aggregates {
         append_aggregate_alias(&mut setup, alias, tables)?;
     }
     setup.push_str(sql);
+    // Literals must not consume headroom available to the original scanner script.
+    if literal_catalog.is_some() && setup.len() > MAX_QUERY_SCRIPT_BYTES {
+        return build_query_mode(tables, sql, options, catalog, worker, false);
+    }
     Ok((setup, input))
 }
 
@@ -402,10 +492,64 @@ fn catalog_row_values(relation: &CatalogRelation, row: &Value) -> Result<Vec<Val
     Ok(values)
 }
 
-fn append_json_line(output: &mut Vec<u8>, value: &Value) -> Result<()> {
-    serde_json::to_writer(&mut *output, value)?;
-    output.push(b'\n');
+fn append_json_line(output: &mut Vec<u8>, value: &impl Serialize) -> Result<()> {
+    let mut writer = BoundedInput(output, MAX_QUERY_INPUT_BYTES);
+    serde_json::to_writer(&mut writer, value)?;
+    writer.write_all(b"\n")?;
     Ok(())
+}
+
+struct BoundedInput<'a>(&'a mut Vec<u8>, usize);
+
+impl Write for BoundedInput<'_> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if bytes.len() > self.1.saturating_sub(self.0.len()) {
+            return Err(std::io::Error::other("DuckDB query input exceeds 128 MiB"));
+        }
+        self.0.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+// Borrow strings; only tags need an owned JSON string for the VARCHAR contract.
+#[derive(Serialize)]
+struct HotInput<'a> {
+    kind: &'a str,
+    table_name: &'a str,
+    timestamp_us: i64,
+    tenant: &'a str,
+    series: &'a str,
+    value: f64,
+    tags: String,
+    sequence: u64,
+    ordinal: u32,
+}
+
+#[derive(Serialize)]
+struct RollupInput<'a> {
+    kind: &'a str,
+    table_name: &'a str,
+    width_us: i64,
+    bucket_us: i64,
+    tenant: &'a str,
+    series: &'a str,
+    tags: String,
+    count: u64,
+    sum: f64,
+    min: f64,
+    max: f64,
+    first: f64,
+    last: f64,
+    first_timestamp_us: i64,
+    last_timestamp_us: i64,
+    first_sequence: u64,
+    first_ordinal: u32,
+    last_sequence: u64,
+    last_ordinal: u32,
 }
 
 fn append_table_input(input: &mut Vec<u8>, table: &QueryTable) -> Result<()> {
@@ -413,17 +557,17 @@ fn append_table_input(input: &mut Vec<u8>, table: &QueryTable) -> Result<()> {
         row.row.validate().context("validate hot query row")?;
         append_json_line(
             input,
-            &json!({
-                "kind": "hot",
-                "table_name": table.name,
-                "timestamp_us": row.row.timestamp_us,
-                "tenant": row.row.tenant,
-                "series": row.row.series,
-                "value": row.row.value,
-                "tags": serde_json::to_string(&row.row.tags)?,
-                "sequence": row.sequence,
-                "ordinal": row.ordinal,
-            }),
+            &HotInput {
+                kind: "hot",
+                table_name: &table.name,
+                timestamp_us: row.row.timestamp_us,
+                tenant: &row.row.tenant,
+                series: &row.row.series,
+                value: row.row.value,
+                tags: serde_json::to_string(&row.row.tags)?,
+                sequence: row.sequence,
+                ordinal: row.ordinal,
+            },
         )?;
     }
     for rollup in &table.rollups {
@@ -437,27 +581,27 @@ fn append_table_input(input: &mut Vec<u8>, table: &QueryTable) -> Result<()> {
         );
         append_json_line(
             input,
-            &json!({
-                "kind": "rollup",
-                "table_name": table.name,
-                "width_us": rollup.width_us,
-                "bucket_us": rollup.bucket_us,
-                "tenant": rollup.tenant,
-                "series": rollup.series,
-                "tags": serde_json::to_string(&rollup.tags)?,
-                "count": rollup.count,
-                "sum": rollup.sum,
-                "min": rollup.min,
-                "max": rollup.max,
-                "first": rollup.first,
-                "last": rollup.last,
-                "first_timestamp_us": rollup.first_timestamp_us,
-                "last_timestamp_us": rollup.last_timestamp_us,
-                "first_sequence": rollup.first_sequence,
-                "first_ordinal": rollup.first_ordinal,
-                "last_sequence": rollup.last_sequence,
-                "last_ordinal": rollup.last_ordinal,
-            }),
+            &RollupInput {
+                kind: "rollup",
+                table_name: &table.name,
+                width_us: rollup.width_us,
+                bucket_us: rollup.bucket_us,
+                tenant: &rollup.tenant,
+                series: &rollup.series,
+                tags: serde_json::to_string(&rollup.tags)?,
+                count: rollup.count,
+                sum: rollup.sum,
+                min: rollup.min,
+                max: rollup.max,
+                first: rollup.first,
+                last: rollup.last,
+                first_timestamp_us: rollup.first_timestamp_us,
+                last_timestamp_us: rollup.last_timestamp_us,
+                first_sequence: rollup.first_sequence,
+                first_ordinal: rollup.first_ordinal,
+                last_sequence: rollup.last_sequence,
+                last_ordinal: rollup.last_ordinal,
+            },
         )?;
     }
     Ok(())
@@ -510,6 +654,71 @@ fn append_table_views(sql: &mut String, table: &QueryTable) -> Result<()> {
     sql.push_str(&table_literal);
     sql.push_str("; ");
     Ok(())
+}
+
+// Bound the complete encoded macros, not just the source payload. Any miss uses
+// the existing JSON scanner; no relation is pruned based on the user's SQL.
+fn catalog_literals(catalog: &QueryCatalog) -> Result<Option<String>> {
+    let mut sql = String::new();
+    macro_rules! push {
+        ($text:expr) => {{
+            let text = $text;
+            if text.len() > MAX_CATALOG_SQL_BYTES - sql.len() {
+                return Ok(None);
+            }
+            sql.push_str(&text);
+        }};
+    }
+    for relation in &catalog.relations {
+        push!(format!(
+            "CREATE TEMP MACRO {}() AS TABLE SELECT * FROM (VALUES ",
+            quote_identifier(&relation.name)
+        ));
+        // A typed NULL row plus WHERE false also supplies empty relation types.
+        for index in 0..relation.rows.len().max(1) {
+            if index > 0 {
+                push!(",");
+            }
+            push!("(");
+            let values = if relation.rows.is_empty() {
+                vec![Value::Null; relation.columns.len()]
+            } else {
+                catalog_row_values(relation, &relation.rows[index])?
+            };
+            for (i, (value, (_, kind))) in values.iter().zip(&relation.columns).enumerate() {
+                if i > 0 {
+                    push!(",");
+                }
+                let literal = match value {
+                    Value::Null => "NULL".into(),
+                    Value::String(text) => {
+                        if text.contains('\0') || text.len() > MAX_CATALOG_SQL_BYTES {
+                            return Ok(None);
+                        }
+                        quote_literal(text)
+                    }
+                    // Quoting numbers avoids inference through signed or decimal
+                    // intermediate types, in particular for u64::MAX.
+                    _ => quote_literal(&value.to_string()),
+                };
+                push!(format!("CAST({literal} AS {kind})"));
+            }
+            push!(")");
+        }
+        push!(") AS catalog_values(");
+        for (i, (name, _)) in relation.columns.iter().enumerate() {
+            if i > 0 {
+                push!(",");
+            }
+            push!(quote_identifier(name));
+        }
+        push!(")");
+        if relation.rows.is_empty() {
+            push!(" WHERE false");
+        }
+        push!("; ");
+    }
+    Ok(Some(sql))
 }
 
 fn append_catalog_macro(sql: &mut String, relation: &CatalogRelation) -> Result<()> {
@@ -584,6 +793,10 @@ fn run_command(
     timeout_ms: u64,
     max_output: usize,
 ) -> Result<ProcessOutput> {
+    if input.is_none() {
+        // No pipe or stdin writer thread for payload-free queries.
+        command.stdin(Stdio::null());
+    }
     let mut child = command.spawn().context("spawn DuckDB executable")?;
     let stdout = child.stdout.take().context("capture DuckDB stdout")?;
     let stderr = child.stderr.take().context("capture DuckDB stderr")?;
@@ -691,7 +904,226 @@ fn read_bounded<R: Read + Send + 'static>(
     })
 }
 
+// Pooling is an optimization, not a SQL permission boundary. ROLLBACK does not
+// reset all connection state (notably setseed/random). Parse misses and anything
+// outside this deliberately small non-mutating subset use a disposable worker.
+fn pooling_eligible(sql: &str, catalog: &QueryCatalog) -> bool {
+    use sqlparser::ast::{
+        BinaryOperator, Expr, FunctionArguments, ObjectName, ObjectNamePart, Query, SelectFlavor,
+        SetExpr, Statement, TableFactor, UnaryOperator, Visit, Visitor,
+    };
+    use sqlparser::dialect::DuckDbDialect;
+    use sqlparser::parser::Parser;
+    use std::ops::ControlFlow;
+
+    fn simple_name(name: &ObjectName) -> Option<&str> {
+        match name.0.as_slice() {
+            [ObjectNamePart::Identifier(name)] if matches!(name.quote_style, None | Some('"')) => {
+                Some(&name.value)
+            }
+            _ => None,
+        }
+    }
+
+    fn scalar(name: &ObjectName) -> bool {
+        simple_name(name).is_some_and(|name| {
+            matches!(
+                name.to_ascii_lowercase().as_str(),
+                "abs"
+                    | "avg"
+                    | "count"
+                    | "sum"
+                    | "min"
+                    | "max"
+                    | "first"
+                    | "last"
+                    | "coalesce"
+                    | "nullif"
+                    | "sin"
+                    | "repeat"
+                    | "error"
+                    | "lower"
+                    | "upper"
+                    | "length"
+                    | "current_setting"
+                    | "floor"
+                    | "ceil"
+                    | "round"
+                    | "date_trunc"
+                    | "to_timestamp"
+                    | "row_number"
+                    | "rank"
+                    | "dense_rank"
+                    | "lag"
+                    | "lead"
+                    | "first_value"
+                    | "last_value"
+            )
+        })
+    }
+
+    struct Eligibility<'a>(&'a QueryCatalog);
+    impl Visitor for Eligibility<'_> {
+        type Break = ();
+
+        fn pre_visit_statement(&mut self, statement: &Statement) -> ControlFlow<()> {
+            match statement {
+                Statement::Query(_) | Statement::Explain { .. } => ControlFlow::Continue(()),
+                _ => ControlFlow::Break(()),
+            }
+        }
+
+        fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<()> {
+            // Keep unfamiliar grammar fresh, even when sqlparser can parse it.
+            let SetExpr::Select(select) = query.body.as_ref() else {
+                return ControlFlow::Break(());
+            };
+            if !query.locks.is_empty()
+                || query.for_clause.is_some()
+                || query.settings.is_some()
+                || query.format_clause.is_some()
+                || !query.pipe_operators.is_empty()
+                || select.optimizer_hint.is_some()
+                || select.select_modifiers.is_some()
+                || select.top.is_some()
+                || select.top_before_distinct
+                || select.exclude.is_some()
+                || select.into.is_some()
+                || !select.lateral_views.is_empty()
+                || select.prewhere.is_some()
+                || !select.connect_by.is_empty()
+                || !select.cluster_by.is_empty()
+                || !select.distribute_by.is_empty()
+                || !select.sort_by.is_empty()
+                || select.value_table_mode.is_some()
+                || select.flavor != SelectFlavor::Standard
+            {
+                return ControlFlow::Break(());
+            }
+            ControlFlow::Continue(())
+        }
+
+        fn pre_visit_table_factor(&mut self, table: &TableFactor) -> ControlFlow<()> {
+            match table {
+                TableFactor::Table {
+                    name,
+                    args,
+                    with_hints,
+                    version,
+                    with_ordinality,
+                    partitions,
+                    json_path,
+                    sample,
+                    index_hints,
+                    ..
+                } if with_hints.is_empty()
+                    && version.is_none()
+                    && !with_ordinality
+                    && partitions.is_empty()
+                    && json_path.is_none()
+                    && sample.is_none()
+                    && index_hints.is_empty() =>
+                {
+                    let Some(name) = simple_name(name) else {
+                        return ControlFlow::Break(());
+                    };
+                    if let Some(args) = args {
+                        if args.settings.is_some() {
+                            return ControlFlow::Break(());
+                        }
+                        let builtin = matches!(
+                            name.to_ascii_lowercase().as_str(),
+                            "range" | "duckdb_tables" | "duckdb_functions"
+                        );
+                        // Only our generated zero-argument table macros qualify.
+                        // prepare/build_query validates the complete catalog before
+                        // any SQL executes; callers cannot supply macro SQL bodies.
+                        let generated = args.args.is_empty()
+                            && self
+                                .0
+                                .relations
+                                .iter()
+                                .any(|relation| relation.name.eq_ignore_ascii_case(name));
+                        if !builtin && !generated {
+                            return ControlFlow::Break(());
+                        }
+                    }
+                }
+                TableFactor::Derived { sample: None, .. } => {}
+                _ => return ControlFlow::Break(()),
+            }
+            ControlFlow::Continue(())
+        }
+
+        fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
+            match expr {
+                Expr::Function(function)
+                    if scalar(&function.name)
+                        && !function.uses_odbc_syntax
+                        && matches!(function.parameters, FunctionArguments::None)
+                        && matches!(&function.args, FunctionArguments::List(args) if args.clauses.is_empty()) =>
+                    {}
+                Expr::BinaryOp {
+                    op:
+                        BinaryOperator::Plus
+                        | BinaryOperator::Minus
+                        | BinaryOperator::Multiply
+                        | BinaryOperator::Divide
+                        | BinaryOperator::Modulo
+                        | BinaryOperator::StringConcat
+                        | BinaryOperator::Eq
+                        | BinaryOperator::NotEq
+                        | BinaryOperator::Gt
+                        | BinaryOperator::Lt
+                        | BinaryOperator::GtEq
+                        | BinaryOperator::LtEq
+                        | BinaryOperator::And
+                        | BinaryOperator::Or,
+                    ..
+                } => {}
+                Expr::UnaryOp {
+                    op: UnaryOperator::Plus | UnaryOperator::Minus | UnaryOperator::Not,
+                    ..
+                } => {}
+                Expr::Identifier(_)
+                | Expr::CompoundIdentifier(_)
+                | Expr::Value(_)
+                | Expr::Nested(_)
+                | Expr::Cast { .. }
+                | Expr::Case { .. }
+                | Expr::IsNull(_)
+                | Expr::IsNotNull(_)
+                | Expr::IsTrue(_)
+                | Expr::IsFalse(_)
+                | Expr::IsNotTrue(_)
+                | Expr::IsNotFalse(_)
+                | Expr::IsDistinctFrom(..)
+                | Expr::IsNotDistinctFrom(..)
+                | Expr::InList { .. }
+                | Expr::InSubquery { .. }
+                | Expr::Between { .. }
+                | Expr::Exists { .. }
+                | Expr::Subquery(_) => {}
+                _ => return ControlFlow::Break(()),
+            }
+            // The visitor traverses arguments, filters, windows and subqueries too.
+            ControlFlow::Continue(())
+        }
+    }
+
+    let Ok(statements) = Parser::parse_sql(&DuckDbDialect {}, sql) else {
+        return false;
+    };
+    statements.len() == 1 && statements.visit(&mut Eligibility(catalog)).is_continue()
+}
+
 fn validate_read_only_statement(sql: &str) -> Result<()> {
+    ensure!(
+        sql.len() <= MAX_QUERY_SCRIPT_BYTES,
+        "DuckDB SQL script exceeds {} bytes",
+        MAX_QUERY_SCRIPT_BYTES
+    );
+    ensure!(!sql.contains('\0'), "SQL contains NUL");
     let tokens = lex_sql(sql)?;
     let first = tokens.first().context("SQL statement is empty")?;
     ensure!(
@@ -891,6 +1323,204 @@ fn skip_dollar_quote(bytes: &[u8], index: usize) -> Result<Option<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pooling_requires_known_parsed_functions_and_grammar() {
+        let catalog = QueryCatalog {
+            relations: vec![CatalogRelation {
+                name: "quoted\"catalog".into(),
+                columns: vec![("value".into(), "DOUBLE".into())],
+                rows: vec![],
+            }],
+            aggregates: vec![],
+        };
+        for sql in [
+            "SELECT 1",
+            "SELECT \"SuM\"(value) FROM measurements",
+            "WITH x AS (SELECT 1 AS n) SELECT count(*) FROM x",
+            "EXPLAIN ANALYZE SELECT abs(-1)",
+            "SELECT * FROM \"quoted\"\"catalog\"()",
+            "SELECT 'setseed(0.25)' AS inert_text",
+            "SELECT date_trunc('minute', to_timestamp(timestamp_us/1000000.0)) FROM measurements",
+            "SELECT row_number() OVER (ORDER BY value), lag(value) OVER (ORDER BY value) FROM measurements",
+        ] {
+            assert!(pooling_eligible(sql, &catalog), "not pooled: {sql}");
+        }
+        for sql in [
+            "SELECT setseed(0.25)",
+            "SELECT \"setseed\"(0.25)",
+            "SELECT \"SeTsEeD\" /* comment */ (0.25)",
+            "SELECT * FROM query('SELECT setseed(0.25)')",
+            "SELECT * FROM \"query\"($$SELECT setseed(0.25)$$)",
+            "SELECT random()",
+            "SELECT mystery_function(1)",
+            "SELECT main.abs(1)",
+            "SELECT * FROM unknown_macro()",
+            "SELECT abs((SELECT setseed(0.25)))",
+            "SELECT count(*) FILTER (WHERE setseed(0.25) IS NULL)",
+            "SELECT sum(1) OVER (ORDER BY setseed(0.25))",
+            "SELECT row_number() OVER (ORDER BY setseed(0.25))",
+            "SELECT lag(setseed(0.25)) OVER (ORDER BY 1)",
+            "SELECT * FROM range(CAST(setseed(0.25) AS BIGINT))",
+            "WITH x AS (SELECT setseed(0.25)) SELECT * FROM x",
+            "SELECT 1 UNION ALL SELECT 2",
+            "SELECT unparsed !!! syntax",
+            "SELECT * FROM measurements USING SAMPLE 1 ROWS",
+            "SELECT * FROM \"quoted\"\"catalog\"(setseed(0.25))",
+        ] {
+            assert!(
+                !pooling_eligible(sql, &catalog),
+                "incorrectly pooled: {sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn query_input_writer_checks_bound_before_appending() {
+        let mut bytes = Vec::new();
+        let mut writer = BoundedInput(&mut bytes, 4);
+        writer.write_all(b"1234").unwrap();
+        assert!(writer.write_all(b"5").is_err());
+        assert_eq!(bytes, b"1234");
+        assert!(validate_read_only_statement("SELECT '\0'").is_err());
+    }
+
+    #[test]
+    fn payload_free_setup_has_no_scanner_or_stdin_allowance() {
+        let worker = tempfile::tempdir().unwrap();
+        let mut tables = vec![QueryTable {
+            name: "metrics".into(),
+            hot: vec![],
+            files: vec![],
+            rollups: vec![],
+            cutoff_us: None,
+        }];
+        let catalog = QueryCatalog {
+            relations: vec![CatalogRelation {
+                name: "metadata".into(),
+                columns: vec![("name".into(), "VARCHAR".into())],
+                rows: vec![],
+            }],
+            aggregates: vec![AggregateAlias {
+                name: "minute".into(),
+                source: "metrics".into(),
+                width_us: 60,
+            }],
+        };
+        for disk in [false, true] {
+            if disk {
+                tables[0].files.push(worker.path().join("selected.parquet"));
+            }
+            let (sql, input) = build_query(
+                &tables,
+                "SELECT 42",
+                &QueryOptions::default(),
+                &catalog,
+                worker.path(),
+            )
+            .unwrap();
+            assert!(input.is_empty());
+            assert!(!sql.contains("read_json("));
+            assert!(!sql.contains("/dev/stdin"));
+            assert!(!sql.contains("sentinel"));
+            assert!(sql.contains("SET lock_configuration = true"));
+            for (name, kind) in INPUT_COLUMNS {
+                assert!(sql.contains(&format!("{} {kind}", quote_identifier(name))));
+            }
+            assert_eq!(sql.contains("read_parquet("), disk);
+        }
+    }
+
+    #[test]
+    fn catalog_literal_budget_and_original_script_headroom() {
+        let worker = tempfile::tempdir().unwrap();
+        let options = QueryOptions::default();
+        let mut catalog = QueryCatalog {
+            relations: vec![CatalogRelation {
+                name: "metadata".into(),
+                columns: vec![("text".into(), "VARCHAR".into())],
+                rows: vec![json!(["x".repeat(16 * 1024)])],
+            }],
+            aggregates: vec![],
+        };
+        assert!(catalog_literals(&catalog).unwrap().unwrap().len() <= MAX_CATALOG_SQL_BYTES);
+        let (legacy, _) =
+            build_query_mode(&[], "", &options, &catalog, worker.path(), false).unwrap();
+        let query = format!(
+            "SELECT 42 AS answer /*{}*/",
+            "x".repeat(MAX_QUERY_SCRIPT_BYTES - legacy.len() - 128)
+        );
+        let (expected, expected_input) =
+            build_query_mode(&[], &query, &options, &catalog, worker.path(), false).unwrap();
+        assert!(expected.len() <= MAX_QUERY_SCRIPT_BYTES);
+        let (actual, input) = build_query(&[], &query, &options, &catalog, worker.path()).unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(input, expected_input);
+        assert_eq!(
+            execute_with_catalog(&[], &query, &options, &catalog).unwrap(),
+            json!([{"answer": 42}])
+        );
+        // Escaping expands this source under 32KiB past the encoded budget.
+        catalog.relations[0].rows = vec![json!(["'".repeat(17 * 1024)])];
+        assert!(catalog_literals(&catalog).unwrap().is_none());
+        catalog.relations[0].rows = vec![json!(["a\0b"])];
+        assert!(catalog_literals(&catalog).unwrap().is_none());
+    }
+
+    #[test]
+    fn typed_records_preserve_legacy_fields_without_sentinel() {
+        use crate::model::Row;
+        let stored = StoredRow {
+            row: Row {
+                timestamp_us: i64::MIN,
+                tenant: "tenant雪".into(),
+                series: "cpu\"\\\n".into(),
+                value: f64::MIN_POSITIVE,
+                tags: std::collections::BTreeMap::from([("\"\\\n雪".into(), "'\t".into())]),
+            },
+            sequence: u64::MAX,
+            ordinal: u32::MAX,
+        };
+        let rollup = RollupRow::from_row(1, &stored).unwrap();
+        let mut table = QueryTable {
+            name: "metrics".into(),
+            hot: vec![stored.clone()],
+            files: vec![],
+            rollups: vec![rollup.clone()],
+            cutoff_us: None,
+        };
+        let worker = tempfile::tempdir().unwrap();
+        let (sql, input) = build_query(
+            std::slice::from_ref(&table),
+            "SELECT 1",
+            &QueryOptions::default(),
+            &QueryCatalog::default(),
+            worker.path(),
+        )
+        .unwrap();
+        assert!(sql.contains("read_json('/dev/stdin'"));
+        let lines: Vec<Value> = input
+            .split(|b| *b == b'\n')
+            .filter(|line| !line.is_empty())
+            .map(|line| serde_json::from_slice(line).unwrap())
+            .collect();
+        let mut hot = serde_json::to_value(&stored.row).unwrap();
+        hot["kind"] = json!("hot");
+        hot["table_name"] = json!("metrics");
+        hot["tags"] = json!(serde_json::to_string(&stored.row.tags).unwrap());
+        hot["sequence"] = json!(stored.sequence);
+        hot["ordinal"] = json!(stored.ordinal);
+        let mut expected_rollup = serde_json::to_value(&rollup).unwrap();
+        expected_rollup["kind"] = json!("rollup");
+        expected_rollup["table_name"] = json!("metrics");
+        expected_rollup["tags"] = json!(serde_json::to_string(&rollup.tags).unwrap());
+        assert_eq!(lines, vec![hot, expected_rollup]);
+        table.hot[0].row.value = f64::NAN;
+        assert!(append_table_input(&mut vec![], &table).is_err());
+        table.hot.clear();
+        table.rollups[0].sum = f64::INFINITY;
+        assert!(append_table_input(&mut vec![], &table).is_err());
+    }
 
     #[test]
     fn accepts_one_analytical_statement() {

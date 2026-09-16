@@ -363,8 +363,20 @@ fn gated_server(extra: &[(&str, &str)]) -> Server {
     use std::os::unix::fs::PermissionsExt;
     let dir = TempDir::new().unwrap();
     let script = dir.path().join("query.sh");
-    // A file barrier makes worker occupancy deterministic; no sleep is used as proof of admission.
-    std::fs::write(&script, format!("#!/bin/sh\ncat >/dev/null\ntouch '{}'\nwhile [ ! -f '{}' ]; do sleep 0.01; done\nprintf '[{{\"answer\":42}}]'\n", dir.path().join("entered").display(), dir.path().join("release").display())).unwrap();
+    // Gate before exec, not EOF: resident workers deliberately keep stdin open.
+    // The marker proves occupancy; the real pinned CLI handles request framing.
+    let duckdb = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tools/duckdb");
+    assert!(duckdb.is_file(), "actual .tools/duckdb is required");
+    std::fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\ntouch '{}'\nwhile [ ! -f '{}' ]; do sleep 0.01; done\nexec '{}' \"$@\"\n",
+            dir.path().join("entered").display(),
+            dir.path().join("release").display(),
+            duckdb.display()
+        ),
+    )
+    .unwrap();
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
     Server::in_dir(
         dir,

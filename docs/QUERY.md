@@ -1,8 +1,10 @@
 # Query adapter
 
-Varve v0.1 runs analytical SQL in a fresh, bounded DuckDB CLI subprocess. The exercised engine is DuckDB `v2.0.0-alpha41533` (`Cyanoptera`, revision `10de957379`). `query::execute_with_catalog` performs an in-worker v2 gate before exposing relations, and `query::version` rejects other major versions. `query::execute` is the compatibility wrapper with an empty `QueryCatalog`.
+Varve runs analytical SQL through bounded, isolated DuckDB CLI workers. `Database::query` owns a resident `QueryRuntime`; its exact reuse, reset, eligibility, cancellation and replacement contract is in [QUERY_WORKERS.md](QUERY_WORKERS.md). Standalone `query::execute_with_catalog` retains a fresh subprocess per call, and `query::execute` wraps it with an empty `QueryCatalog`. The exercised engine is DuckDB `v2.0.0-alpha41533` (`Cyanoptera`, revision `10de957379`); an in-worker v2 gate precedes relation exposure, and `query::version` rejects other major versions.
 
-## Worker boundary
+The worker-boundary details below describe the standalone compatibility path. Resident workers instead use unique private staging files, deny direct stdin reads, and retain locked immutable execution scopes; they do not inherit the standalone stdin exception.
+
+## Standalone compatibility boundary
 
 The CLI starts with `-no-init`, an in-memory database and a private temporary directory. Varve writes setup plus user SQL to a mode-private file and invokes DuckDB with native `-f`; SQL and long Parquet lists are not process arguments. The script is capped at 8 MiB and removed with the worker directory. Standard input remains dedicated to hot NDJSON ingestion. The database layer currently applies its own smaller public SQL request limit.
 
@@ -22,9 +24,9 @@ This is still an alpha CLI subprocess boundary, not an OS sandbox: Varve does no
 
 ## Exposed relations
 
-Hot rows and rollups are encoded as newline-delimited JSON on stdin and copied into a typed temporary in-memory staging table. This is copied ingestion, not zero-copy Arrow integration. Immutable cold files are native typed Parquet with ZSTD compression. Raw tables use their configured names; rollups use `<table>__rollup`.
+Nonempty hot rows and rollups are serialized from borrowed typed records as bounded newline-delimited JSON and copied into a typed temporary in-memory staging table: stdin for standalone execution, unique private files for resident execution. Encoded input is capped at 128 MiB per request; this is not a total-RSS guarantee. This avoids constructing a JSON object tree for every row, but remains copied ingestion—not zero-copy Arrow integration. Payload-free snapshots create the same typed empty staging table without invoking a JSON scanner. Immutable cold files are native typed Parquet with ZSTD compression. Raw tables use their configured names; rollups use `<table>__rollup`.
 
-`QueryCatalog` adds read-only feature metadata without interpolating values into SQL. Each `CatalogRelation` becomes a quoted zero-argument DuckDB table macro, for example `varve_tables()`. Its rows travel as tagged JSON payloads on the same stdin stream. Columns and macro names are quoted, and declared types are restricted to `VARCHAR`, `BIGINT`, `UBIGINT`, `DOUBLE`, and `BOOLEAN`. Rows must match the declared nullable types.
+`QueryCatalog` adds read-only feature metadata. Each `CatalogRelation` becomes a quoted zero-argument DuckDB table macro, for example `varve_tables()`. Small catalogs use escaped, explicitly typed SQL literals within a 32 KiB limit. Embedded NUL, excessive literal size or insufficient script headroom conservatively selects the bounded tagged-NDJSON transport instead; relations are not omitted to force the fast path. Columns and macro names are quoted, and declared types are restricted to `VARCHAR`, `BIGINT`, `UBIGINT`, `DOUBLE`, and `BOOLEAN`. Rows must match the declared nullable types, including exact signed/unsigned integer bounds.
 
 Each `AggregateAlias` becomes a quoted view over `<source>__rollup` with an exact `width_us` predicate. Alias `count` is exposed as `BIGINT` for normal JSON numeric output; the underlying rollup relation retains `UBIGINT`. It does not create or maintain an aggregate. Core configuration and schema validation remain authoritative, and Varve still does not provide arbitrary SQL incremental maintenance, DDL, or mutable relational SQL.
 

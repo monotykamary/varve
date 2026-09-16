@@ -12,19 +12,19 @@ use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::model::{Row, StoredRow};
 
 const BATCH_ROWS: usize = 8_192;
 
-struct LimitedWriter {
-    file: File,
+struct LimitedWriter<W> {
+    inner: W,
     written: u64,
     max_bytes: u64,
 }
 
-impl Write for LimitedWriter {
+impl<W: Write> Write for LimitedWriter<W> {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
         crate::wal::injected_io("segment_before_write")?;
         let length = u64::try_from(bytes.len()).map_err(|_| {
@@ -43,7 +43,7 @@ impl Write for LimitedWriter {
                 "segment exceeds configured byte limit",
             ));
         }
-        let written = self.file.write(bytes)?;
+        let written = self.inner.write(bytes)?;
         self.written = self
             .written
             .checked_add(written as u64)
@@ -53,7 +53,7 @@ impl Write for LimitedWriter {
 
     fn flush(&mut self) -> std::io::Result<()> {
         crate::wal::injected_io("segment_before_flush")?;
-        self.file.flush()
+        self.inner.flush()
     }
 }
 
@@ -103,6 +103,64 @@ fn record_batch(rows: &[&StoredRow], schema: Arc<Schema>) -> Result<RecordBatch>
     RecordBatch::try_new(schema, columns).context("construct Arrow record batch")
 }
 
+fn encode_to<W: Write + Send>(inner: W, rows: &[StoredRow], max_bytes: u64) -> Result<()> {
+    ensure!(max_bytes > 0, "segment byte limit must be positive");
+    for row in rows {
+        row.row.validate().context("validate segment row")?;
+    }
+    let mut sorted: Vec<&StoredRow> = rows.iter().collect();
+    sorted.sort_by(|left, right| row_order(left, right));
+    let limited = LimitedWriter {
+        inner,
+        written: 0,
+        max_bytes,
+    };
+    let properties = WriterProperties::builder()
+        .set_compression(Compression::ZSTD(ZstdLevel::default()))
+        .build();
+    let segment_schema = schema();
+    let mut writer = ArrowWriter::try_new(limited, Arc::clone(&segment_schema), Some(properties))
+        .context("create Parquet writer")?;
+    for chunk in sorted.chunks(BATCH_ROWS) {
+        writer
+            .write(&record_batch(chunk, Arc::clone(&segment_schema))?)
+            .context("write Parquet record batch")?;
+    }
+    writer.close().context("finish Parquet segment")?;
+    Ok(())
+}
+
+#[derive(Clone)]
+struct MemoryWriter(Arc<Mutex<Vec<u8>>>);
+
+impl Write for MemoryWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .map_err(|_| std::io::Error::other("segment memory writer poisoned"))?
+            .extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+pub fn encode_with_limit(rows: &[StoredRow], max_bytes: u64) -> Result<Vec<u8>> {
+    let shared = Arc::new(Mutex::new(Vec::new()));
+    encode_to(MemoryWriter(Arc::clone(&shared)), rows, max_bytes)?;
+    let bytes = Arc::try_unwrap(shared)
+        .map_err(|_| anyhow::anyhow!("segment memory writer still shared"))?
+        .into_inner()
+        .map_err(|_| anyhow::anyhow!("segment memory writer poisoned"))?;
+    ensure!(
+        bytes.len() as u64 <= max_bytes,
+        "segment exceeds configured byte limit"
+    );
+    Ok(bytes)
+}
+
 pub fn write(path: &Path, rows: &[StoredRow]) -> Result<()> {
     write_with_limit(path, rows, u64::MAX)
 }
@@ -111,35 +169,11 @@ pub fn write_with_limit(path: &Path, rows: &[StoredRow], max_bytes: u64) -> Resu
     ensure!(max_bytes > 0, "segment byte limit must be positive");
     let mut created = false;
     let result = (|| {
-        for row in rows {
-            row.row.validate().context("validate segment row")?;
-        }
-
-        let mut sorted: Vec<&StoredRow> = rows.iter().collect();
-        sorted.sort_by(|left, right| row_order(left, right));
-
         crate::wal::injected_io("segment_before_create")?;
         let file =
             File::create(path).with_context(|| format!("create segment {}", path.display()))?;
         created = true;
-        let limited = LimitedWriter {
-            file,
-            written: 0,
-            max_bytes,
-        };
-        let properties = WriterProperties::builder()
-            .set_compression(Compression::ZSTD(ZstdLevel::default()))
-            .build();
-        let segment_schema = schema();
-        let mut writer =
-            ArrowWriter::try_new(limited, Arc::clone(&segment_schema), Some(properties))
-                .context("create Parquet writer")?;
-        for chunk in sorted.chunks(BATCH_ROWS) {
-            writer
-                .write(&record_batch(chunk, Arc::clone(&segment_schema))?)
-                .context("write Parquet record batch")?;
-        }
-        writer.close().context("finish Parquet segment")?;
+        encode_to(file, rows, max_bytes)?;
         ensure!(
             fs::metadata(path)?.len() <= max_bytes,
             "segment exceeds configured byte limit"

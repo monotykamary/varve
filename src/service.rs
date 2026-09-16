@@ -528,12 +528,15 @@ async fn serve_connection(
         .with_upgrades();
     tokio::pin!(connection);
     tokio::select! {
-        result = timeout(connection_timeout, &mut connection) => {
-            match result {
-                Ok(result) => result.context("serve HTTP connection")?,
-                Err(_) => {
-                    metrics.connection_timeouts_total.fetch_add(1, Ordering::Relaxed);
-                }
+        result = &mut connection => {
+            result.context("serve HTTP connection")?;
+        },
+        _ = sleep(connection_timeout) => {
+            metrics.connection_timeouts_total.fetch_add(1, Ordering::Relaxed);
+            connection.as_mut().graceful_shutdown();
+            let drain_timeout = state.request_timeout.saturating_add(header_timeout);
+            if let Ok(result) = timeout(drain_timeout, &mut connection).await {
+                result.context("drain retired HTTP connection")?;
             }
         },
         changed = shutdown.changed() => {
@@ -779,9 +782,10 @@ async fn process_request(
                     Ok(text_response(
                         StatusCode::OK,
                         format!(
-                            "{}{}",
-                            render_metrics(&metrics, &status),
-                            transport::ingest_metrics(&ingestor.stats())
+                            "{}{}{}",
+                            render_metrics(&metrics, &status, &db.query_worker_stats()),
+                            transport::ingest_metrics(&ingestor.stats()),
+                            db.performance().prometheus()
                         ),
                     ))
                 }
@@ -988,7 +992,11 @@ async fn shutdown_signal() -> Result<()> {
         .context("install interrupt handler")
 }
 
-fn render_metrics(metrics: &Metrics, status: &varve::Status) -> String {
+fn render_metrics(
+    metrics: &Metrics,
+    status: &varve::Status,
+    workers: &varve::query::QueryWorkerStats,
+) -> String {
     let uptime = metrics
         .started
         .map(|started| started.elapsed().as_secs_f64())
@@ -1018,6 +1026,16 @@ fn render_metrics(metrics: &Metrics, status: &varve::Status) -> String {
             "# TYPE varve_unshipped_batches gauge\nvarve_unshipped_batches {unshipped_batches}\n",
             "# TYPE varve_hot_bytes gauge\nvarve_hot_bytes {hot_bytes}\n",
             "# TYPE varve_metadata_bytes gauge\nvarve_metadata_bytes {metadata_bytes}\n",
+            "# TYPE varve_control_root_bytes gauge\nvarve_control_root_bytes {control_root_bytes}\n",
+            "# TYPE varve_derived_encoded_bytes gauge\nvarve_derived_encoded_bytes {derived_encoded_bytes}\n",
+            "# TYPE varve_derived_resident_bytes gauge\nvarve_derived_resident_bytes {derived_resident_bytes}\n",
+            "# TYPE varve_derived_working_bytes gauge\nvarve_derived_working_bytes {derived_working_bytes}\n",
+            "# TYPE varve_query_workers_active gauge\nvarve_query_workers_active {workers_active}\n",
+            "# TYPE varve_query_workers_idle gauge\nvarve_query_workers_idle {workers_idle}\n",
+            "# TYPE varve_query_workers_spawned_total counter\nvarve_query_workers_spawned_total {workers_spawned}\n",
+            "# TYPE varve_query_workers_reused_total counter\nvarve_query_workers_reused_total {workers_reused}\n",
+            "# TYPE varve_query_workers_resets_total counter\nvarve_query_workers_resets_total {workers_resets}\n",
+            "# TYPE varve_query_workers_discarded_total counter\nvarve_query_workers_discarded_total {workers_discarded}\n",
             "# TYPE varve_idempotency_keys gauge\nvarve_idempotency_keys {idempotency_keys}\n",
             "# TYPE varve_rollup_groups gauge\nvarve_rollup_groups {rollup_groups}\n",
             "# TYPE varve_decoded_cache_bytes gauge\nvarve_decoded_cache_bytes {decoded_cache_bytes}\n",
@@ -1048,6 +1066,16 @@ fn render_metrics(metrics: &Metrics, status: &varve::Status) -> String {
         unshipped_batches = status.unshipped_batches,
         hot_bytes = status.hot_bytes,
         metadata_bytes = status.metadata_bytes,
+        control_root_bytes = status.control_root_bytes,
+        derived_encoded_bytes = status.derived_encoded_bytes,
+        derived_resident_bytes = status.derived_resident_bytes,
+        derived_working_bytes = status.derived_working_bytes,
+        workers_active = workers.active,
+        workers_idle = workers.idle,
+        workers_spawned = workers.spawned,
+        workers_reused = workers.reused,
+        workers_resets = workers.resets,
+        workers_discarded = workers.discarded,
         idempotency_keys = status.idempotency_keys,
         rollup_groups = status.rollup_groups,
         decoded_cache_bytes = status.decoded_cache_bytes,

@@ -1,0 +1,34 @@
+{
+  "region": "asia-southeast1-eqsg3a",
+  "uid": 0,
+  "platform": {
+    "platform": "Linux-6.18.15+deb13-cloud-amd64-x86_64-with-glibc2.36",
+    "python": "3.12.14",
+    "logical_cpus": 48,
+    "cgroup_v2": {
+      "cpu.max": "200000 100000",
+      "memory.max": "999997440"
+    }
+  },
+  "artifact": {
+    "format_version": 1,
+    "sha256": "0b652bcbe6f1ab75c680b892d5209ecf031894c3baa7a35878321da1714a3513",
+    "files": {
+      "benchmark.py": "f5488311247210b118410c155408a5be5af9ce2d28d6d480585a9c315125f637",
+      "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+      "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+    }
+  },
+  "preflight": {
+    "timescaledb_version": "2.30.0",
+    "postgresql_version": "17.11",
+    "durability": {
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on"
+    },
+    "extension_preinstalled": true
+  },
+  "results_writable": true
+}

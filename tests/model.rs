@@ -67,6 +67,45 @@ fn every_public_configuration_entry_is_documented() {
 }
 
 #[test]
+fn derived_layout_migration_is_explicit_and_writer_pages_are_bounded() {
+    let legacy: Config = serde_json::from_str("{}").unwrap();
+    assert!(!legacy.derived_pages);
+    assert_eq!(legacy.derived_max_bytes, 64 * 1024 * 1024);
+    assert_eq!(legacy.derived_page_bytes, 256 * 1024);
+    legacy.validate().unwrap();
+    let opted_in: Config = serde_json::from_value(serde_json::json!({
+        "derived_pages": true, "derived_max_bytes": 8192, "derived_page_bytes": 4096
+    }))
+    .unwrap();
+    opted_in.validate().unwrap();
+    assert!(opted_in.derived_pages);
+    for (budget, page) in [
+        (4095, 4096),
+        (8192, 4095),
+        (4096, 8192),
+        (512 * 1024 * 1024 + 1, 4096),
+        (8 * 1024 * 1024, 1024 * 1024 + 1),
+    ] {
+        assert!(
+            Config {
+                derived_max_bytes: budget,
+                derived_page_bytes: page,
+                ..Config::default()
+            }
+            .validate()
+            .is_err()
+        );
+    }
+    assert!(
+        serde_json::from_str::<Config>("{\"derived_page_bytes\":0}")
+            .unwrap()
+            .validate()
+            .is_err()
+    );
+    assert!(serde_json::from_str::<Config>("{\"derived_pages\":\"true\"}").is_err());
+}
+
+#[test]
 fn invalid_configuration_and_partition_extremes() {
     for name in ["", "x__rollup", "../x", "UPPER", "1x", "a-b"] {
         assert!(validate_name(name).is_err());

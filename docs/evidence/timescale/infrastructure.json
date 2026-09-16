@@ -1,0 +1,52 @@
+{
+  "project_id": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+  "environment_id": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+  "region": "asia-southeast1-eqsg3a",
+  "services": {
+    "varve-benchmark": {
+      "id": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+      "name": "varve-benchmark",
+      "volumeId": "720d3de6-3ce6-4007-b2a1-c3f6d2ee5232",
+      "mountPath": "/data",
+      "vCPUs": 2,
+      "memoryGB": 2
+    },
+    "timescale-benchmark": {
+      "id": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+      "name": "timescale-benchmark",
+      "volumeId": "cdd445af-7c7d-42b8-ba10-5a2055e5abc8",
+      "mountPath": "/var/lib/postgresql/data",
+      "vCPUs": 2,
+      "memoryGB": 2
+    },
+    "benchmark-driver": {
+      "id": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+      "name": "benchmark-driver",
+      "vCPUs": 2,
+      "memoryGB": 1
+    }
+  },
+  "observed_caps": {
+    "databases": {
+      "cpu_max": "200000 100000",
+      "memory_max": 1999998976
+    },
+    "driver": {
+      "cpu_max": "200000 100000",
+      "memory_max": 999997440
+    }
+  },
+  "cap_evidence": "database values transcribed from live runtime probes; API-configured limits retained here; driver cgroups also present in raw reports",
+  "source_v1_manifest_sha256": "15aa3f5887a830943eb516d26a3f4d53fe963634148224bcb3baaa8e2cd8a61f",
+  "source_v2_manifest_sha256": "18e4a1311f6b12181557e95118b5db7e8c56ab8612f93ecc82627c0cd22b7f4c",
+  "effective_config_sha256": "135b331eb502807a6a5be13524dbfe07ba7aab25d29338066f097ee1328e3ac6",
+  "source_v2_image_digest": "sha256:fa096633a21583a1f70e4a9d0982f907a7145006730ef448558ee11edb70dd63",
+  "restart_requests": {
+    "varve": {
+      "id": "085a0d4d-9912-49f8-9e27-986d662e42ac"
+    },
+    "timescale": {
+      "id": "75d68bf5-fc1b-48e0-9223-9f0fde4bf0f2"
+    }
+  }
+}

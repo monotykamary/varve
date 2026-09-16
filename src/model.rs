@@ -20,30 +20,7 @@ pub struct Row {
 impl Row {
     pub fn validate(&self) -> Result<()> {
         ensure!(self.value.is_finite(), "value must be finite");
-        ensure!(
-            !self.tenant.is_empty() && self.tenant.len() <= 256,
-            "tenant must be 1..256 bytes"
-        );
-        ensure!(
-            !self.series.is_empty() && self.series.len() <= 1024,
-            "series must be 1..1024 bytes"
-        );
-        ensure!(
-            !self.tenant.contains('\0') && !self.series.contains('\0'),
-            "NUL is not permitted"
-        );
-        ensure!(self.tags.len() <= 32, "at most 32 tags");
-        for (k, v) in &self.tags {
-            ensure!(
-                !k.is_empty() && k.len() <= 128 && v.len() <= 1024,
-                "invalid tag size"
-            );
-            ensure!(
-                !k.contains('\0') && !v.contains('\0'),
-                "NUL is not permitted in tags"
-            );
-        }
-        Ok(())
+        validate_dimensions(&self.tenant, &self.series, &self.tags)
     }
     pub fn estimated_bytes(&self) -> usize {
         128 + self.tenant.len()
@@ -54,6 +31,37 @@ impl Row {
                 .map(|(k, v)| k.len() + v.len() + 64)
                 .sum::<usize>()
     }
+}
+
+pub(crate) fn validate_dimensions(
+    tenant: &str,
+    series: &str,
+    tags: &BTreeMap<String, String>,
+) -> Result<()> {
+    ensure!(
+        !tenant.is_empty() && tenant.len() <= 256,
+        "tenant must be 1..256 bytes"
+    );
+    ensure!(
+        !series.is_empty() && series.len() <= 1024,
+        "series must be 1..1024 bytes"
+    );
+    ensure!(
+        !tenant.contains('\0') && !series.contains('\0'),
+        "NUL is not permitted"
+    );
+    ensure!(tags.len() <= 32, "at most 32 tags");
+    for (key, value) in tags {
+        ensure!(
+            !key.is_empty() && key.len() <= 128 && value.len() <= 1024,
+            "invalid tag size"
+        );
+        ensure!(
+            !key.contains('\0') && !value.contains('\0'),
+            "NUL is not permitted in tags"
+        );
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -225,6 +233,10 @@ pub struct JobAlter {
 pub struct Config {
     pub hot_max_bytes: usize,
     pub metadata_max_bytes: usize,
+    /// Opt in to paged derived-state checkpoints; existing v2 roots stay paged.
+    pub derived_pages: bool,
+    pub derived_max_bytes: usize,
+    pub derived_page_bytes: usize,
     pub hot_max_rows: usize,
     pub wal_max_bytes: u64,
     pub max_disk_bytes: u64,
@@ -252,6 +264,9 @@ impl Default for Config {
         Self {
             hot_max_bytes: 16 * 1024 * 1024,
             metadata_max_bytes: 32 * 1024 * 1024,
+            derived_pages: false,
+            derived_max_bytes: 64 * 1024 * 1024,
+            derived_page_bytes: 256 * 1024,
             hot_max_rows: 100_000,
             wal_max_bytes: 64 * 1024 * 1024,
             max_disk_bytes: 512 * 1024 * 1024,
@@ -288,6 +303,12 @@ impl Config {
         ensure!(
             (1024..=64 * 1024 * 1024).contains(&self.metadata_max_bytes),
             "metadata_max_bytes must be 1KiB..64MiB"
+        );
+        ensure!(
+            (4096..=512 * 1024 * 1024).contains(&self.derived_max_bytes)
+                && (4096..=1024 * 1024).contains(&self.derived_page_bytes)
+                && self.derived_page_bytes <= self.derived_max_bytes,
+            "derived limits require 4KiB..512MiB budget and 4KiB..1MiB pages within that budget"
         );
         ensure!(
             self.max_batch_bytes > 0 && self.max_batch_bytes <= 64 * 1024 * 1024,

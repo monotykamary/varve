@@ -1,3 +1,5 @@
+use crate::derived::PageRef;
+use crate::derived_root;
 use crate::engine::*;
 use crate::model::{Config, FORMAT_VERSION};
 use crate::remote::{MAX_LIST_PAGE_SIZE, RemoteStore};
@@ -478,6 +480,7 @@ struct ShipSnapshot {
     remote_state: RemoteState,
     sequence: u64,
     checkpoint: Manifest,
+    derived_pages: Vec<PageRef>,
     checkpoint_bytes: Vec<u8>,
     wal: Vec<WalUpload>,
     _pin: Pin,
@@ -490,6 +493,7 @@ struct PublishedHead {
 }
 
 struct ReconcileSnapshot {
+    _derived_working: DerivedWorking,
     remote_state: RemoteState,
     sequence: u64,
     catalog: Manifest,
@@ -658,7 +662,9 @@ fn capture_ship(inner: &Inner, s: &State) -> Result<ShipSnapshot> {
         &inner.root.join("manifest.bin"),
         inner.config.metadata_max_bytes,
     )?;
-    let checkpoint = decode_manifest(&checkpoint_bytes)?;
+    let root = derived_root::decode(&checkpoint_bytes, &inner.config)?;
+    let derived_pages: Vec<_> = root.page_refs().cloned().collect();
+    let checkpoint = root.catalog;
     ensure!(
         checkpoint.checkpoint_sequence == s.catalog.checkpoint_sequence,
         "local checkpoint moved unexpectedly"
@@ -667,11 +673,12 @@ fn capture_ship(inner: &Inner, s: &State) -> Result<ShipSnapshot> {
         checkpoint.checkpoint_sequence <= s.sequence,
         "local checkpoint is ahead of WAL state"
     );
-    let segment_ids = checkpoint
+    let mut segment_ids: BTreeSet<String> = checkpoint
         .tables
         .values()
         .flat_map(|table| table.segments.iter().map(|segment| segment.id.clone()))
         .collect();
+    segment_ids.extend(derived_pages.iter().map(PageRef::key));
     let pin = Pin::new(inner, segment_ids)?;
     let mut wal = Vec::new();
     let mut wal_bytes = 0u64;
@@ -701,6 +708,7 @@ fn capture_ship(inner: &Inner, s: &State) -> Result<ShipSnapshot> {
         remote_state: RemoteState::capture(s),
         sequence: s.sequence,
         checkpoint,
+        derived_pages,
         checkpoint_bytes,
         wal,
         _pin: pin,
@@ -762,7 +770,19 @@ fn prove_owned_remote_prefix(
         .context("no remote store configured")?;
     let bytes = remote.get_bounded(&head.checkpoint.key, head.checkpoint.bytes as usize)?;
     head.checkpoint.verify(&bytes)?;
-    let checkpoint = decode_manifest(&bytes)?;
+    let mut root = derived_root::decode(&bytes, &inner.config)?;
+    let hydration_bytes = root.derived_encoded_bytes()?.saturating_mul(64);
+    let _hydration = {
+        let s = inner
+            .state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("state poisoned during prefix hydration"))?;
+        reserve_derived(&s, &inner.config, hydration_bytes)?
+    };
+    root.hydrate_with_budget(&inner.config, hydration_bytes, |page| {
+        remote.get_bounded(&page.key(), usize::try_from(page.bytes)?)
+    })?;
+    let checkpoint = root.catalog;
     ensure!(
         checkpoint.database_id == head.database_id
             && checkpoint.checkpoint_sequence <= head.sequence,
@@ -812,8 +832,12 @@ fn prove_owned_remote_prefix(
         );
         ensure!(
             cutoff_covers(local_table.cutoff_us, remote_table.cutoff_us)
-                && cutoff_covers(local_table.rollup_cutoff_us, remote_table.rollup_cutoff_us),
-            "local retention cutoffs do not cover remote table {name}"
+                && cutoff_covers(local_table.rollup_cutoff_us, remote_table.rollup_cutoff_us)
+                && cutoff_covers(
+                    local_table.idempotency_floor_us,
+                    remote_table.idempotency_floor_us
+                ),
+            "local retention/idempotency cutoffs do not cover remote table {name}"
         );
         for (request_id, remote_receipt) in &remote_table.receipts {
             ensure!(
@@ -1045,6 +1069,7 @@ fn reconcile_owned_head(db: &Database) -> Result<()> {
         let s = db.lock()?;
         healthy(&s)?;
         ReconcileSnapshot {
+            _derived_working: reserve_catalog_clone(&s, &db.inner.config)?,
             remote_state: RemoteState::capture(&s),
             sequence: s.sequence,
             catalog: s.catalog.clone(),
@@ -1147,6 +1172,12 @@ fn upload_ship(inner: &Inner, snapshot: &ShipSnapshot) -> Result<PublishedHead> 
         ),
         CurrentHead::Match(None) => {}
         CurrentHead::Mismatch(reason) => bail!("remote publication fenced: {reason}"),
+    }
+    // The snapshot owns exact persisted references and holds their local pins.
+    for page in &snapshot.derived_pages {
+        let bytes = wal::read_bounded(&inner.root.join(page.key()), usize::try_from(page.bytes)?)?;
+        page.verify(&bytes)?;
+        remote.put_immutable(&page.key(), &bytes)?;
     }
     let mut segment_ids = BTreeSet::new();
     for table in snapshot.checkpoint.tables.values() {
@@ -1305,12 +1336,28 @@ impl Database {
                 .open(target.join("LOCK"))?;
             lock.try_lock_exclusive()?;
             wal::atomic_write(&target.join("RESTORING"), operation_id.as_bytes())?;
-            for directory in ["wal", "segments", "cache", "staging"] {
+            for directory in ["wal", "segments", "cache", "staging", "derived"] {
                 fs::create_dir(target.join(directory))?;
             }
             let bytes = remote.get_bounded(&head.checkpoint.key, head.checkpoint.bytes as usize)?;
             head.checkpoint.verify(&bytes)?;
-            let catalog = decode_manifest(&bytes)?;
+            let mut root = derived_root::decode(&bytes, &config)?;
+            let mut used = bytes.len() as u64;
+            root.hydrate(&config, |page| {
+                used = used
+                    .checked_add(page.bytes)
+                    .context("restore derived size overflow")?;
+                ensure!(
+                    used <= config.max_disk_bytes,
+                    "restore derived pages exceed disk budget"
+                );
+                let payload = remote.get_bounded(&page.key(), usize::try_from(page.bytes)?)?;
+                page.verify(&payload)?;
+                wal::atomic_write(&target.join(page.key()), &payload)?;
+                Ok(payload)
+            })?;
+            wal::sync_dir(target)?;
+            let catalog = root.catalog;
             ensure!(
                 catalog.database_id == head.database_id,
                 "remote manifest identity mismatch"
@@ -1325,7 +1372,6 @@ impl Database {
                 }),
                 "incomplete remote WAL tail"
             );
-            let mut used = bytes.len() as u64;
             ensure!(
                 used <= config.max_disk_bytes,
                 "restore checkpoint exceeds disk budget"
@@ -1357,6 +1403,7 @@ impl Database {
                 );
                 wal::atomic_write(&wal::path(target, sequence), &bytes)?;
             }
+            drop(catalog);
             // Segments remain remote and are fetched/verified on demand. Replay is validated before releasing the remote lease.
             let db = Self::open_locked(target, config.clone(), Some(remote.clone()), Some(lock))?;
             Ok(db)
@@ -1420,6 +1467,41 @@ impl Database {
     }
 }
 
+fn protected_segment_keys(db: &Database) -> Result<BTreeSet<String>> {
+    let s = db.lock()?;
+    healthy(&s)?;
+    let mut protected: BTreeSet<_> = s
+        .catalog
+        .tables
+        .values()
+        .flat_map(|table| table.segments.iter().map(Segment::key))
+        .collect();
+    // Readers publish their pins while holding the state lock. Taking the locks in
+    // that same order closes the snapshot-to-pin race without holding either lock
+    // during remote deletion.
+    let pins = db
+        .inner
+        .segment_pins
+        .lock()
+        .map_err(|_| anyhow::anyhow!("segment pins poisoned during remote vacuum"))?;
+    protected.extend(pins.keys().map(|id| {
+        if id.starts_with("derived/") {
+            id.clone()
+        } else {
+            format!("segments/{id}.parquet")
+        }
+    }));
+    // Runtime state can have changed since its persisted checkpoint; protect the
+    // current authoritative root, never infer its page closure from runtime maps.
+    let bytes = wal::read_bounded(
+        &db.inner.root.join("manifest.bin"),
+        db.inner.config.metadata_max_bytes,
+    )?;
+    let root = derived_root::decode(&bytes, &db.inner.config)?;
+    protected.extend(root.page_refs().map(PageRef::key));
+    Ok(protected)
+}
+
 pub(crate) fn vacuum_with_remote_gate(
     db: &Database,
     _gate: &std::sync::MutexGuard<'_, ()>,
@@ -1470,7 +1552,9 @@ pub(crate) fn vacuum_with_remote_gate(
     let result = (|| {
         let bytes = remote.get_bounded(&head.checkpoint.key, head.checkpoint.bytes as usize)?;
         head.checkpoint.verify(&bytes)?;
-        let checkpoint = decode_manifest(&bytes)?;
+        let root = derived_root::decode(&bytes, &db.inner.config)?;
+        let derived_keys: BTreeSet<_> = root.page_refs().map(PageRef::key).collect();
+        let checkpoint = root.catalog;
         ensure!(
             checkpoint.database_id == head.database_id
                 && checkpoint.checkpoint_sequence <= head.sequence,
@@ -1486,10 +1570,11 @@ pub(crate) fn vacuum_with_remote_gate(
             .values()
             .flat_map(|table| table.segments.iter().map(Segment::key))
             .collect();
+        live.extend(derived_keys);
         live.insert(head.checkpoint.key.clone());
         live.extend(head.wal.iter().map(|record| record.key.clone()));
         let mut removed = 0usize;
-        for prefix in ["segments", "manifests", "wal"] {
+        for prefix in ["segments", "manifests", "wal", "derived"] {
             let mut after = None;
             let mut cursors = BTreeSet::new();
             let mut pages = 0usize;
@@ -1502,13 +1587,18 @@ pub(crate) fn vacuum_with_remote_gate(
                     "remote vacuum exceeds bounded per-prefix page limit"
                 );
                 let page = remote.list_page(prefix, after.as_deref(), MAX_LIST_PAGE_SIZE)?;
+                let protected = if prefix == "segments" || prefix == "derived" {
+                    protected_segment_keys(db)?
+                } else {
+                    BTreeSet::new()
+                };
                 let mut unreachable = Vec::new();
                 for key in page.keys {
                     ensure!(
                         key.starts_with(&format!("{prefix}/")),
                         "remote listing escaped requested prefix"
                     );
-                    if !live.contains(&key) {
+                    if !live.contains(&key) && !protected.contains(&key) {
                         unreachable.push(key);
                     }
                 }

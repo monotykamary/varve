@@ -41,6 +41,11 @@ export interface Status {
   wal_bytes: JsonInteger;
   disk_bytes: JsonInteger;
   metadata_bytes: JsonInteger;
+  /** Absent on older servers; an absent counter is not a measured zero. */
+  control_root_bytes?: JsonInteger;
+  derived_encoded_bytes?: JsonInteger;
+  derived_resident_bytes?: JsonInteger;
+  derived_working_bytes?: JsonInteger;
   decoded_cache_bytes: JsonInteger;
   disk_cache_bytes: JsonInteger;
   tables: JsonInteger;

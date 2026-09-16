@@ -1,0 +1,87 @@
+{
+  "artifact": {
+    "files": {
+      "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c",
+      "benchmark.py": "f5488311247210b118410c155408a5be5af9ce2d28d6d480585a9c315125f637",
+      "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    "format_version": 1,
+    "sha256": "0b652bcbe6f1ab75c680b892d5209ecf031894c3baa7a35878321da1714a3513"
+  },
+  "checks": [
+    "Varve raw count/sum/min/max",
+    "Varve eager aggregate count/sum/min/max",
+    "Timescale raw count/sum/min/max",
+    "Timescale retained fresh continuous aggregate count/sum/min/max"
+  ],
+  "claim_boundary": "Generic synthetic single-node capability evidence only; not user workload compatibility, distributed behavior, high availability, or production certification.",
+  "configuration": {
+    "automatic_retries_after_ambiguous_ack": 0,
+    "batch": 1000,
+    "mixed_seconds": 60,
+    "offered_rate_rows_per_second": 5000.0,
+    "outer_wall_clock_seconds": 150,
+    "per_call_timeout_seconds": 35.0,
+    "query_samples": 50,
+    "rows": 250000,
+    "writers": 4
+  },
+  "expected_watermark_rows": 550000,
+  "finished_at": "2026-09-16T09:54:20.294486+00:00",
+  "generator": {
+    "cpu_delta": {
+      "system_seconds": 0.012143999999999995,
+      "user_seconds": 0.013042999999999971
+    },
+    "cpu_end": {
+      "system_seconds": 0.052246999999999995,
+      "user_seconds": 0.47830799999999996
+    },
+    "cpu_start": {
+      "system_seconds": 0.040103,
+      "user_seconds": 0.465265
+    },
+    "platform": {
+      "cgroup_v2": {
+        "cpu.max": "200000 100000",
+        "memory.max": "999997440"
+      },
+      "logical_cpus": 48,
+      "platform": "Linux-6.18.15+deb13-cloud-amd64-x86_64-with-glibc2.36",
+      "python": "3.12.14"
+    }
+  },
+  "infrastructure_assumptions": {
+    "generator": "2 vCPU / 1 GB",
+    "ownership": "infrastructure, secrets, CPU/RSS/disk metrics, and cleanup are external",
+    "region": "Singapore; supplied by infrastructure owner, not independently detected",
+    "timescale_database": "2 vCPU / 2 GB",
+    "timescale_image": "timescale/timescaledb:2.30.0-pg17 (official full/non-oss)",
+    "timescale_image_digest": "sha256:3113d12b78392c064aa7475caf7a52b447b29ddd4f9bfd23526733fcb03e3459",
+    "varve_benchmark_config": {
+      "hot_max_bytes": 134217728,
+      "max_batch_rows": 10000,
+      "metadata_max_bytes": 67108864,
+      "query_memory_bytes_per_worker": 268435456,
+      "query_threads": 2,
+      "query_timeout_seconds": 30,
+      "query_workers": 2
+    },
+    "varve_database": "2 vCPU / 2 GB"
+  },
+  "mode": "verify_only",
+  "phases": [
+    {
+      "finished_at": "2026-09-16T09:54:20.292238+00:00",
+      "name": "restart_verify_only",
+      "started_at": "2026-09-16T09:54:18.934202+00:00",
+      "state": "passed"
+    }
+  ],
+  "run_id": "verify",
+  "source_report": "/results/railway002.json",
+  "started_at": "2026-09-16T09:54:18.934202+00:00",
+  "state": "passed",
+  "workload_stage": "baseline_250k_synthetic_capability"
+}

@@ -1,4 +1,7 @@
+use crate::derived::{self, DerivedRefs, RollupIndex, RollupSelection};
+use crate::derived_root::{self, CheckpointRoot};
 use crate::job_runtime::{self, JobRuntime};
+use crate::metrics::{Metrics, PerformanceSnapshot, Phase, PhaseTimer};
 use crate::model::*;
 use crate::query::{self, QueryOptions, QueryTable};
 use crate::remote::RemoteStore;
@@ -10,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::{
     Arc, Mutex, MutexGuard,
@@ -77,7 +81,7 @@ pub struct ReceiptEntry {
 // Exactly the encoded size of the final BLAKE3 hex proof, including JSON escaping.
 const GROUP_PROOF_RESERVATION: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Segment {
     pub id: String,
@@ -151,6 +155,10 @@ pub struct Status {
     pub wal_bytes: u64,
     pub disk_bytes: u64,
     pub metadata_bytes: usize,
+    pub control_root_bytes: usize,
+    pub derived_encoded_bytes: usize,
+    pub derived_resident_bytes: usize,
+    pub derived_working_bytes: usize,
     pub decoded_cache_bytes: usize,
     pub disk_cache_bytes: u64,
     pub tables: usize,
@@ -170,8 +178,16 @@ pub(crate) struct CacheEntry {
 }
 pub(crate) struct State {
     pub catalog: Manifest,
+    pub derived_refs: Option<BTreeMap<String, DerivedRefs>>,
+    pub rollup_indexes: BTreeMap<String, RollupIndex>,
+    pub derived_working: Arc<AtomicUsize>,
+    pub control_root_bytes: usize,
+    pub derived_resident_bytes: usize,
+    derived_accounting: DerivedAccounting,
     pub metadata_bytes: usize,
     pub sequence: u64,
+    replaying: bool,
+    pub generation: u64,
     pub hot: BTreeMap<String, Vec<StoredRow>>,
     pub hot_bytes: usize,
     pub wal_bytes: u64,
@@ -193,12 +209,17 @@ pub(crate) struct Inner {
     pub root: PathBuf,
     pub config: Config,
     pub state: Mutex<State>,
+    pub metrics: Arc<Metrics>,
     pub disk_admission: Mutex<()>,
+    pub maintenance_preparation: Mutex<()>,
+    #[cfg(feature = "fault-injection")]
+    maintenance_test_hook: Mutex<Option<MaintenanceTestHook>>,
     pub remote_operation: Mutex<()>,
     pub remote: Option<Arc<dyn RemoteStore>>,
     pub readers: Arc<AtomicUsize>,
     pub segment_pins: Arc<Mutex<BTreeMap<String, usize>>>,
     pub query_active: AtomicUsize,
+    pub query_runtime: query::QueryRuntime,
     pub jobs_running: Mutex<BTreeSet<String>>,
     _file_lock: File,
 }
@@ -212,6 +233,90 @@ impl Drop for Inner {
 #[derive(Clone)]
 pub struct Database {
     pub(crate) inner: Arc<Inner>,
+}
+
+#[cfg(feature = "fault-injection")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MaintenanceHookPhase {
+    CheckpointPrepare,
+    CheckpointBeforePublish,
+    CompactionPrepare,
+}
+
+#[cfg(feature = "fault-injection")]
+#[derive(Clone)]
+pub struct MaintenanceTestHook {
+    phase: MaintenanceHookPhase,
+    shared: Arc<(Mutex<MaintenanceHookState>, std::sync::Condvar)>,
+}
+
+#[cfg(feature = "fault-injection")]
+#[derive(Default)]
+struct MaintenanceHookState {
+    entered: bool,
+    released: bool,
+}
+
+#[cfg(feature = "fault-injection")]
+impl MaintenanceTestHook {
+    pub fn new(phase: MaintenanceHookPhase) -> Self {
+        Self {
+            phase,
+            shared: Arc::new((
+                Mutex::new(MaintenanceHookState::default()),
+                std::sync::Condvar::new(),
+            )),
+        }
+    }
+
+    pub fn wait_until_blocked(&self, timeout: std::time::Duration) -> bool {
+        let (state, changed) = &*self.shared;
+        let state = state.lock().expect("maintenance hook poisoned");
+        changed
+            .wait_timeout_while(state, timeout, |state| !state.entered)
+            .expect("maintenance hook poisoned")
+            .0
+            .entered
+    }
+
+    pub fn release(&self) {
+        let (state, changed) = &*self.shared;
+        let mut state = state.lock().expect("maintenance hook poisoned");
+        state.released = true;
+        changed.notify_all();
+    }
+
+    fn block(&self, phase: MaintenanceHookPhase) {
+        if self.phase != phase {
+            return;
+        }
+        let (state, changed) = &*self.shared;
+        let mut state = state.lock().expect("maintenance hook poisoned");
+        state.entered = true;
+        changed.notify_all();
+        while !state.released {
+            state = changed.wait(state).expect("maintenance hook poisoned");
+        }
+    }
+}
+
+pub(crate) struct StateGuard<'a> {
+    guard: MutexGuard<'a, State>,
+    _hold: PhaseTimer<'a>,
+}
+
+impl Deref for StateGuard<'_> {
+    type Target = State;
+
+    fn deref(&self) -> &Self::Target {
+        &self.guard
+    }
+}
+
+impl DerefMut for StateGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.guard
+    }
 }
 
 pub(crate) struct Pin {
@@ -234,6 +339,19 @@ impl Pin {
             pins: inner.segment_pins.clone(),
             ids,
         })
+    }
+
+    pub(crate) fn add(&mut self, id: String) -> Result<()> {
+        if self.ids.contains(&id) {
+            return Ok(());
+        }
+        let mut pins = self
+            .pins
+            .lock()
+            .map_err(|_| anyhow::anyhow!("segment pins poisoned"))?;
+        *pins.entry(id.clone()).or_default() += 1;
+        self.ids.insert(id);
+        Ok(())
     }
 }
 impl Drop for Pin {
@@ -296,21 +414,22 @@ impl Database {
             );
             lock
         };
-        for dir in ["wal", "segments", "cache", "staging"] {
+        for dir in ["wal", "segments", "cache", "staging", "derived"] {
             fs::create_dir_all(root.join(dir))?;
         }
         wal::sync_dir(&root)?;
         cleanup_temporaries(&root)?;
         let manifest_path = root.join("manifest.bin");
-        let catalog = if manifest_path.exists() {
-            decode_manifest(&wal::read_bounded(
-                &manifest_path,
-                config.metadata_max_bytes,
-            )?)?
+        let mut checkpoint = if manifest_path.exists() {
+            derived_root::decode(
+                &wal::read_bounded(&manifest_path, config.metadata_max_bytes)?,
+                &config,
+            )?
         } else {
             ensure!(
                 fs::read_dir(root.join("wal"))?.next().is_none()
-                    && fs::read_dir(root.join("segments"))?.next().is_none(),
+                    && fs::read_dir(root.join("segments"))?.next().is_none()
+                    && fs::read_dir(root.join("derived"))?.next().is_none(),
                 "missing manifest in nonempty database; refusing to initialize over data"
             );
             let catalog = Manifest {
@@ -326,10 +445,22 @@ impl Database {
                 control_history: Vec::new(),
             };
             wal::atomic_write(&manifest_path, &encode_manifest(&catalog)?)?;
-            catalog
+            CheckpointRoot {
+                catalog,
+                derived: None,
+            }
         };
+        let control_root_bytes = fs::metadata(&manifest_path)?.len() as usize;
+        checkpoint.hydrate(&config, |page| {
+            wal::read_bounded(&root.join(page.key()), page.bytes as usize)
+        })?;
+        let derived_refs = checkpoint.derived;
+        let catalog = checkpoint.catalog;
         validate_manifest(&catalog)?;
-        let metadata_bytes = encode_manifest(&catalog)?.len();
+        let rollup_indexes = build_rollup_indexes(&catalog, &config)?;
+        let derived_resident_bytes = derived_root::resident_bytes(&catalog, true);
+        let metadata_bytes = logical_metadata_bytes(&catalog)?;
+        let derived_accounting = DerivedAccounting::build(&catalog, &config)?;
         let wal_bytes = directory_bytes(&root.join("wal"))?;
         ensure!(
             wal_bytes <= config.max_disk_bytes,
@@ -337,7 +468,15 @@ impl Database {
         );
         let mut state = State {
             sequence: catalog.checkpoint_sequence,
+            replaying: true,
+            generation: 0,
             catalog,
+            derived_refs,
+            rollup_indexes,
+            derived_working: Arc::new(AtomicUsize::new(0)),
+            control_root_bytes,
+            derived_resident_bytes,
+            derived_accounting,
             metadata_bytes,
             hot: BTreeMap::new(),
             hot_bytes: 0,
@@ -361,6 +500,7 @@ impl Database {
             check_recovery_budget(&config, &state)?;
         }
         check_recovery_budget(&config, &state)?;
+        state.replaying = false;
         state.idempotency_floors = state
             .catalog
             .tables
@@ -390,17 +530,25 @@ impl Database {
             state.hot_bytes <= config.hot_max_bytes && hot_count(&state) <= config.hot_max_rows,
             "recovery hot set exceeds configured budget; reopen with larger limits"
         );
+        let metrics = Arc::new(Metrics::default());
+        let query_runtime =
+            query::QueryRuntime::with_metrics(config.query_workers, Arc::clone(&metrics));
         let db = Self {
             inner: Arc::new(Inner {
                 root,
                 config,
                 state: Mutex::new(state),
+                metrics,
                 disk_admission: Mutex::new(()),
+                maintenance_preparation: Mutex::new(()),
+                #[cfg(feature = "fault-injection")]
+                maintenance_test_hook: Mutex::new(None),
                 remote_operation: Mutex::new(()),
                 remote,
                 readers: Arc::new(AtomicUsize::new(0)),
                 segment_pins: Arc::new(Mutex::new(BTreeMap::new())),
                 query_active: AtomicUsize::new(0),
+                query_runtime,
                 jobs_running: Mutex::new(BTreeSet::new()),
                 _file_lock: lock,
             }),
@@ -421,6 +569,9 @@ impl Database {
                     }
                 }
             }
+            if db.inner.config.derived_pages && s.derived_refs.is_none() {
+                checkpoint_locked(&db.inner, &mut s)?;
+            }
             gc_locked(&db.inner, &mut s)?;
         }
         db.ensure_builtin_job()?;
@@ -434,11 +585,17 @@ impl Database {
             .is_ok_and(|state| state.fenced.is_none())
     }
 
-    pub(crate) fn lock(&self) -> Result<MutexGuard<'_, State>> {
-        self.inner
-            .state
-            .lock()
-            .map_err(|_| anyhow::anyhow!("database state mutex poisoned; reopen for recovery"))
+    pub(crate) fn lock(&self) -> Result<StateGuard<'_>> {
+        let wait = self.inner.metrics.timer(Phase::StateLockWait);
+        let guard =
+            self.inner.state.lock().map_err(|_| {
+                anyhow::anyhow!("database state mutex poisoned; reopen for recovery")
+            })?;
+        drop(wait);
+        Ok(StateGuard {
+            guard,
+            _hold: self.inner.metrics.timer(Phase::StateLockHold),
+        })
     }
 
     pub(crate) fn lock_remote_operation(&self) -> Result<MutexGuard<'_, ()>> {
@@ -446,6 +603,37 @@ impl Database {
             .remote_operation
             .lock()
             .map_err(|_| anyhow::anyhow!("remote operation mutex poisoned"))
+    }
+
+    pub(crate) fn lock_maintenance_preparation(&self) -> Result<MutexGuard<'_, ()>> {
+        self.inner
+            .maintenance_preparation
+            .lock()
+            .map_err(|_| anyhow::anyhow!("maintenance preparation mutex poisoned"))
+    }
+
+    #[cfg(feature = "fault-injection")]
+    pub fn set_maintenance_test_hook(&self, hook: Option<MaintenanceTestHook>) -> Result<()> {
+        *self
+            .inner
+            .maintenance_test_hook
+            .lock()
+            .map_err(|_| anyhow::anyhow!("maintenance test hook poisoned"))? = hook;
+        Ok(())
+    }
+
+    #[cfg(feature = "fault-injection")]
+    pub(crate) fn block_maintenance_test_hook(&self, phase: MaintenanceHookPhase) -> Result<()> {
+        let hook = self
+            .inner
+            .maintenance_test_hook
+            .lock()
+            .map_err(|_| anyhow::anyhow!("maintenance test hook poisoned"))?
+            .clone();
+        if let Some(hook) = hook {
+            hook.block(phase);
+        }
+        Ok(())
     }
 
     pub fn create_table(&self, name: &str, config: TableConfig) -> Result<u64> {
@@ -470,12 +658,13 @@ impl Database {
             "table admission limit"
         );
         let sequence = next_sequence(&s)?;
+        let _derived_working = reserve_catalog_clone(&s, &self.inner.config)?;
         let mut projected = s.catalog.clone();
         projected
             .tables
             .insert(name.to_owned(), empty_table(config.clone(), sequence));
         projected.checkpoint_sequence = sequence;
-        check_metadata_budget(&self.inner.config, &projected, hot_count(&s))?;
+        check_state_catalog_budget(&self.inner, &s, &projected, hot_count(&s))?;
         let record = wal::Record::new(
             sequence,
             wal::Operation::CreateTable {
@@ -603,7 +792,12 @@ impl Database {
                 ordinal: ordinal as u32,
             })
             .collect();
-        let updates = aggregate_updates(t, &stored, self.inner.config.metadata_max_bytes)?;
+        let update_budget = if uses_derived_pages(&s, &self.inner.config) {
+            self.inner.config.derived_max_bytes
+        } else {
+            self.inner.config.metadata_max_bytes
+        };
+        let updates = aggregate_updates(t, &stored, update_budget)?;
         let total_groups: usize = s
             .catalog
             .tables
@@ -632,16 +826,18 @@ impl Database {
         };
         let mut projected =
             append_metadata_bytes(&s, table, request_id, &receipt, &updates, sequence)?;
-        if projected.saturating_add((hot_count(&s) + rows.len()).saturating_mul(512))
-            > self.inner.config.metadata_max_bytes
+        if !uses_derived_pages(&s, &self.inner.config)
+            && projected.saturating_add((hot_count(&s) + rows.len()).saturating_mul(512))
+                > self.inner.config.metadata_max_bytes
             && (hot_count(&s) > 0 || idempotency_checkpoint_due(&s))
         {
             checkpoint_locked(&self.inner, &mut s)?;
             projected = append_metadata_bytes(&s, table, request_id, &receipt, &updates, sequence)?;
         }
         ensure!(
-            projected.saturating_add((hot_count(&s) + rows.len()).saturating_mul(512))
-                <= self.inner.config.metadata_max_bytes,
+            uses_derived_pages(&s, &self.inner.config)
+                || projected.saturating_add((hot_count(&s) + rows.len()).saturating_mul(512))
+                    <= self.inner.config.metadata_max_bytes,
             "projected checkpoint exceeds metadata byte budget"
         );
         let record = wal::Record::new(
@@ -653,7 +849,14 @@ impl Database {
                 rows,
             },
         );
-        commit_record(&self.inner, &mut s, &record)?;
+        let encoded = prepare_record(&self.inner, &mut s, &record)?;
+        let derived = check_derived_append(
+            &s,
+            &self.inner.config,
+            (table, request_id, &receipt, &updates),
+            sequence,
+            hot_count(&s) + stored.len(),
+        )?;
         let actual_metadata_bytes = append_metadata_bytes(
             &s,
             table,
@@ -662,6 +865,13 @@ impl Database {
             &updates,
             s.catalog.checkpoint_sequence,
         )?;
+        publish_record(&self.inner, &mut s, &encoded)?;
+        let index = s.rollup_indexes.entry(table.to_owned()).or_default();
+        for (key, row) in &updates {
+            index
+                .insert(key, row, usize::MAX)
+                .expect("prevalidated rollup index");
+        }
         let t = s
             .catalog
             .tables
@@ -674,6 +884,9 @@ impl Database {
         s.sequence = sequence;
         s.metadata_bytes = actual_metadata_bytes;
         s.first_hot_us.get_or_insert(now_us);
+        s.derived_resident_bytes = derived.resident;
+        s.derived_accounting
+            .replace(table.to_owned(), derived.accounting);
         Ok(receipt_for(&receipt, false))
     }
 
@@ -746,23 +959,43 @@ impl Database {
 
     fn write_group_chunk(&self, requests: Vec<WriteRequest>) -> Vec<Result<WriteReceipt>> {
         let count = requests.len();
+        let first_now = requests[0].now_us;
+        // Own each immutable input once; hashing and allocation accounting do not need the state lock.
+        let requests: Vec<Result<_>> = requests
+            .into_iter()
+            .map(|request| {
+                let bytes = request.admission_bytes()?;
+                let digest = blake3::hash(&serde_json::to_vec(&request.rows)?)
+                    .to_hex()
+                    .to_string();
+                Ok((
+                    wal::AppendItem {
+                        table: request.table,
+                        request_id: request.request_id,
+                        digest,
+                        rows: request.rows,
+                        now_us: Some(request.now_us),
+                    },
+                    bytes,
+                ))
+            })
+            .collect();
         let run = || -> Result<Vec<Result<WriteReceipt>>> {
             let mut s = self.lock()?;
             healthy(&s)?;
             let config = &self.inner.config;
-            // Durable retries/conflicts and unknown tables cannot consume new
-            // capacity. In particular an all-retry group must not force a checkpoint.
+            // Durable retries/conflicts and unknown tables cannot consume new capacity.
             let mut rows = 0usize;
             let mut bytes = 0usize;
             let mut new_requests = 0usize;
-            for request in &requests {
+            for (request, admission_bytes) in requests.iter().flatten() {
                 if s.catalog
                     .tables
                     .get(&request.table)
                     .is_some_and(|table| !table.receipts.contains_key(&request.request_id))
                 {
                     rows += request.rows.len();
-                    bytes += request.admission_bytes().unwrap();
+                    bytes += admission_bytes;
                     new_requests += 1;
                 }
             }
@@ -782,99 +1015,135 @@ impl Database {
             {
                 checkpoint_locked(&self.inner, &mut s)?;
             }
-            let sequence = next_sequence(&s)?;
-            let mut items = Vec::new();
-            let mut undo = Vec::new();
-            let mut results = Vec::with_capacity(count);
-            let mut ordinal = 0usize;
-            let mut undo_bytes = 0usize;
-            let first_now = requests[0].now_us;
-            for request in requests {
-                let result = (|| -> Result<WriteReceipt> {
-                    let digest = blake3::hash(&serde_json::to_vec(&request.rows)?)
-                        .to_hex()
-                        .to_string();
-                    if let Some(receipt) = group_retry(&mut s, &request, &digest)? {
-                        return Ok(receipt);
-                    }
-                    let table = s
-                        .catalog
+            let mut checkpoint_retry = hot_count(&s) > 0 || idempotency_checkpoint_due(&s);
+            // Clock floors are the only staging side effect outside the existing append undo log.
+            let floors_before: BTreeMap<_, _> = requests
+                .iter()
+                .flatten()
+                .filter(|(item, _)| {
+                    s.catalog
                         .tables
-                        .get(&request.table)
-                        .context("unknown table")?;
-                    for row in &request.rows {
-                        if let Some(age) = table.config.late_after_us {
-                            ensure!(
-                                row.timestamp_us >= checked_cutoff(request.now_us, age),
-                                "row exceeds allowed lateness"
-                            );
+                        .get(&item.table)
+                        .is_some_and(|table| table.config.idempotency_window_us.is_some())
+                })
+                .map(|(item, _)| {
+                    (
+                        item.table.clone(),
+                        s.idempotency_floors.get(&item.table).copied(),
+                    )
+                })
+                .collect();
+            loop {
+                let sequence = next_sequence(&s)?;
+                let mut accepted = vec![false; count];
+                let mut undo = Vec::new();
+                let mut results = Vec::with_capacity(count);
+                let mut ordinal = 0usize;
+                let mut undo_bytes = 0usize;
+                let mut needs_headroom = false;
+                for (index, request) in requests.iter().enumerate() {
+                    let result = (|| -> Result<WriteReceipt> {
+                        let (item, _) = request
+                            .as_ref()
+                            .map_err(|error| anyhow::anyhow!("{error:#}"))?;
+                        if let Some(receipt) = group_retry(&mut s, item, &item.digest)? {
+                            return Ok(receipt);
+                        }
+                        let table = s.catalog.tables.get(&item.table).context("unknown table")?;
+                        let now_us = item.now_us.context("live group request missing clock")?;
+                        for row in &item.rows {
+                            if let Some(age) = table.config.late_after_us {
+                                ensure!(
+                                    row.timestamp_us >= checked_cutoff(now_us, age),
+                                    "row exceeds allowed lateness"
+                                );
+                            }
+                        }
+                        let prepared = prepare_group_append(
+                            &s,
+                            item,
+                            sequence,
+                            ordinal,
+                            Some(GROUP_PROOF_RESERVATION),
+                            config,
+                        )?;
+                        let working_bytes = prepared.working_bytes();
+                        ensure!(
+                            undo_bytes.saturating_add(working_bytes) <= config.metadata_max_bytes,
+                            "group rollback metadata byte budget exceeded"
+                        );
+                        undo_bytes += working_bytes;
+                        let receipt = receipt_for(&prepared.receipt, false);
+                        undo.push(apply_group_append(&mut s, prepared));
+                        ordinal += item.rows.len();
+                        accepted[index] = true;
+                        Ok(receipt)
+                    })();
+                    needs_headroom |= result
+                        .as_ref()
+                        .err()
+                        .is_some_and(|error| error.is::<CheckpointHeadroom>());
+                    results.push(result);
+                }
+                // Restore every provisional row, receipt and rollup before checkpoint or publication.
+                for entry in undo.into_iter().rev() {
+                    undo_group_append(&mut s, entry);
+                }
+                if needs_headroom && checkpoint_retry {
+                    checkpoint_retry = false;
+                    for (table, floor) in &floors_before {
+                        if let Some(floor) = floor {
+                            s.idempotency_floors.insert(table.clone(), *floor);
+                        } else {
+                            s.idempotency_floors.remove(table);
                         }
                     }
-                    let item = wal::AppendItem {
-                        table: request.table,
-                        request_id: request.request_id,
-                        digest,
-                        rows: request.rows,
-                        now_us: Some(request.now_us),
-                    };
-                    let prepared = prepare_group_append(
-                        &s,
-                        &item,
-                        sequence,
-                        ordinal,
-                        Some(GROUP_PROOF_RESERVATION),
-                        config,
-                    )?;
-                    let working_bytes = prepared.working_bytes();
+                    checkpoint_locked(&self.inner, &mut s)?;
+                    continue;
+                }
+                let items: Vec<_> = requests
+                    .into_iter()
+                    .zip(accepted)
+                    .filter_map(|(request, accepted)| {
+                        if accepted {
+                            Some(request.expect("staged request").0)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if !items.is_empty() {
+                    let record = wal::Record::new(sequence, wal::Operation::AppendGroup { items });
+                    let fingerprint = wal::group_fingerprint(&record)?;
                     ensure!(
-                        undo_bytes.saturating_add(working_bytes) <= config.metadata_max_bytes,
-                        "group rollback metadata byte budget exceeded"
+                        fingerprint
+                            .as_ref()
+                            .is_some_and(|proof| proof.len() == GROUP_PROOF_RESERVATION.len()),
+                        "group proof reservation mismatch"
                     );
-                    undo_bytes += working_bytes;
-                    let receipt = receipt_for(&prepared.receipt, false);
-                    undo.push(apply_group_append(&mut s, prepared));
-                    ordinal += item.rows.len();
-                    items.push(item);
-                    Ok(receipt)
-                })();
-                results.push(result);
-            }
-            // Nothing provisional may reach checkpoint or become query-visible.
-            for entry in undo.into_iter().rev() {
-                undo_group_append(&mut s, entry);
-            }
-            if !items.is_empty() {
-                let record = wal::Record::new(sequence, wal::Operation::AppendGroup { items });
-                let fingerprint = wal::group_fingerprint(&record)?;
-                // Admission charged the identical JSON string length for every receipt.
-                // Compute the final proof before publication; no catalog-sized recheck.
-                ensure!(
-                    fingerprint
-                        .as_ref()
-                        .is_some_and(|proof| proof.len() == GROUP_PROOF_RESERVATION.len()),
-                    "group proof reservation mismatch"
-                );
-                let publication = commit_record(&self.inner, &mut s, &record).and_then(|()| {
-                    wal::failpoint("group_before_apply");
-                    if let Err(error) = apply_record(&mut s, record, config, fingerprint.as_deref())
-                    {
-                        s.fenced = Some(format!("durable group application failed: {error:#}"));
-                        return Err(error);
-                    }
-                    s.first_hot_us.get_or_insert(first_now);
-                    wal::failpoint("group_applied");
-                    Ok(())
-                });
-                if let Err(error) = publication {
-                    let message = format!("{error:#}");
-                    for result in &mut results {
-                        if result.as_ref().is_ok_and(|r| r.sequence == sequence) {
-                            *result = Err(anyhow::anyhow!(message.clone()));
+                    let publication = commit_record(&self.inner, &mut s, &record).and_then(|()| {
+                        wal::failpoint("group_before_apply");
+                        if let Err(error) =
+                            apply_record(&mut s, record, config, fingerprint.as_deref())
+                        {
+                            s.fenced = Some(format!("durable group application failed: {error:#}"));
+                            return Err(error);
+                        }
+                        s.first_hot_us.get_or_insert(first_now);
+                        wal::failpoint("group_applied");
+                        Ok(())
+                    });
+                    if let Err(error) = publication {
+                        let message = format!("{error:#}");
+                        for result in &mut results {
+                            if result.as_ref().is_ok_and(|r| r.sequence == sequence) {
+                                *result = Err(anyhow::anyhow!(message.clone()));
+                            }
                         }
                     }
                 }
+                return Ok(results);
             }
-            Ok(results)
         };
         match run() {
             Ok(results) => results,
@@ -885,22 +1154,22 @@ impl Database {
     }
 
     pub fn checkpoint(&self) -> Result<()> {
-        let mut s = self.lock()?;
-        healthy(&s)?;
-        checkpoint_locked(&self.inner, &mut s)
+        checkpoint_prepared(self).map(|_| ())
     }
 
     pub fn rollups(&self, table: &str) -> Result<Vec<RollupRow>> {
+        self.select_rollups(table, RollupSelection::default())
+    }
+
+    pub fn select_rollups(
+        &self,
+        table: &str,
+        selection: RollupSelection<'_>,
+    ) -> Result<Vec<RollupRow>> {
         let s = self.lock()?;
         healthy(&s)?;
-        Ok(s.catalog
-            .tables
-            .get(table)
-            .context("unknown table")?
-            .rollups
-            .values()
-            .cloned()
-            .collect())
+        let (rows, _working) = select_rollups_locked(&s, &self.inner.config, table, selection)?;
+        Ok(rows)
     }
 
     pub fn scan(
@@ -914,15 +1183,11 @@ impl Database {
         if let (Some(start), Some(end)) = (start_us, end_us) {
             ensure!(start <= end, "invalid half-open time range");
         }
-        let (table_state, mut output, pin) = {
+        let snapshot_timer = self.inner.metrics.timer(Phase::Snapshot);
+        let (segments, cutoff_us, mut output, pin) = {
             let s = self.lock()?;
             healthy(&s)?;
-            let mut table_state = s
-                .catalog
-                .tables
-                .get(table)
-                .context("unknown table")?
-                .clone();
+            let table_state = s.catalog.tables.get(table).context("unknown table")?;
             let start = match (start_us, table_state.cutoff_us) {
                 (Some(a), Some(b)) => Some(a.max(b)),
                 (a, b) => a.or(b),
@@ -941,23 +1206,26 @@ impl Database {
                 .filter(|row| matches(row))
                 .cloned()
                 .collect();
-            table_state.segments.retain(|segment| {
-                !start.is_some_and(|value| segment.max_timestamp_us < value)
-                    && !end_us.is_some_and(|value| segment.min_timestamp_us >= value)
-                    && (tenant.zip(series).is_none_or(|(tenant, series)| {
-                        segment.shard == shard_for(tenant, series, table_state.config.shards)
-                    }))
-            });
-            let ids = table_state
+            let shard = tenant
+                .zip(series)
+                .map(|(tenant, series)| shard_for(tenant, series, table_state.config.shards));
+            let segments: Vec<_> = table_state
                 .segments
                 .iter()
-                .map(|segment| segment.id.clone())
+                .filter(|segment| {
+                    !start.is_some_and(|value| segment.max_timestamp_us < value)
+                        && !end_us.is_some_and(|value| segment.min_timestamp_us >= value)
+                        && shard.is_none_or(|shard| segment.shard == shard)
+                })
+                .cloned()
                 .collect();
+            let ids = segments.iter().map(|segment| segment.id.clone()).collect();
             let pin = Pin::new(&self.inner, ids)?;
-            (table_state, output, pin)
+            (segments, table_state.cutoff_us, output, pin)
         };
+        drop(snapshot_timer);
         let _pin = pin;
-        let start = match (start_us, table_state.cutoff_us) {
+        let start = match (start_us, cutoff_us) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (a, b) => a.or(b),
         };
@@ -972,7 +1240,7 @@ impl Database {
             bytes <= self.inner.config.query_max_output_bytes,
             "scan output budget exceeded"
         );
-        for descriptor in &table_state.segments {
+        for descriptor in &segments {
             ensure!(
                 descriptor.decoded_bytes <= self.inner.config.hot_max_bytes as u64,
                 "segment decoded working set exceeds hot memory budget"
@@ -1061,77 +1329,106 @@ impl Database {
             })
             .map_err(|_| anyhow::anyhow!("query concurrency limit"))?;
         let _permit = QueryPermit(&self.inner.query_active);
-        let (snapshots, pin, catalog) = {
+        let snapshot_timer = self.inner.metrics.timer(Phase::Snapshot);
+        let (snapshots, pin, catalog, _derived_working) = {
             let s = self.lock()?;
             healthy(&s)?;
             let names = s.catalog.tables.keys().cloned().collect::<Vec<_>>();
             let planning_catalog = query_catalog(&s, names.iter().map(String::as_str).collect())?;
             let scan_plan = crate::plan::plan_with_catalog(sql, &names, &planning_catalog);
-            let mut selected: BTreeMap<_, _> = s
-                .catalog
-                .tables
-                .iter()
-                .filter(|(name, _)| scan_plan.as_ref().is_none_or(|plan| plan.table == **name))
-                .map(|(name, table)| (name.clone(), table.clone()))
-                .collect();
-            if let Some(plan) = &scan_plan {
-                for table in selected.values_mut() {
-                    table.segments.retain(|segment| {
-                        !plan.rollup
-                            && !plan.empty
-                            && plan
-                                .start_us
-                                .is_none_or(|start| segment.max_timestamp_us >= start)
-                            && plan.end_us.is_none_or(|end| segment.min_timestamp_us < end)
-                    });
-                }
-            }
-            let pinned_ids = selected
-                .values()
-                .flat_map(|table| table.segments.iter().map(|segment| segment.id.clone()))
-                .collect();
-            let pin = Pin::new(&self.inner, pinned_ids)?;
             let mut snapshots = Vec::new();
-            for (name, table) in selected {
-                let descriptors = table.segments.clone();
+            let mut derived_working = Vec::new();
+            for (name, table) in &s.catalog.tables {
+                if scan_plan.as_ref().is_some_and(|plan| plan.table != *name) {
+                    continue;
+                }
+                // Project before cloning: receipts and unrelated derived state never enter a snapshot.
+                let shard = scan_plan.as_ref().and_then(|plan| {
+                    plan.tenant
+                        .as_deref()
+                        .zip(plan.series.as_deref())
+                        .map(|(tenant, series)| shard_for(tenant, series, table.config.shards))
+                });
+                let descriptors: Vec<_> = table
+                    .segments
+                    .iter()
+                    .filter(|segment| {
+                        table
+                            .cutoff_us
+                            .is_none_or(|cutoff| segment.max_timestamp_us >= cutoff)
+                            && scan_plan.as_ref().is_none_or(|plan| {
+                                !plan.rollup
+                                    && !plan.empty
+                                    && plan
+                                        .start_us
+                                        .is_none_or(|start| segment.max_timestamp_us >= start)
+                                    && plan.end_us.is_none_or(|end| segment.min_timestamp_us < end)
+                                    && shard.is_none_or(|shard| segment.shard == shard)
+                            })
+                    })
+                    .cloned()
+                    .collect();
+                let hot = s
+                    .hot
+                    .get(name)
+                    .into_iter()
+                    .flatten()
+                    .filter(|row| {
+                        table
+                            .cutoff_us
+                            .is_none_or(|cutoff| row.row.timestamp_us >= cutoff)
+                            && scan_plan.as_ref().is_none_or(|plan| {
+                                !plan.rollup
+                                    && plan.matches_series(&row.row.tenant, &row.row.series)
+                                    && plan
+                                        .start_us
+                                        .is_none_or(|start| row.row.timestamp_us >= start)
+                                    && plan.end_us.is_none_or(|end| row.row.timestamp_us < end)
+                            })
+                    })
+                    .cloned()
+                    .collect();
+                let rollups = if scan_plan
+                    .as_ref()
+                    .is_some_and(|plan| !plan.rollup || plan.empty)
+                {
+                    Vec::new()
+                } else {
+                    let selection = RollupSelection {
+                        tenant: scan_plan.as_ref().and_then(|p| p.tenant.as_deref()),
+                        series: scan_plan.as_ref().and_then(|p| p.series.as_deref()),
+                        width_us: scan_plan.as_ref().and_then(|p| p.rollup_width_us),
+                        ..RollupSelection::default()
+                    };
+                    let (rows, working) =
+                        select_rollups_locked(&s, &self.inner.config, name, selection)?;
+                    derived_working.push(working);
+                    rows
+                };
                 snapshots.push((
                     QueryTable {
-                        hot: s
-                            .hot
-                            .get(&name)
-                            .into_iter()
-                            .flatten()
-                            .filter(|row| {
-                                scan_plan.as_ref().is_none_or(|plan| {
-                                    !plan.rollup
-                                        && !plan.empty
-                                        && plan
-                                            .start_us
-                                            .is_none_or(|start| row.row.timestamp_us >= start)
-                                        && plan.end_us.is_none_or(|end| row.row.timestamp_us < end)
-                                })
-                            })
-                            .cloned()
-                            .collect(),
-                        name,
+                        name: name.clone(),
+                        hot,
                         files: Vec::new(),
-                        rollups: if scan_plan.as_ref().is_some_and(|plan| !plan.rollup) {
-                            Vec::new()
-                        } else {
-                            table.rollups.values().cloned().collect()
-                        },
+                        rollups,
                         cutoff_us: table.cutoff_us,
                     },
                     descriptors,
                 ));
             }
+            let pinned_ids = snapshots
+                .iter()
+                .flat_map(|(_, segments)| segments.iter().map(|segment| segment.id.clone()))
+                .collect();
+            let pin = Pin::new(&self.inner, pinned_ids)?;
             let selected_names = snapshots
                 .iter()
                 .map(|(table, _)| table.name.as_str())
                 .collect();
             let catalog = query_catalog(&s, selected_names)?;
-            (snapshots, pin, catalog)
+            (snapshots, pin, catalog, derived_working)
         };
+        drop(snapshot_timer);
         let mut tables = Vec::with_capacity(snapshots.len());
         for (mut table, descriptors) in snapshots {
             for segment in &descriptors {
@@ -1148,7 +1445,17 @@ impl Database {
             timeout_ms: c.query_timeout_ms,
             max_output_bytes: c.query_max_output_bytes,
         };
-        query::execute_with_catalog(&tables, sql, &options, &catalog)
+        self.inner
+            .query_runtime
+            .execute_with_catalog(&tables, sql, &options, &catalog)
+    }
+
+    pub fn query_worker_stats(&self) -> query::QueryWorkerStats {
+        self.inner.query_runtime.stats()
+    }
+
+    pub fn performance(&self) -> PerformanceSnapshot {
+        self.inner.metrics.snapshot()
     }
 
     pub fn status(&self) -> Result<Status> {
@@ -1170,6 +1477,10 @@ impl Database {
                 wal_bytes: s.wal_bytes,
                 disk_bytes: 0,
                 metadata_bytes: s.metadata_bytes,
+                control_root_bytes: s.control_root_bytes,
+                derived_encoded_bytes: persisted_derived_bytes(&s),
+                derived_resident_bytes: s.derived_resident_bytes,
+                derived_working_bytes: s.derived_working.load(Ordering::SeqCst),
                 decoded_cache_bytes: s.decoded.values().map(|entry| entry.bytes).sum(),
                 disk_cache_bytes: 0,
                 tables: s.catalog.tables.len(),
@@ -1396,6 +1707,424 @@ fn query_catalog(s: &State, selected_tables: Vec<&str>) -> Result<query::QueryCa
     })
 }
 
+fn select_rollups_locked(
+    s: &State,
+    config: &Config,
+    name: &str,
+    selection: RollupSelection<'_>,
+) -> Result<(Vec<RollupRow>, DerivedWorking)> {
+    let table = s.catalog.tables.get(name).context("unknown table")?;
+    let index = s
+        .rollup_indexes
+        .get(name)
+        .context("missing resident rollup index")?;
+    let available = config
+        .derived_max_bytes
+        .saturating_sub(s.derived_resident_bytes)
+        .saturating_sub(s.derived_working.load(Ordering::SeqCst));
+    let selected = index.select(&table.rollups, selection, available)?;
+    let bytes = selected.iter().fold(0usize, |bytes, row| {
+        bytes
+            .saturating_add(derived::rollup_resident_bytes("", row))
+            .saturating_add(64)
+    });
+    let guard = reserve_derived(s, config, bytes)?;
+    let rows = selected.into_iter().cloned().collect();
+    Ok((rows, guard))
+}
+
+#[derive(Clone, Debug, Default)]
+struct MapAccounting {
+    json_bytes: usize,
+    entries: usize,
+    max_entry_bytes: usize,
+}
+#[derive(Clone, Debug, Default)]
+struct TableAccounting {
+    rollups: MapAccounting,
+    receipts: MapAccounting,
+    root_bound: usize,
+    encoded_bound: usize,
+    oversized_sets: usize,
+}
+#[derive(Default)]
+struct DerivedAccounting {
+    tables: BTreeMap<String, TableAccounting>,
+    control_base: usize,
+    root_bound: usize,
+    encoded_bound: usize,
+    oversized_sets: usize,
+}
+
+fn json_bytes<T: Serialize>(value: &T) -> Result<usize> {
+    struct Count(usize);
+    impl std::io::Write for Count {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 = self
+                .0
+                .checked_add(bytes.len())
+                .ok_or_else(|| std::io::Error::other("JSON count overflow"))?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut count = Count(0);
+    serde_json::to_writer(&mut count, value)?;
+    Ok(count.0)
+}
+
+fn map_accounting<T: Serialize>(map: &BTreeMap<String, T>) -> Result<MapAccounting> {
+    let mut max_entry_bytes = 0;
+    for (key, value) in map {
+        max_entry_bytes = max_entry_bytes.max(json_bytes(&(key, value))?);
+    }
+    Ok(MapAccounting {
+        json_bytes: json_bytes(map)?,
+        entries: map.len(),
+        max_entry_bytes,
+    })
+}
+
+impl TableAccounting {
+    fn bound(&mut self, name: &str, config: &Config) -> Result<()> {
+        self.root_bound = 0;
+        self.encoded_bound = 0;
+        self.oversized_sets = 0;
+        for (kind, map) in [
+            (derived::PageKind::Rollup, &self.rollups),
+            (derived::PageKind::Receipt, &self.receipts),
+        ] {
+            if map.entries == 0 {
+                continue;
+            }
+            let overhead = derived::page_overhead(name, kind)?;
+            let capacity = config
+                .derived_page_bytes
+                .checked_sub(overhead)
+                .context("derived page target too small")?;
+            self.oversized_sets += usize::from(map.max_entry_bytes > capacity);
+            // Adjacent greedy pages together contain at least one payload-capacity
+            // of entry bytes. Thus pairs prove this bound without re-packing maps.
+            let body = map
+                .json_bytes
+                .saturating_sub(2)
+                .saturating_add(map.entries.saturating_mul(2));
+            let pages = map.entries.min(body.saturating_mul(2) / capacity + 1);
+            self.encoded_bound = self
+                .encoded_bound
+                .saturating_add(body)
+                .saturating_add(pages.saturating_mul(overhead));
+            // Digest/byte/count references are fixed-size; reserve decimal growth
+            // in the two PageSet totals independently of the inline map size.
+            self.root_bound = self
+                .root_bound
+                .saturating_add(pages.saturating_mul(192))
+                .saturating_add(38);
+        }
+        Ok(())
+    }
+    fn entries_fit(&self, name: &str, config: &Config) -> Result<()> {
+        for (kind, map) in [
+            (derived::PageKind::Rollup, &self.rollups),
+            (derived::PageKind::Receipt, &self.receipts),
+        ] {
+            ensure!(
+                map.max_entry_bytes
+                    .saturating_add(derived::page_overhead(name, kind)?)
+                    <= config.derived_page_bytes,
+                "derived entry exceeds configured page target"
+            );
+        }
+        Ok(())
+    }
+}
+
+impl DerivedAccounting {
+    fn build(catalog: &Manifest, config: &Config) -> Result<Self> {
+        let mut accounting = Self::default();
+        let mut empty = BTreeMap::new();
+        for (name, table) in &catalog.tables {
+            let mut entry = TableAccounting {
+                rollups: map_accounting(&table.rollups)?,
+                receipts: map_accounting(&table.receipts)?,
+                ..Default::default()
+            };
+            entry.bound(name, config)?;
+            accounting.root_bound = accounting.root_bound.saturating_add(entry.root_bound);
+            accounting.encoded_bound = accounting.encoded_bound.saturating_add(entry.encoded_bound);
+            accounting.oversized_sets += entry.oversized_sets;
+            accounting.tables.insert(name.clone(), entry);
+            empty.insert(name.clone(), DerivedRefs::default());
+        }
+        let mut sizing = config.clone();
+        sizing.metadata_max_bytes = wal::MAX_FRAME_BYTES;
+        accounting.control_base =
+            derived_root::encode_control(catalog, &empty, catalog.checkpoint_sequence, &sizing)?
+                .len();
+        Ok(accounting)
+    }
+    fn replace(&mut self, name: String, next: TableAccounting) -> Option<TableAccounting> {
+        let old = self.tables.insert(name, next.clone());
+        self.root_bound = self
+            .root_bound
+            .saturating_sub(old.as_ref().map_or(0, |a| a.root_bound))
+            .saturating_add(next.root_bound);
+        self.encoded_bound = self
+            .encoded_bound
+            .saturating_sub(old.as_ref().map_or(0, |a| a.encoded_bound))
+            .saturating_add(next.encoded_bound);
+        self.oversized_sets = self.oversized_sets - old.as_ref().map_or(0, |a| a.oversized_sets)
+            + next.oversized_sets;
+        old
+    }
+}
+
+struct DerivedAppend {
+    working: DerivedWorking,
+    resident: usize,
+    accounting: TableAccounting,
+}
+
+pub(crate) struct DerivedWorking {
+    counter: Arc<AtomicUsize>,
+    bytes: usize,
+}
+impl Drop for DerivedWorking {
+    fn drop(&mut self) {
+        self.counter.fetch_sub(self.bytes, Ordering::SeqCst);
+    }
+}
+
+pub(crate) fn reserve_derived(s: &State, config: &Config, bytes: usize) -> Result<DerivedWorking> {
+    let resident = s.derived_resident_bytes;
+    let working = s.derived_working.load(Ordering::SeqCst);
+    ensure!(
+        resident.saturating_add(working).saturating_add(bytes) <= config.derived_max_bytes,
+        "derived resident/working byte budget exceeded"
+    );
+    s.derived_working.fetch_add(bytes, Ordering::SeqCst);
+    Ok(DerivedWorking {
+        counter: Arc::clone(&s.derived_working),
+        bytes,
+    })
+}
+
+pub(crate) fn reserve_catalog_clone(s: &State, config: &Config) -> Result<DerivedWorking> {
+    reserve_derived(s, config, derived_root::resident_bytes(&s.catalog, false))
+}
+
+fn build_rollup_indexes(
+    catalog: &Manifest,
+    config: &Config,
+) -> Result<BTreeMap<String, RollupIndex>> {
+    let mut remaining = config
+        .derived_max_bytes
+        .checked_sub(derived_root::resident_bytes(catalog, false))
+        .context("derived resident map budget exceeded")?;
+    let mut indexes = BTreeMap::new();
+    for (name, table) in &catalog.tables {
+        let index = RollupIndex::rebuild(&table.rollups, remaining)?;
+        remaining -= index.resident_bytes();
+        indexes.insert(name.clone(), index);
+    }
+    Ok(indexes)
+}
+
+fn persisted_derived_bytes(s: &State) -> usize {
+    s.derived_refs
+        .iter()
+        .flat_map(|tables| tables.values())
+        .fold(0usize, |total, refs| {
+            total
+                .saturating_add(refs.rollups.encoded_bytes as usize)
+                .saturating_add(refs.receipts.encoded_bytes as usize)
+        })
+}
+
+fn uses_derived_pages(s: &State, config: &Config) -> bool {
+    s.derived_refs.is_some() || config.derived_pages
+}
+
+fn check_derived_checkpoint_headroom(s: &State, config: &Config, resident: usize) -> Result<()> {
+    if !s.replaying {
+        let page_working = if uses_derived_pages(s, config) {
+            config.derived_page_bytes.saturating_mul(4)
+        } else {
+            0
+        };
+        // Both checkpoint paths retain cloned maps while persist_manifest builds
+        // replacement indexes: resident + maps + indexes + page buffers. Leave
+        // this space for a future checkpoint after other working users drain.
+        ensure!(
+            resident.saturating_mul(2).saturating_add(page_working) <= config.derived_max_bytes,
+            "projected derived checkpoint working budget exceeded"
+        );
+    }
+    Ok(())
+}
+
+fn logical_metadata_bytes(catalog: &Manifest) -> Result<usize> {
+    struct Count(usize);
+    impl std::io::Write for Count {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 = self
+                .0
+                .checked_add(bytes.len())
+                .ok_or_else(|| std::io::Error::other("metadata count overflow"))?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut count = Count(40);
+    serde_json::to_writer(&mut count, catalog)?;
+    Ok(count.0)
+}
+
+pub(crate) fn check_state_catalog_budget(
+    inner: &Inner,
+    s: &State,
+    catalog: &Manifest,
+    hot_rows: usize,
+) -> Result<()> {
+    let resident = derived_root::resident_bytes(catalog, true);
+    ensure!(
+        resident.saturating_add(s.derived_working.load(Ordering::SeqCst))
+            <= inner.config.derived_max_bytes,
+        "derived catalog resident/working budget exceeded"
+    );
+    // Control preflight (notably aggregate backfill) can grow the derived maps
+    // without append admission. Do not impose new headroom on historical state
+    // merely to checkpoint it or perform a non-growing control operation.
+    if resident > s.derived_resident_bytes {
+        check_derived_checkpoint_headroom(s, &inner.config, resident)?;
+    }
+    if uses_derived_pages(s, &inner.config) {
+        let _working = reserve_derived(
+            s,
+            &inner.config,
+            inner.config.derived_page_bytes.saturating_mul(4),
+        )?;
+        let (_, bytes) =
+            derived_root::project(catalog, &inner.config, catalog.checkpoint_sequence, None)?;
+        ensure!(
+            bytes.saturating_add(hot_rows.saturating_mul(512)) <= inner.config.metadata_max_bytes,
+            "projected checkpoint exceeds control metadata byte budget"
+        );
+        Ok(())
+    } else {
+        check_metadata_budget(&inner.config, catalog, hot_rows)
+    }
+}
+
+fn check_derived_append(
+    s: &State,
+    config: &Config,
+    append: derived_root::AppendProjection<'_>,
+    _sequence: u64,
+    hot_rows: usize,
+) -> Result<DerivedAppend> {
+    let (table_name, id, receipt, updates) = append;
+    let table = s
+        .catalog
+        .tables
+        .get(table_name)
+        .context("unknown derived table")?;
+    let old = s
+        .derived_accounting
+        .tables
+        .get(table_name)
+        .context("missing derived accounting")?;
+    let mut accounting = old.clone();
+    accounting.receipts.json_bytes = apply_encoded_delta(
+        accounting.receipts.json_bytes,
+        serialized_map_upsert_delta(
+            &table.receipts,
+            id,
+            receipt,
+            accounting.receipts.entries > 0,
+        )?,
+    )?;
+    accounting.receipts.max_entry_bytes = accounting
+        .receipts
+        .max_entry_bytes
+        .max(json_bytes(&(id, receipt))?);
+    let mut projected = s.derived_resident_bytes;
+    let mut working = derived::receipt_resident_bytes(id, receipt);
+    if !table.receipts.contains_key(id) {
+        projected = projected.saturating_add(working);
+        accounting.receipts.entries += 1;
+    }
+    for (key, row) in updates {
+        let bytes = derived::rollup_resident_bytes(key, row);
+        working = working.saturating_add(bytes.saturating_mul(2));
+        accounting.rollups.json_bytes = apply_encoded_delta(
+            accounting.rollups.json_bytes,
+            serialized_map_upsert_delta(&table.rollups, key, row, accounting.rollups.entries > 0)?,
+        )?;
+        accounting.rollups.max_entry_bytes = accounting
+            .rollups
+            .max_entry_bytes
+            .max(json_bytes(&(key, row))?);
+        if let Some(old) = table.rollups.get(key) {
+            projected = projected.saturating_sub(derived::rollup_resident_bytes(key, old));
+        } else {
+            projected = projected.saturating_add(RollupIndex::entry_bytes(key, row));
+            accounting.rollups.entries += 1;
+        }
+        projected = projected.saturating_add(bytes);
+    }
+    accounting.bound(table_name, config)?;
+    ensure!(
+        projected
+            .saturating_add(working)
+            .saturating_add(s.derived_working.load(Ordering::SeqCst))
+            <= config.derived_max_bytes,
+        "projected derived resident/working budget exceeded"
+    );
+    check_derived_checkpoint_headroom(s, config, projected)?;
+    if uses_derived_pages(s, config) && !s.replaying {
+        accounting.entries_fit(table_name, config)?;
+        ensure!(
+            s.derived_accounting.oversized_sets - old.oversized_sets + accounting.oversized_sets
+                == 0,
+            "existing derived entry exceeds configured writer target"
+        );
+        let encoded = s
+            .derived_accounting
+            .encoded_bound
+            .saturating_sub(old.encoded_bound)
+            .saturating_add(accounting.encoded_bound);
+        ensure!(
+            encoded <= config.derived_max_bytes,
+            "projected derived encoded byte budget exceeded"
+        );
+        let bytes = s
+            .derived_accounting
+            .control_base
+            .saturating_add(s.derived_accounting.root_bound)
+            .saturating_sub(old.root_bound)
+            .saturating_add(accounting.root_bound)
+            .saturating_add(20);
+        ensure!(
+            projected.saturating_add(config.derived_page_bytes.saturating_mul(64))
+                <= config.derived_max_bytes,
+            "projected derived recovery working budget exceeded"
+        );
+        if bytes.saturating_add(hot_rows.saturating_mul(512)) > config.metadata_max_bytes {
+            return Err(CheckpointHeadroom.into());
+        }
+    }
+    Ok(DerivedAppend {
+        working: reserve_derived(s, config, working)?,
+        resident: projected,
+        accounting,
+    })
+}
+
 fn empty_table(config: TableConfig, sequence: u64) -> Table {
     Table {
         creation_config: Some(config.clone()),
@@ -1434,6 +2163,11 @@ fn apply_encoded_delta(base: usize, delta: i128) -> Result<usize> {
     Ok(value as usize)
 }
 
+fn checkpoint_sequence_delta(previous: u64, next: u64) -> i128 {
+    i128::from(next.checked_ilog10().unwrap_or(0))
+        - i128::from(previous.checked_ilog10().unwrap_or(0))
+}
+
 fn append_metadata_bytes(
     s: &State,
     table_name: &str,
@@ -1454,15 +2188,27 @@ fn append_metadata_bytes(
         delta += serialized_map_upsert_delta(&table.rollups, key, value, rollups_nonempty)?;
         rollups_nonempty = true;
     }
-    delta += serde_json::to_vec(&checkpoint_sequence)?.len() as i128
-        - serde_json::to_vec(&s.catalog.checkpoint_sequence)?.len() as i128;
+    delta += checkpoint_sequence_delta(s.catalog.checkpoint_sequence, checkpoint_sequence);
     apply_encoded_delta(s.metadata_bytes, delta)
 }
 fn check_recovery_budget(config: &Config, s: &State) -> Result<()> {
+    let _working = reserve_derived(s, config, 0)?;
+    if uses_derived_pages(s, config) && !s.replaying {
+        let bytes = s
+            .derived_accounting
+            .control_base
+            .saturating_add(s.derived_accounting.root_bound)
+            .saturating_add(20);
+        ensure!(
+            bytes.saturating_add(hot_count(s).saturating_mul(512)) <= config.metadata_max_bytes,
+            "control metadata recovery byte budget exceeded"
+        );
+    }
     ensure!(
-        s.metadata_bytes
-            .saturating_add(hot_count(s).saturating_mul(512))
-            <= config.metadata_max_bytes,
+        uses_derived_pages(s, config)
+            || s.metadata_bytes
+                .saturating_add(hot_count(s).saturating_mul(512))
+                <= config.metadata_max_bytes,
         "metadata/recovery byte budget exceeded; increase metadata_max_bytes"
     );
     ensure!(
@@ -1617,7 +2363,19 @@ fn apply_idempotency_checkpoint(s: &State, next: &mut Manifest) {
     }
 }
 
+#[derive(Debug)]
+struct CheckpointHeadroom;
+
+impl std::fmt::Display for CheckpointHeadroom {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("projected checkpoint exceeds metadata byte budget")
+    }
+}
+
+impl std::error::Error for CheckpointHeadroom {}
+
 struct PreparedAppend {
+    derived: DerivedAppend,
     table: String,
     request_id: String,
     receipt: ReceiptEntry,
@@ -1649,6 +2407,9 @@ impl PreparedAppend {
     }
 }
 struct AppendUndo {
+    _derived_working: DerivedWorking,
+    derived_resident_bytes: usize,
+    derived_accounting: TableAccounting,
     table: String,
     request_id: String,
     rollups: BTreeMap<String, Option<RollupRow>>,
@@ -1659,9 +2420,10 @@ struct AppendUndo {
 
 fn group_retry(
     s: &mut State,
-    request: &WriteRequest,
+    request: &wal::AppendItem,
     digest: &str,
 ) -> Result<Option<WriteReceipt>> {
+    let now_us = request.now_us.context("live group request missing clock")?;
     let table = s
         .catalog
         .tables
@@ -1675,17 +2437,13 @@ fn group_retry(
             .get(&request.table)
             .copied()
             .unwrap_or(i64::MIN)
-            .max(checked_cutoff(request.now_us, window));
+            .max(checked_cutoff(now_us, window));
         ensure!(
             issued >= floor,
             "request_id is outside the idempotency window"
         );
         ensure!(
-            receipt.is_some()
-                || issued
-                    <= request
-                        .now_us
-                        .saturating_add(IDEMPOTENCY_MAX_FUTURE_SKEW_US),
+            receipt.is_some() || issued <= now_us.saturating_add(IDEMPOTENCY_MAX_FUTURE_SKEW_US),
             "request_id issue time exceeds the future-skew limit"
         );
         Some(floor)
@@ -1788,7 +2546,12 @@ fn prepare_group_append(
             ordinal: (ordinal + index) as u32,
         })
         .collect();
-    let updates = aggregate_updates(table, &stored, config.metadata_max_bytes)?;
+    let update_budget = if uses_derived_pages(s, config) {
+        config.derived_max_bytes
+    } else {
+        config.metadata_max_bytes
+    };
+    let updates = aggregate_updates(table, &stored, update_budget)?;
     let new_groups = updates
         .keys()
         .filter(|key| !table.rollups.contains_key(*key))
@@ -1810,22 +2573,6 @@ fn prepare_group_append(
         issued_us,
         group_fingerprint: group_fingerprint.map(str::to_owned),
     };
-    let projected = append_metadata_bytes(
-        s,
-        &item.table,
-        &item.request_id,
-        &receipt,
-        &updates,
-        sequence,
-    )?;
-    ensure!(
-        projected.saturating_add(
-            hot_count(s)
-                .saturating_add(item.rows.len())
-                .saturating_mul(512)
-        ) <= config.metadata_max_bytes,
-        "projected checkpoint exceeds metadata byte budget"
-    );
     let metadata_bytes = append_metadata_bytes(
         s,
         &item.table,
@@ -1834,7 +2581,29 @@ fn prepare_group_append(
         &updates,
         s.catalog.checkpoint_sequence,
     )?;
+    // The checkpoint projection changes only the sequence token's encoded width.
+    let projected = apply_encoded_delta(
+        metadata_bytes,
+        checkpoint_sequence_delta(s.catalog.checkpoint_sequence, sequence),
+    )?;
+    if !uses_derived_pages(s, config)
+        && projected.saturating_add(
+            hot_count(s)
+                .saturating_add(item.rows.len())
+                .saturating_mul(512),
+        ) > config.metadata_max_bytes
+    {
+        return Err(CheckpointHeadroom.into());
+    }
+    let derived = check_derived_append(
+        s,
+        config,
+        (&item.table, &item.request_id, &receipt, &updates),
+        sequence,
+        hot_count(s) + item.rows.len(),
+    )?;
     Ok(PreparedAppend {
+        derived,
         table: item.table.clone(),
         request_id: item.request_id.clone(),
         receipt,
@@ -1847,6 +2616,14 @@ fn prepare_group_append(
 
 fn apply_group_append(s: &mut State, prepared: PreparedAppend) -> AppendUndo {
     let mut undo = AppendUndo {
+        _derived_working: prepared.derived.working,
+        derived_resident_bytes: s.derived_resident_bytes,
+        derived_accounting: s
+            .derived_accounting
+            .tables
+            .get(&prepared.table)
+            .expect("prepared accounting")
+            .clone(),
         table: prepared.table.clone(),
         request_id: prepared.request_id.clone(),
         rollups: BTreeMap::new(),
@@ -1854,6 +2631,12 @@ fn apply_group_append(s: &mut State, prepared: PreparedAppend) -> AppendUndo {
         hot_bytes: s.hot_bytes,
         metadata_bytes: s.metadata_bytes,
     };
+    let index = s.rollup_indexes.entry(prepared.table.clone()).or_default();
+    for (key, row) in &prepared.updates {
+        index
+            .insert(key, row, usize::MAX)
+            .expect("prevalidated rollup index");
+    }
     let table = s
         .catalog
         .tables
@@ -1865,11 +2648,14 @@ fn apply_group_append(s: &mut State, prepared: PreparedAppend) -> AppendUndo {
     }
     table.receipts.insert(prepared.request_id, prepared.receipt);
     s.hot
-        .entry(prepared.table)
+        .entry(prepared.table.clone())
         .or_default()
         .extend(prepared.stored);
     s.hot_bytes += prepared.bytes;
     s.metadata_bytes = prepared.metadata_bytes;
+    s.derived_resident_bytes = prepared.derived.resident;
+    s.derived_accounting
+        .replace(prepared.table, prepared.derived.accounting);
     undo
 }
 
@@ -1880,7 +2666,12 @@ fn undo_group_append(s: &mut State, undo: AppendUndo) {
         if let Some(value) = previous {
             table.rollups.insert(key, value);
         } else {
-            table.rollups.remove(&key);
+            if let Some(row) = table.rollups.remove(&key) {
+                s.rollup_indexes
+                    .get_mut(&undo.table)
+                    .expect("staged index")
+                    .remove(&key, &row);
+            }
         }
     }
     if let Some(len) = undo.hot_len {
@@ -1890,6 +2681,9 @@ fn undo_group_append(s: &mut State, undo: AppendUndo) {
     }
     s.hot_bytes = undo.hot_bytes;
     s.metadata_bytes = undo.metadata_bytes;
+    s.derived_resident_bytes = undo.derived_resident_bytes;
+    s.derived_accounting
+        .replace(undo.table, undo.derived_accounting);
 }
 
 fn receipt_for(r: &ReceiptEntry, duplicate: bool) -> WriteReceipt {
@@ -1902,7 +2696,19 @@ fn receipt_for(r: &ReceiptEntry, duplicate: bool) -> WriteReceipt {
 }
 
 pub(crate) fn commit_record(inner: &Inner, s: &mut State, record: &wal::Record) -> Result<()> {
-    let bytes = wal::encode(record)?.len() as u64;
+    let encoded = prepare_record(inner, s, record)?;
+    publish_record(inner, s, &encoded)
+}
+
+fn prepare_record(
+    inner: &Inner,
+    s: &mut State,
+    record: &wal::Record,
+) -> Result<wal::EncodedRecord> {
+    let encode_timer = inner.metrics.timer(Phase::WalEncode);
+    let encoded = wal::EncodedRecord::new(record)?;
+    drop(encode_timer);
+    let bytes = encoded.len() as u64;
     ensure!(
         bytes <= inner.config.wal_max_bytes,
         "batch exceeds WAL capacity"
@@ -1910,9 +2716,13 @@ pub(crate) fn commit_record(inner: &Inner, s: &mut State, record: &wal::Record) 
     if s.wal_bytes.saturating_add(bytes) > inner.config.wal_max_bytes {
         checkpoint_locked(inner, s)?;
     }
+    Ok(encoded)
+}
+
+fn publish_record(inner: &Inner, s: &mut State, encoded: &wal::EncodedRecord) -> Result<()> {
     let _disk = lock_disk_admission(inner)?;
-    ensure_budget(inner, bytes)?;
-    match wal::append(&inner.root, record) {
+    ensure_budget(inner, encoded.len() as u64)?;
+    match wal::append_encoded(&inner.root, encoded, Some(&inner.metrics)) {
         Ok(size) => {
             s.wal_bytes += size as u64;
             Ok(())
@@ -2022,8 +2832,18 @@ fn apply_record(
         }
     }
     s.sequence = record.sequence;
+    s.generation = s
+        .generation
+        .checked_add(1)
+        .context("state generation exhausted")?;
     if !append_applied {
-        s.metadata_bytes = encode_manifest(&s.catalog)?.len();
+        let index_bytes = derived_root::resident_bytes(&s.catalog, true)
+            .saturating_sub(derived_root::resident_bytes(&s.catalog, false));
+        let _working = reserve_derived(s, config, index_bytes)?;
+        s.rollup_indexes = build_rollup_indexes(&s.catalog, config)?;
+        s.metadata_bytes = logical_metadata_bytes(&s.catalog)?;
+        s.derived_resident_bytes = derived_root::resident_bytes(&s.catalog, true);
+        s.derived_accounting = DerivedAccounting::build(&s.catalog, config)?;
     }
     Ok(())
 }
@@ -2120,6 +2940,9 @@ pub(crate) fn validate_manifest(c: &Manifest) -> Result<()> {
             t.created_sequence > 0 && t.created_sequence <= c.checkpoint_sequence,
             "invalid table creation sequence"
         );
+        for (key, row) in &t.rollups {
+            derived::validate_rollup(key, row)?;
+        }
         let mut identities = BTreeSet::new();
         for seg in &t.segments {
             ensure!(
@@ -2189,28 +3012,236 @@ pub(crate) fn validate_manifest(c: &Manifest) -> Result<()> {
 
 pub(crate) fn persist_manifest(inner: &Inner, s: &mut State, next: Manifest) -> Result<()> {
     validate_manifest(&next)?;
-    check_metadata_budget(&inner.config, &next, 0)?;
-    let bytes = encode_manifest(&next)?;
+    check_state_catalog_budget(inner, s, &next, 0)?;
+    let logical_bytes = logical_metadata_bytes(&next)?;
+    let index_bytes = derived_root::resident_bytes(&next, true)
+        .saturating_sub(derived_root::resident_bytes(&next, false));
+    let page_working = if uses_derived_pages(s, &inner.config) {
+        inner.config.derived_page_bytes.saturating_mul(4)
+    } else {
+        0
+    };
+    let _working = reserve_derived(s, &inner.config, index_bytes.saturating_add(page_working))?;
+    let indexes = build_rollup_indexes(&next, &inner.config)?;
+    let accounting = DerivedAccounting::build(&next, &inner.config)?;
+    // Keep disk admission through dependency publication and atomic root rename:
+    // GC cannot observe an unpinned page between its fsync and root publication.
     let _disk = lock_disk_admission(inner)?;
+    let root = if uses_derived_pages(s, &inner.config) {
+        derived_root::prepare(next, &inner.config, |page, bytes| {
+            let path = inner.root.join(page.key());
+            if path.exists() {
+                page.verify(&wal::read_bounded(&path, page.bytes as usize)?)?;
+            } else {
+                ensure_budget(inner, page.bytes)?;
+                wal::atomic_write(&path, bytes)?;
+                wal::failpoint("derived_page_published");
+            }
+            Ok(())
+        })?
+    } else {
+        CheckpointRoot {
+            catalog: next,
+            derived: None,
+        }
+    };
+    let bytes = root.encode(&inner.config)?;
+    wal::failpoint("derived_pages_published");
     ensure_budget(inner, bytes.len() as u64)?;
     if let Err(e) = wal::atomic_write(&inner.root.join("manifest.bin"), &bytes) {
         s.fenced = Some(format!("ambiguous manifest publication: {e:#}"));
         return Err(e);
     }
     wal::failpoint("manifest_published");
-    s.metadata_bytes = bytes.len();
-    s.catalog = next;
+    s.metadata_bytes = logical_bytes;
+    s.control_root_bytes = bytes.len();
+    s.derived_refs = root.derived;
+    s.rollup_indexes = indexes;
+    s.derived_accounting = accounting;
+    s.catalog = root.catalog;
+    s.derived_resident_bytes = derived_root::resident_bytes(&s.catalog, true);
+    s.generation = s
+        .generation
+        .checked_add(1)
+        .context("state generation exhausted")?;
     Ok(())
+}
+
+struct CheckpointPreparation {
+    _derived_working: DerivedWorking,
+    generation: u64,
+    sequence: u64,
+    idempotency_floors: BTreeMap<String, i64>,
+    next: Manifest,
+    hot: Vec<(String, TableConfig, Vec<StoredRow>)>,
+}
+
+fn capture_checkpoint(s: &State, config: &Config) -> Result<Option<CheckpointPreparation>> {
+    if s.sequence == s.catalog.checkpoint_sequence
+        && s.hot.values().all(Vec::is_empty)
+        && !idempotency_checkpoint_due(s)
+        && !(config.derived_pages && s.derived_refs.is_none())
+    {
+        return Ok(None);
+    }
+    let derived_working = reserve_catalog_clone(s, config)?;
+    let mut next = s.catalog.clone();
+    apply_idempotency_checkpoint(s, &mut next);
+    let hot = s
+        .hot
+        .iter()
+        .filter(|(_, rows)| !rows.is_empty())
+        .map(|(name, rows)| {
+            let config = next
+                .tables
+                .get(name)
+                .context("hot rows without table")?
+                .config
+                .clone();
+            Ok((name.clone(), config, rows.clone()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Some(CheckpointPreparation {
+        _derived_working: derived_working,
+        generation: s.generation,
+        sequence: s.sequence,
+        idempotency_floors: s.idempotency_floors.clone(),
+        next,
+        hot,
+    }))
+}
+
+#[derive(Clone, Copy)]
+enum StaleCheckpoint {
+    Defer,
+    ExplicitFallback,
+}
+
+pub(crate) fn checkpoint_prepared(db: &Database) -> Result<bool> {
+    checkpoint_prepared_with_policy(db, StaleCheckpoint::ExplicitFallback)
+}
+
+pub(crate) fn checkpoint_prepared_scheduled(db: &Database) -> Result<bool> {
+    checkpoint_prepared_with_policy(db, StaleCheckpoint::Defer)
+}
+
+fn checkpoint_locked_fallback(db: &Database) -> Result<bool> {
+    let mut s = db.lock()?;
+    healthy(&s)?;
+    let needed = s.sequence != s.catalog.checkpoint_sequence
+        || s.hot.values().any(|rows| !rows.is_empty())
+        || idempotency_checkpoint_due(&s);
+    checkpoint_locked(&db.inner, &mut s)?;
+    Ok(needed)
+}
+
+fn checkpoint_prepared_with_policy(db: &Database, stale: StaleCheckpoint) -> Result<bool> {
+    let _preparation = match db.inner.maintenance_preparation.try_lock() {
+        Ok(gate) => gate,
+        Err(std::sync::TryLockError::WouldBlock) => {
+            return match stale {
+                StaleCheckpoint::Defer => Ok(false),
+                StaleCheckpoint::ExplicitFallback => checkpoint_locked_fallback(db),
+            };
+        }
+        Err(std::sync::TryLockError::Poisoned(_)) => {
+            bail!("maintenance preparation mutex poisoned")
+        }
+    };
+    let (mut prepared, mut output_pin) = {
+        let s = db.lock()?;
+        healthy(&s)?;
+        let Some(prepared) = capture_checkpoint(&s, &db.inner.config)? else {
+            return Ok(false);
+        };
+        let pin = Pin::new(&db.inner, BTreeSet::new())?;
+        (prepared, pin)
+    };
+    #[cfg(feature = "fault-injection")]
+    db.block_maintenance_test_hook(MaintenanceHookPhase::CheckpointPrepare)?;
+    let prepare_timer = db.inner.metrics.timer(Phase::CheckpointPrepare);
+    let preparation = (|| {
+        for (name, config, rows) in &prepared.hot {
+            let table = prepared
+                .next
+                .tables
+                .get_mut(name)
+                .context("checkpoint table disappeared")?;
+            table.segments.extend(write_partitioned_with_pin(
+                &db.inner,
+                config,
+                rows,
+                Some(&mut output_pin),
+            )?);
+        }
+        prepared.next.checkpoint_sequence = prepared.sequence;
+        wal::failpoint("segments_published");
+        Ok::<_, anyhow::Error>(())
+    })();
+    drop(prepare_timer);
+    if let Err(error) = preparation {
+        drop(output_pin);
+        let mut s = db.lock()?;
+        if s.fenced.is_none()
+            && let Err(cleanup) = cleanup_unpublished_segments(&db.inner, &s)
+        {
+            let reason =
+                format!("checkpoint preparation failed and output cleanup failed: {cleanup:#}");
+            s.fenced = Some(reason.clone());
+            return Err(error.context(reason));
+        }
+        return Err(error);
+    }
+    #[cfg(feature = "fault-injection")]
+    db.block_maintenance_test_hook(MaintenanceHookPhase::CheckpointBeforePublish)?;
+    let mut s = db.lock()?;
+    healthy(&s)?;
+    if s.generation != prepared.generation
+        || s.sequence != prepared.sequence
+        || s.idempotency_floors != prepared.idempotency_floors
+    {
+        drop(output_pin);
+        drop(prepared);
+        cleanup_unpublished_segments(&db.inner, &s)?;
+        drop(s);
+        return match stale {
+            StaleCheckpoint::Defer => Ok(false),
+            StaleCheckpoint::ExplicitFallback => checkpoint_locked_fallback(db),
+        };
+    }
+    let publish_timer = db.inner.metrics.timer(Phase::CheckpointPublish);
+    if let Err(error) = persist_manifest(&db.inner, &mut s, prepared.next) {
+        drop(output_pin);
+        if s.fenced.is_none()
+            && let Err(cleanup) = cleanup_unpublished_segments(&db.inner, &s)
+        {
+            let reason =
+                format!("checkpoint publication failed and output cleanup failed: {cleanup:#}");
+            s.fenced = Some(reason.clone());
+            return Err(error.context(reason));
+        }
+        return Err(error);
+    }
+    drop(publish_timer);
+    s.hot.clear();
+    s.hot_bytes = 0;
+    s.first_hot_us = None;
+    drop(output_pin);
+    gc_locked(&db.inner, &mut s)?;
+    Ok(true)
 }
 
 pub(crate) fn checkpoint_locked(inner: &Inner, s: &mut State) -> Result<()> {
     if s.sequence == s.catalog.checkpoint_sequence
         && s.hot.values().all(Vec::is_empty)
         && !idempotency_checkpoint_due(s)
+        && !(inner.config.derived_pages && s.derived_refs.is_none())
     {
         return Ok(());
     }
     let publication = (|| {
+        let prepare_timer = inner.metrics.timer(Phase::CheckpointPrepare);
+        let _derived_working = reserve_catalog_clone(s, &inner.config)?;
         let mut next = s.catalog.clone();
         apply_idempotency_checkpoint(s, &mut next);
         for (name, rows) in &s.hot {
@@ -2224,6 +3255,8 @@ pub(crate) fn checkpoint_locked(inner: &Inner, s: &mut State) -> Result<()> {
         }
         next.checkpoint_sequence = s.sequence;
         wal::failpoint("segments_published");
+        drop(prepare_timer);
+        let _publish_timer = inner.metrics.timer(Phase::CheckpointPublish);
         persist_manifest(inner, s, next)
     })();
     if let Err(error) = publication {
@@ -2244,7 +3277,7 @@ pub(crate) fn checkpoint_locked(inner: &Inner, s: &mut State) -> Result<()> {
     Ok(())
 }
 
-fn cleanup_unpublished_segments(inner: &Inner, s: &State) -> Result<()> {
+pub(crate) fn cleanup_unpublished_segments(inner: &Inner, s: &State) -> Result<()> {
     let _disk = lock_disk_admission(inner)?;
     let pins = inner
         .segment_pins
@@ -2283,6 +3316,15 @@ pub(crate) fn write_partitioned(
     config: &TableConfig,
     rows: &[StoredRow],
 ) -> Result<Vec<Segment>> {
+    write_partitioned_with_pin(inner, config, rows, None)
+}
+
+pub(crate) fn write_partitioned_with_pin(
+    inner: &Inner,
+    config: &TableConfig,
+    rows: &[StoredRow],
+    mut output_pin: Option<&mut Pin>,
+) -> Result<Vec<Segment>> {
     let mut partitions: BTreeMap<(u32, i64), Vec<StoredRow>> = BTreeMap::new();
     for row in rows {
         let shard = shard_for(&row.row.tenant, &row.row.series, config.shards);
@@ -2311,32 +3353,30 @@ pub(crate) fn write_partitioned(
                 ))
         });
         for chunk in rows.chunks(inner.config.segment_rows) {
-            let _disk = lock_disk_admission(inner)?;
-            let temp = tempfile::Builder::new()
-                .prefix("segment-")
-                .suffix(".tmp")
-                .tempfile_in(inner.root.join("staging"))?;
-            let used = directory_bytes(&inner.root)?;
-            let remaining = inner.config.max_disk_bytes.saturating_sub(used);
-            let limit = remaining.min(wal::MAX_FRAME_BYTES as u64);
-            ensure!(
-                limit > 0,
-                "local disk admission budget exhausted; compact, archive, or increase max_disk_bytes"
-            );
-            segment::write_with_limit(temp.path(), chunk, limit)?;
+            // The candidate buffer is bounded by configured hot+metadata memory and
+            // the immutable frame ceiling. CPU-heavy sorting/compression holds no
+            // shared lock; exact bytes are admitted and atomically fsynced afterward.
+            let preparation_bytes = inner
+                .config
+                .hot_max_bytes
+                .saturating_add(inner.config.metadata_max_bytes)
+                .min(wal::MAX_FRAME_BYTES);
+            let bytes = segment::encode_with_limit(chunk, preparation_bytes as u64)?;
             wal::failpoint("segment_written");
-            File::open(temp.path())?.sync_all()?;
-            let bytes = wal::read_bounded(temp.path(), wal::MAX_FRAME_BYTES)?;
             let id = blake3::hash(&bytes).to_hex().to_string();
             let path = inner.root.join("segments").join(format!("{id}.parquet"));
+            let _disk = lock_disk_admission(inner)?;
+            if let Some(pin) = output_pin.as_deref_mut() {
+                pin.add(id.clone())?;
+            }
             if path.exists() {
                 ensure!(
                     wal::read_bounded(&path, wal::MAX_FRAME_BYTES)? == bytes,
                     "immutable local segment collision"
                 );
             } else {
-                fs::rename(temp.path(), &path)?;
-                wal::sync_dir(&inner.root.join("segments"))?;
+                ensure_budget(inner, bytes.len() as u64)?;
+                wal::atomic_write(&path, &bytes)?;
             }
             result.push(Segment {
                 id,
@@ -2509,6 +3549,43 @@ pub(crate) fn gc_locked(inner: &Inner, s: &mut State) -> Result<usize> {
     }
     wal::sync_dir(&inner.root.join("wal"))?;
     s.wal_bytes = directory_bytes(&inner.root.join("wal"))?;
+    {
+        let _disk = lock_disk_admission(inner)?;
+        let mut retained: BTreeSet<String> = s
+            .derived_refs
+            .iter()
+            .flat_map(|tables| tables.values())
+            .flat_map(|refs| refs.rollups.pages.iter().chain(&refs.receipts.pages))
+            .map(|p| p.key())
+            .collect();
+        let pins = inner
+            .segment_pins
+            .lock()
+            .map_err(|_| anyhow::anyhow!("derived pins poisoned"))?;
+        retained.extend(
+            pins.keys()
+                .filter(|key| key.starts_with("derived/"))
+                .cloned(),
+        );
+        let directory = inner.root.join("derived");
+        for entry in fs::read_dir(&directory)? {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let orphan = name
+                .strip_suffix(".page")
+                .is_some_and(|id| id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit()));
+            let temporary = name.starts_with('.') && name.ends_with(".tmp");
+            if (orphan && !retained.contains(&format!("derived/{name}"))) || temporary {
+                ensure!(
+                    entry.file_type()?.is_file(),
+                    "unexpected non-file derived object"
+                );
+                fs::remove_file(entry.path())?;
+                removed += 1;
+            }
+        }
+        wal::sync_dir(&directory)?;
+    }
     if inner.readers.load(Ordering::SeqCst) == 0 {
         let referenced: BTreeSet<_> = s
             .catalog
@@ -2557,6 +3634,7 @@ pub(crate) fn directory_bytes(root: &Path) -> Result<u64> {
     Ok(total)
 }
 pub(crate) fn ensure_budget(inner: &Inner, additional: u64) -> Result<()> {
+    let _timer = inner.metrics.timer(Phase::DiskAccount);
     ensure!(
         directory_bytes(&inner.root)?.saturating_add(additional) <= inner.config.max_disk_bytes,
         "local disk admission budget exhausted; compact, archive, or increase max_disk_bytes"
@@ -2568,6 +3646,318 @@ pub(crate) fn ensure_budget(inner: &Inner, additional: u64) -> Result<()> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn derived_checkpoint_headroom_covers_clone_indexes_and_sticky_pages() -> Result<()> {
+        for derived_pages in [false, true] {
+            let dir = TempDir::new()?;
+            let config = Config {
+                derived_pages,
+                derived_page_bytes: 4096,
+                ..Config::default()
+            };
+            let db = Database::open(dir.path(), config.clone())?;
+            db.create_table("metrics", TableConfig::default())?;
+            db.write(
+                "metrics",
+                "first",
+                vec![Row {
+                    timestamp_us: 0,
+                    tenant: "tenant".into(),
+                    series: "series".into(),
+                    value: 1.0,
+                    tags: BTreeMap::new(),
+                }],
+                0,
+            )?;
+            let mut s = db.lock()?;
+            let resident = s.derived_resident_bytes;
+            let maps = derived_root::resident_bytes(&s.catalog, false);
+            let pages = if derived_pages {
+                4 * config.derived_page_bytes
+            } else {
+                0
+            };
+            let boundary = Config {
+                // An authoritative v2 root remains paged with the flag disabled.
+                derived_pages: false,
+                derived_max_bytes: 2 * resident + pages,
+                ..config.clone()
+            };
+            check_derived_checkpoint_headroom(&s, &boundary, resident)?;
+            {
+                let _clone = reserve_catalog_clone(&s, &boundary)?;
+                let _indexes = reserve_derived(&s, &boundary, resident - maps + pages)?;
+                assert_eq!(s.derived_working.load(Ordering::SeqCst), resident + pages);
+            }
+            let insufficient = Config {
+                derived_max_bytes: boundary.derived_max_bytes - 1,
+                ..boundary
+            };
+            assert!(check_derived_checkpoint_headroom(&s, &insufficient, resident).is_err());
+            s.replaying = true;
+            check_derived_checkpoint_headroom(&s, &insufficient, resident)?;
+            s.replaying = false;
+            checkpoint_locked(&db.inner, &mut s)?;
+            assert_eq!(s.catalog.checkpoint_sequence, s.sequence);
+            assert_eq!(s.derived_working.load(Ordering::SeqCst), 0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn derived_dimensions_are_validated_in_the_legacy_envelope_too() -> Result<()> {
+        let dir = TempDir::new()?;
+        let db = Database::open(dir.path(), Config::default())?;
+        db.create_table("metrics", TableConfig::default())?;
+        db.write(
+            "metrics",
+            "id",
+            vec![Row {
+                timestamp_us: 0,
+                tenant: "tenant".into(),
+                series: "series".into(),
+                value: 1.0,
+                tags: BTreeMap::new(),
+            }],
+            0,
+        )?;
+        db.checkpoint()?;
+        let mut catalog = db.lock()?.catalog.clone();
+        catalog
+            .tables
+            .get_mut("metrics")
+            .unwrap()
+            .rollups
+            .values_mut()
+            .next()
+            .unwrap()
+            .tenant
+            .clear();
+        let encoded = encode_manifest(&catalog)?;
+        assert!(
+            decode_manifest(&encoded)
+                .unwrap_err()
+                .to_string()
+                .contains("tenant")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn derived_greedy_bounds_cover_names_escaping_and_decimal_edges() -> Result<()> {
+        for name in ["m".to_owned(), "m".repeat(63)] {
+            for page_bytes in [4096, 16_384, 131_072] {
+                for count in [0, 1, 9, 10, 99, 100] {
+                    let config = Config {
+                        derived_page_bytes: page_bytes,
+                        ..Config::default()
+                    };
+                    let mut rollups = BTreeMap::new();
+                    let mut receipts = BTreeMap::new();
+                    for i in 0..count {
+                        let size = [0, 17, 127, 511, 1024][i % 5];
+                        let source = Row {
+                            timestamp_us: i as i64 - 100,
+                            tenant: "é".repeat(if i % 3 == 0 { 128 } else { 1 }),
+                            series: format!("s{i}"),
+                            value: if i % 2 == 0 { -0.0 } else { f64::MIN_POSITIVE },
+                            tags: BTreeMap::from([("tag".into(), "\"".repeat(size))]),
+                        };
+                        source.validate()?;
+                        let row = RollupRow::from_row(
+                            10,
+                            &StoredRow {
+                                row: source,
+                                sequence: [9, 10, 99, 100, u64::MAX][i % 5],
+                                ordinal: 0,
+                            },
+                        )?;
+                        rollups.insert(derived::canonical_key(&row)?, row);
+                        receipts.insert(
+                            format!("r{i}{}", "\\".repeat(i % 128)),
+                            ReceiptEntry {
+                                sequence: [9, 10, 99, 100, u64::MAX][i % 5],
+                                rows: i + 1,
+                                digest: "a".repeat(64),
+                                issued_us: None,
+                                group_fingerprint: Some("b".repeat(64)),
+                            },
+                        );
+                    }
+                    let mut accounting = TableAccounting {
+                        rollups: map_accounting(&rollups)?,
+                        receipts: map_accounting(&receipts)?,
+                        ..Default::default()
+                    };
+                    accounting.bound(&name, &config)?;
+                    let actual = derived::encode_rollups(
+                        &name,
+                        &rollups,
+                        derived_root::limits(&config, false, config.derived_max_bytes),
+                        |_, _| Ok(()),
+                    );
+                    if accounting.entries_fit(&name, &config).is_err() {
+                        assert!(actual.is_err(), "oversized entry unexpectedly encoded");
+                        continue;
+                    }
+                    let actual = actual?;
+                    let receipts = derived::encode_receipts(
+                        &name,
+                        &receipts,
+                        derived_root::limits(&config, true, config.derived_max_bytes),
+                        |_, _| Ok(()),
+                    )?;
+                    assert!(
+                        actual.encoded_bytes as usize + receipts.encoded_bytes as usize
+                            <= accounting.encoded_bound
+                    );
+                    let refs = DerivedRefs {
+                        rollups: actual,
+                        receipts,
+                    };
+                    let root_extra = json_bytes(&refs)? - json_bytes(&DerivedRefs::default())?;
+                    assert!(
+                        root_extra <= accounting.root_bound,
+                        "root bound: {name}/{page_bytes}/{count}"
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn derived_append_caches_match_recomputation_without_page_encoding() -> Result<()> {
+        fn verify(s: &State, config: &Config) -> Result<()> {
+            assert_eq!(
+                s.derived_resident_bytes,
+                derived_root::resident_bytes(&s.catalog, true)
+            );
+            let rebuilt = DerivedAccounting::build(&s.catalog, config)?;
+            assert_eq!(s.derived_accounting.root_bound, rebuilt.root_bound);
+            assert_eq!(s.derived_accounting.encoded_bound, rebuilt.encoded_bound);
+            for (name, table) in &s.catalog.tables {
+                let cached = &s.derived_accounting.tables[name];
+                assert_eq!(cached.rollups.json_bytes, json_bytes(&table.rollups)?);
+                assert_eq!(cached.receipts.json_bytes, json_bytes(&table.receipts)?);
+                assert_eq!(cached.rollups.entries, table.rollups.len());
+                assert_eq!(cached.receipts.entries, table.receipts.len());
+                let selected = s.rollup_indexes[name].select(
+                    &table.rollups,
+                    RollupSelection::default(),
+                    config.derived_max_bytes,
+                )?;
+                assert_eq!(selected, table.rollups.values().collect::<Vec<_>>());
+                let actual = derived::encode_rollups(
+                    name,
+                    &table.rollups,
+                    derived_root::limits(config, false, config.derived_max_bytes),
+                    |_, _| Ok(()),
+                )?;
+                let receipts = derived::encode_receipts(
+                    name,
+                    &table.receipts,
+                    derived_root::limits(config, true, config.derived_max_bytes),
+                    |_, _| Ok(()),
+                )?;
+                assert!(
+                    actual.encoded_bytes as usize + receipts.encoded_bytes as usize
+                        <= cached.encoded_bound
+                );
+                let root_extra = serde_json::to_vec(&DerivedRefs {
+                    rollups: actual,
+                    receipts,
+                })?
+                .len()
+                    - serde_json::to_vec(&DerivedRefs::default())?.len();
+                assert!(root_extra <= cached.root_bound);
+            }
+            Ok(())
+        }
+        for derived_pages in [false, true] {
+            let dir = TempDir::new()?;
+            let config = Config {
+                derived_pages,
+                derived_page_bytes: 4096,
+                ..Config::default()
+            };
+            let db = Database::open(dir.path(), config.clone())?;
+            for table in ["metrics", "other"] {
+                db.create_table(
+                    table,
+                    TableConfig {
+                        rollup_widths_us: vec![10, 20],
+                        ..TableConfig::default()
+                    },
+                )?;
+            }
+            for i in 0..12 {
+                let row = Row {
+                    timestamp_us: i - 6,
+                    tenant: "é".into(),
+                    series: "雪".into(),
+                    value: i as f64,
+                    tags: BTreeMap::from([("tag".into(), "x".repeat(40 + (i as usize % 3) * 60))]),
+                };
+                let before = derived::codec_calls();
+                db.write("metrics", &format!("single{i}"), vec![row.clone()], 10)?;
+                assert_eq!(
+                    derived::codec_calls(),
+                    before,
+                    "append must not encode any page set"
+                );
+                let results = db.write_group(vec![WriteRequest {
+                    table: "other".into(),
+                    request_id: format!("group{i}"),
+                    rows: vec![row],
+                    now_us: 10,
+                }]);
+                results.into_iter().next().unwrap()?;
+                assert_eq!(
+                    derived::codec_calls(),
+                    before,
+                    "group stage/apply must not encode any page set"
+                );
+                let s = db.lock()?;
+                verify(&s, &config)?;
+            }
+            {
+                let mut s = db.lock()?;
+                let before = s.derived_resident_bytes;
+                let rows = vec![Row {
+                    timestamp_us: -1,
+                    tenant: "t".into(),
+                    series: "s".into(),
+                    value: 3.0,
+                    tags: BTreeMap::new(),
+                }];
+                let item = wal::AppendItem {
+                    table: "metrics".into(),
+                    request_id: "provisional".into(),
+                    digest: blake3::hash(&serde_json::to_vec(&rows)?)
+                        .to_hex()
+                        .to_string(),
+                    rows,
+                    now_us: Some(10),
+                };
+                let prepared =
+                    prepare_group_append(&s, &item, next_sequence(&s)?, 0, None, &config)?;
+                let undo = apply_group_append(&mut s, prepared);
+                verify(&s, &config)?;
+                undo_group_append(&mut s, undo);
+                verify(&s, &config)?;
+                assert_eq!(s.derived_resident_bytes, before);
+                assert_eq!(s.derived_working.load(Ordering::SeqCst), 0);
+            }
+            db.checkpoint()?;
+            drop(db);
+            let db = Database::open(dir.path(), config.clone())?;
+            let s = db.lock()?;
+            verify(&s, &config)?;
+        }
+        Ok(())
+    }
 
     #[test]
     #[cfg(unix)]
@@ -2758,6 +4148,171 @@ mod tests {
     }
 
     #[test]
+    fn group_headroom_checkpoints_only_durable_state_before_replanning() {
+        group_headroom_case(false);
+    }
+
+    #[test]
+    fn group_headroom_replanning_restores_provisional_clock_floors() {
+        group_headroom_case(true);
+    }
+
+    fn group_headroom_case(timed: bool) {
+        let temp = TempDir::new().unwrap();
+        let mut config = Config::default();
+        let db = Database::open(temp.path(), config.clone()).unwrap();
+        db.create_table(
+            "metrics",
+            TableConfig {
+                rollup_widths_us: Vec::new(),
+                idempotency_window_us: timed.then_some(100),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        db.checkpoint().unwrap();
+        let request = |id: &str, count: usize| {
+            let now_us = match id {
+                "seed" => 90,
+                "b" => 201,
+                _ => 100,
+            };
+            WriteRequest {
+                table: "metrics".into(),
+                request_id: if timed {
+                    format!("v1:{now_us}:{id}")
+                } else {
+                    id.into()
+                },
+                now_us,
+                rows: vec![
+                    Row {
+                        timestamp_us: 1,
+                        tenant: "t".into(),
+                        series: "s".into(),
+                        value: 1.0,
+                        tags: BTreeMap::new(),
+                    };
+                    count
+                ],
+            }
+        };
+        let seed = request("seed", 16);
+        let seed_receipt = db
+            .write(&seed.table, &seed.request_id, seed.rows, seed.now_us)
+            .unwrap();
+        let mut s = db.lock().unwrap();
+        let sequence = next_sequence(&s).unwrap();
+        let before = encode_manifest(&s.catalog).unwrap();
+        let mut undo = Vec::new();
+        let mut required = 0;
+        for id in ["a", "b"] {
+            let request = request(id, 2);
+            let item = wal::AppendItem {
+                table: request.table,
+                request_id: request.request_id.clone(),
+                digest: blake3::hash(&serde_json::to_vec(&request.rows).unwrap())
+                    .to_hex()
+                    .to_string(),
+                rows: request.rows,
+                now_us: Some(request.now_us),
+            };
+            let prepared = prepare_group_append(
+                &s,
+                &item,
+                sequence,
+                undo.len() * 2,
+                Some(GROUP_PROOF_RESERVATION),
+                &config,
+            )
+            .unwrap();
+            required = append_metadata_bytes(
+                &s,
+                "metrics",
+                &request.request_id,
+                &prepared.receipt,
+                &prepared.updates,
+                sequence,
+            )
+            .unwrap()
+                + (hot_count(&s) + 2) * 512;
+            undo.push(apply_group_append(&mut s, prepared));
+        }
+        for entry in undo.into_iter().rev() {
+            undo_group_append(&mut s, entry);
+        }
+        assert_eq!(encode_manifest(&s.catalog).unwrap(), before);
+        assert!(s.metadata_bytes + hot_count(&s) * 512 < required - 1);
+        drop(s);
+        drop(db);
+        config.metadata_max_bytes = required - 1;
+        let db = Database::open(temp.path(), config.clone()).unwrap();
+        let mut unknown = request("unknown", 1);
+        unknown.table = "missing".into();
+        let results = db.write_group(vec![
+            request("a", 2),
+            unknown,
+            request("b", 2),
+            request("a", 2),
+            request("seed", 16),
+        ]);
+        assert!(results[0].is_ok());
+        assert!(results[1].is_err());
+        assert!(results[2].is_ok(), "{:#}", results[2].as_ref().unwrap_err());
+        if timed {
+            // The later request expires these IDs, but must not retroactively reject the earlier staged write.
+            assert!(
+                format!("{:#}", results[3].as_ref().unwrap_err())
+                    .contains("outside the idempotency window")
+            );
+            assert!(
+                format!("{:#}", results[4].as_ref().unwrap_err())
+                    .contains("outside the idempotency window")
+            );
+        } else {
+            assert!(results[3].as_ref().unwrap().duplicate);
+            assert_eq!(results[4].as_ref().unwrap().sequence, seed_receipt.sequence);
+            assert!(results[4].as_ref().unwrap().duplicate);
+        }
+        assert_eq!(results[0].as_ref().unwrap().sequence, sequence);
+        assert_eq!(results[2].as_ref().unwrap().sequence, sequence);
+        let check = |db: &Database| {
+            let s = db.lock().unwrap();
+            assert_eq!(s.catalog.checkpoint_sequence, seed_receipt.sequence);
+            assert_eq!(hot_count(&s), 4);
+            assert_eq!(
+                s.catalog.tables["metrics"]
+                    .segments
+                    .iter()
+                    .map(|segment| segment.rows)
+                    .sum::<u64>(),
+                16
+            );
+            assert_eq!(s.catalog.tables["metrics"].receipts.len(), 3);
+            assert_eq!(s.metadata_bytes, encode_manifest(&s.catalog).unwrap().len());
+            assert!(s.fenced.is_none());
+        };
+        check(&db);
+        assert_eq!(
+            db.scan("metrics", None, None, None, None).unwrap().len(),
+            20
+        );
+        let durable = decode_manifest(
+            &wal::read_bounded(&temp.path().join("manifest.bin"), wal::MAX_FRAME_BYTES).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(durable.tables["metrics"].receipts.len(), 1);
+        assert!(
+            durable.tables["metrics"]
+                .receipts
+                .contains_key(&request("seed", 16).request_id)
+        );
+        drop(db);
+        let db = Database::open(temp.path(), config).unwrap();
+        check(&db);
+    }
+
+    #[test]
     fn legacy_group_wal_replay_preserves_absent_clocks() {
         let temp = TempDir::new().unwrap();
         let db = Database::open(temp.path(), Config::default()).unwrap();
@@ -2844,6 +4399,26 @@ mod tests {
             last_sequence: sequence,
             first_ordinal: 0,
             last_ordinal: 0,
+        }
+    }
+
+    #[test]
+    fn checkpoint_sequence_width_matches_json_at_every_decimal_boundary() {
+        let mut values = vec![0, u64::MAX];
+        let mut power = 1_u64;
+        loop {
+            values.extend([power - 1, power]);
+            let Some(next) = power.checked_mul(10) else {
+                break;
+            };
+            power = next;
+        }
+        for previous in &values {
+            for next in &values {
+                let expected = serde_json::to_vec(next).unwrap().len() as i128
+                    - serde_json::to_vec(previous).unwrap().len() as i128;
+                assert_eq!(checkpoint_sequence_delta(*previous, *next), expected);
+            }
         }
     }
 

@@ -1,0 +1,303 @@
+{
+  "artifact": {
+    "files": {
+      "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c",
+      "benchmark.py": "4bed75795148b9d3de0e72b21fd9069a3c6e805e9059f59336ac4ad1b5482917",
+      "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    "format_version": 1,
+    "sha256": "68b7745ea00e8bde2b35a0928ca76bf5ce9a253bafe238e73315093f96282656"
+  },
+  "claim_boundary": "Generic synthetic single-node capability evidence only; not user workload compatibility, distributed behavior, high availability, or production certification.",
+  "configuration": {
+    "automatic_retries_after_ambiguous_ack": 0,
+    "batch": 1000,
+    "mixed_seconds": 30,
+    "offered_rate_rows_per_second": 20000.0,
+    "outer_wall_clock_seconds": 580,
+    "per_call_timeout_seconds": 35.0,
+    "query_samples": 30,
+    "rows": 1000000,
+    "writers": 4
+  },
+  "database_versions": {
+    "durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "extension_preinstalled": true,
+    "postgresql_version": "17.11",
+    "timescaledb_version": "2.30.0"
+  },
+  "failure": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+  "finished_at": "2026-09-16T09:29:52.763150+00:00",
+  "generator": {
+    "cpu_delta": {
+      "system_seconds": 0.057813,
+      "user_seconds": 6.483612
+    },
+    "cpu_end": {
+      "system_seconds": 0.105905,
+      "user_seconds": 7.589531
+    },
+    "cpu_start": {
+      "system_seconds": 0.048091999999999996,
+      "user_seconds": 1.105919
+    },
+    "platform": {
+      "cgroup_v2": {
+        "cpu.max": "200000 100000",
+        "memory.max": "999997440"
+      },
+      "logical_cpus": 48,
+      "platform": "Linux-6.12.12+bpo-cloud-amd64-x86_64-with-glibc2.36",
+      "python": "3.12.14"
+    }
+  },
+  "infrastructure_assumptions": {
+    "generator": "2 vCPU / 1 GB",
+    "ownership": "infrastructure, secrets, CPU/RSS/disk metrics, and cleanup are external",
+    "region": "Singapore; supplied by infrastructure owner, not independently detected",
+    "timescale_database": "2 vCPU / 2 GB",
+    "timescale_image": "timescale/timescaledb:2.30.0-pg17 (official full/non-oss)",
+    "timescale_image_digest": "sha256:3113d12b78392c064aa7475caf7a52b447b29ddd4f9bfd23526733fcb03e3459",
+    "varve_benchmark_config": {
+      "hot_max_bytes": 134217728,
+      "max_batch_rows": 10000,
+      "metadata_max_bytes": 67108864,
+      "query_memory_bytes_per_worker": 268435456,
+      "query_threads": 2,
+      "query_timeout_seconds": 30,
+      "query_workers": 2
+    },
+    "varve_database": "2 vCPU / 2 GB"
+  },
+  "initial_ingest_order": [
+    "varve",
+    "timescale"
+  ],
+  "manifest": {
+    "aggregate_width_us": 60000000,
+    "base_timestamp_us": 1789464540000000,
+    "initial_rows": 1000000,
+    "seed": 20260915,
+    "series": 1024,
+    "tags": {},
+    "tenants": 4,
+    "timestamp_rule": "base + (i//1024)*1 second + (i%1024) microseconds",
+    "value_rule": "((i * 17) % 10000) / 4"
+  },
+  "matched_durability": {
+    "scope": "single-node local durable acknowledgement; no replicated durability claim",
+    "timescale": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "varve": "acknowledged writes require durability=local_fsync"
+  },
+  "mode": "benchmark",
+  "namespaces": {
+    "checkpoint_job": "vc_railway003_80b98df0",
+    "compact_job": "vm_railway003_80b98df0",
+    "pg_aggregate": "minute_rollup",
+    "pg_receipts": "batch_receipts",
+    "pg_schema": "vb_railway003_80b98df0",
+    "pg_table": "measurements",
+    "varve_aggregate": "va_railway003_80b98df0",
+    "varve_table": "vb_railway003_80b98df0"
+  },
+  "oracles": {
+    "global": {
+      "count": 1000000,
+      "max": 2499.75,
+      "min": 0.0,
+      "sum": 1249875000.0
+    },
+    "selected_buckets": {
+      "1789464540000000": {
+        "count": 15,
+        "max": 2408.0,
+        "min": 0.0,
+        "sum": 25340.0
+      },
+      "1789464600000000": {
+        "count": 15,
+        "max": 2424.0,
+        "min": 16.0,
+        "sum": 12140.0
+      },
+      "1789464660000000": {
+        "count": 15,
+        "max": 2240.0,
+        "min": 952.0,
+        "sum": 23940.0
+      },
+      "1789464720000000": {
+        "count": 15,
+        "max": 2440.0,
+        "min": 32.0,
+        "sum": 15740.0
+      },
+      "1789464780000000": {
+        "count": 15,
+        "max": 1980.0,
+        "min": 692.0,
+        "sum": 20040.0
+      },
+      "1789464840000000": {
+        "count": 15,
+        "max": 2456.0,
+        "min": 48.0,
+        "sum": 19340.0
+      },
+      "1789464900000000": {
+        "count": 15,
+        "max": 1720.0,
+        "min": 432.0,
+        "sum": 16140.0
+      },
+      "1789464960000000": {
+        "count": 15,
+        "max": 2472.0,
+        "min": 64.0,
+        "sum": 22940.0
+      },
+      "1789465020000000": {
+        "count": 15,
+        "max": 1460.0,
+        "min": 172.0,
+        "sum": 12240.0
+      },
+      "1789465080000000": {
+        "count": 15,
+        "max": 2488.0,
+        "min": 80.0,
+        "sum": 26540.0
+      },
+      "1789465140000000": {
+        "count": 15,
+        "max": 2412.0,
+        "min": 4.0,
+        "sum": 10840.0
+      },
+      "1789465200000000": {
+        "count": 15,
+        "max": 2320.0,
+        "min": 1032.0,
+        "sum": 25140.0
+      },
+      "1789465260000000": {
+        "count": 15,
+        "max": 2428.0,
+        "min": 20.0,
+        "sum": 14440.0
+      },
+      "1789465320000000": {
+        "count": 15,
+        "max": 2060.0,
+        "min": 772.0,
+        "sum": 21240.0
+      },
+      "1789465380000000": {
+        "count": 15,
+        "max": 2444.0,
+        "min": 36.0,
+        "sum": 18040.0
+      },
+      "1789465440000000": {
+        "count": 15,
+        "max": 1800.0,
+        "min": 512.0,
+        "sum": 17340.0
+      },
+      "1789465500000000": {
+        "count": 5,
+        "max": 420.0,
+        "min": 52.0,
+        "sum": 1180.0
+      }
+    },
+    "selected_group": {
+      "count": 245,
+      "max": 2488.0,
+      "min": 0.0,
+      "sum": 302620.0
+    },
+    "selected_window": [
+      {
+        "timestamp_us": 1789465516000000,
+        "value": 52.0
+      },
+      {
+        "timestamp_us": 1789465512000000,
+        "value": 144.0
+      },
+      {
+        "timestamp_us": 1789465508000000,
+        "value": 236.0
+      },
+      {
+        "timestamp_us": 1789465504000000,
+        "value": 328.0
+      },
+      {
+        "timestamp_us": 1789465500000000,
+        "value": 420.0
+      }
+    ],
+    "tenants": {
+      "tenant_0": {
+        "count": 250432,
+        "max": 2499.75,
+        "min": 0.0,
+        "sum": 313081596.0
+      },
+      "tenant_1": {
+        "count": 249856,
+        "max": 2499.75,
+        "min": 0.0,
+        "sum": 312318656.0
+      },
+      "tenant_2": {
+        "count": 249856,
+        "max": 2499.75,
+        "min": 0.0,
+        "sum": 312266968.0
+      },
+      "tenant_3": {
+        "count": 249856,
+        "max": 2499.75,
+        "min": 0.0,
+        "sum": 312207780.0
+      }
+    }
+  },
+  "phases": [
+    {
+      "finished_at": "2026-09-16T09:29:44.240762+00:00",
+      "name": "preflight",
+      "started_at": "2026-09-16T09:29:43.908626+00:00",
+      "state": "passed"
+    },
+    {
+      "finished_at": "2026-09-16T09:29:45.601820+00:00",
+      "name": "isolated_setup",
+      "started_at": "2026-09-16T09:29:44.240762+00:00",
+      "state": "passed"
+    }
+  ],
+  "run_id": "railway003",
+  "started_at": "2026-09-16T09:29:43.908626+00:00",
+  "state": "failed",
+  "timescale_setup_commands": [
+    "CREATE TABLE logged measurements",
+    "SELECT create_hypertable(..., chunk_time_interval => INTERVAL '1 hour')",
+    "CREATE INDEX measurements_tenant_series_ts_idx ON measurements (tenant, series, ts DESC) INCLUDE (value)",
+    "CREATE MATERIALIZED VIEW minute_rollup WITH (timescaledb.continuous) ... WITH NO DATA",
+    "explicit refresh_continuous_aggregate barriers; no background refresh policy"
+  ],
+  "workload_stage": "bounded_custom_synthetic_capability"
+}

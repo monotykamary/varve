@@ -24,7 +24,12 @@ struct Service {
 
 impl Service {
     fn start(data: &Path, config: &Path, port: u16) -> Self {
-        let child = Command::new(env!("CARGO_BIN_EXE_varve"))
+        Self::start_with_env(data, config, port, &[])
+    }
+
+    fn start_with_env(data: &Path, config: &Path, port: u16, env: &[(&str, &str)]) -> Self {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_varve"));
+        command
             .arg("--data")
             .arg(data)
             .arg("--config")
@@ -35,9 +40,11 @@ impl Service {
             .env_remove("VARVE_API_TOKEN")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("start varve service");
+            .stderr(Stdio::piped());
+        for (name, value) in env {
+            command.env(name, value);
+        }
+        let child = command.spawn().expect("start varve service");
         let mut service = Self { child };
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
@@ -145,10 +152,90 @@ fn request(
     Ok((status, body))
 }
 
+fn metrics_text(port: u16) -> String {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    stream
+        .write_all(b"GET /metrics HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    stream
+        .take(256 * 1024)
+        .read_to_string(&mut response)
+        .unwrap();
+    let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+    assert!(headers.starts_with("HTTP/1.1 200"), "{headers}");
+    body.to_owned()
+}
+
+fn metric_count(text: &str, name: &str) -> u64 {
+    let prefix = format!("{name} ");
+    text.lines()
+        .find_map(|line| line.strip_prefix(&prefix))
+        .unwrap()
+        .parse()
+        .unwrap()
+}
+
+fn phase_count(text: &str, phase: &str) -> u64 {
+    let prefix = format!("varve_phase_duration_seconds_count{{phase=\"{phase}\"}} ");
+    text.lines()
+        .find_map(|line| line.strip_prefix(&prefix))
+        .unwrap()
+        .parse()
+        .unwrap()
+}
+
 fn post(port: u16, path: &str, body: Value) -> Value {
     let (status, body) = request(port, "POST", path, Some(&body), &[]).expect("HTTP request");
     assert_eq!(status, 200, "HTTP error: {body}");
     body
+}
+
+fn read_persistent_response(stream: &mut TcpStream) -> Result<(u16, Value), String> {
+    let mut response = Vec::new();
+    let mut chunk = [0_u8; 4096];
+    let header_end = loop {
+        if let Some(index) = response.windows(4).position(|window| window == b"\r\n\r\n") {
+            break index;
+        }
+        let read = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+        if read == 0 {
+            return Err("connection closed before response headers".to_owned());
+        }
+        response.extend_from_slice(&chunk[..read]);
+    };
+    let head = std::str::from_utf8(&response[..header_end]).map_err(|error| error.to_string())?;
+    let status = head
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| format!("missing status: {head:?}"))?
+        .parse::<u16>()
+        .map_err(|error| error.to_string())?;
+    let content_length = head
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse::<usize>())
+        })
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("missing content-length: {head:?}"))?;
+    let body_start = header_end + 4;
+    let response_length = body_start + content_length;
+    while response.len() < response_length {
+        let read = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+        if read == 0 {
+            return Err("connection closed before response body".to_owned());
+        }
+        response.extend_from_slice(&chunk[..read]);
+    }
+    let body = serde_json::from_slice(&response[body_start..response_length])
+        .map_err(|error| error.to_string())?;
+    Ok((status, body))
 }
 
 fn write_config(path: &Path, maintenance_interval_ms: u64, flush_interval_us: i64) {
@@ -216,6 +303,39 @@ fn http_ingest_is_idempotent_queries_expected_rows_and_scheduler_ticks() {
     assert_eq!(result, json!([{"count": 2, "total": 5.0}]));
     wait_for_checkpoint(port, first["sequence"].as_u64().unwrap());
 
+    let before = metrics_text(port);
+    assert!(before.contains("# TYPE varve_phase_duration_seconds histogram"));
+    assert!(phase_count(&before, "wal_encode") >= 2);
+    assert!(phase_count(&before, "wal_sync") >= 4);
+    assert!(phase_count(&before, "state_lock_wait") > 0);
+    for _ in 0..2 {
+        assert_eq!(
+            post(port, "/v1/query", json!({"sql":"SELECT 1 AS value"})),
+            json!([{"value":1}])
+        );
+    }
+    let after = metrics_text(port);
+    assert_eq!(
+        phase_count(&after, "query_run") - phase_count(&before, "query_run"),
+        2
+    );
+    assert!(phase_count(&after, "query_spawn") - phase_count(&before, "query_spawn") <= 1);
+    assert_eq!(metric_count(&after, "varve_query_workers_active"), 0);
+    assert!(metric_count(&after, "varve_query_workers_idle") <= 2);
+    assert!(
+        metric_count(&after, "varve_query_workers_reused_total")
+            - metric_count(&before, "varve_query_workers_reused_total")
+            >= 1
+    );
+    assert_eq!(
+        metric_count(&after, "varve_query_workers_resets_total")
+            - metric_count(&before, "varve_query_workers_resets_total"),
+        2
+    );
+    assert!(metric_count(&after, "varve_control_root_bytes") > 0);
+    assert!(metric_count(&after, "varve_derived_resident_bytes") > 0);
+    assert_eq!(metric_count(&after, "varve_derived_working_bytes"), 0);
+
     let (status, body) = request(
         port,
         "POST",
@@ -228,6 +348,69 @@ fn http_ingest_is_idempotent_queries_expected_rows_and_scheduler_ticks() {
 
     #[cfg(unix)]
     service.interrupt();
+}
+
+#[test]
+fn connection_lifetime_drains_an_active_write() {
+    let _guard = service_test_guard();
+    let temporary = TempDir::new().unwrap();
+    let data = temporary.path().join("data");
+    let config = temporary.path().join("config.json");
+    write_config(&config, 60_000, 60_000_000);
+    let port = free_port();
+    let mut service = Service::start_with_env(
+        &data,
+        &config,
+        port,
+        &[
+            ("VARVE_HTTP_CONNECTION_TIMEOUT_MS", "2500"),
+            ("VARVE_HTTP_REQUEST_TIMEOUT_MS", "2000"),
+            ("VARVE_HTTP_BODY_TIMEOUT_MS", "1800"),
+            ("VARVE_HTTP_HEADER_TIMEOUT_MS", "3500"),
+        ],
+    );
+    post(port, "/v1/tables", table());
+
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    stream
+        .write_all(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        .unwrap();
+    stream.flush().unwrap();
+    let (status, body) = read_persistent_response(&mut stream).unwrap();
+    assert_eq!(status, 200);
+    assert_eq!(body, json!({"ok": true}));
+
+    thread::sleep(Duration::from_millis(1800));
+    let body = batch("lifetime-drain", 42.0).to_string();
+    write!(
+        stream,
+        "POST /v1/write HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .unwrap();
+    stream.flush().unwrap();
+    thread::sleep(Duration::from_millis(1100));
+    stream.write_all(body.as_bytes()).unwrap();
+    stream.flush().unwrap();
+
+    let (status, receipt) = read_persistent_response(&mut stream).unwrap();
+    assert_eq!(status, 200, "HTTP error: {receipt}");
+    assert_eq!(receipt["durability"], "local_fsync");
+    let mut byte = [0_u8; 1];
+    assert_eq!(stream.read(&mut byte).unwrap(), 0, "connection stayed open");
+
+    service.kill();
+    let db = varve::Database::open(&data, varve::Config::default()).unwrap();
+    let rows = db.scan("metrics", None, None, None, None).unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].row.value, 42.0);
+    assert_eq!(rows[1].row.value, 43.0);
 }
 
 #[test]

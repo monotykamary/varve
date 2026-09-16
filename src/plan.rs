@@ -13,6 +13,9 @@ use crate::query::QueryCatalog;
 pub struct ScanPlan {
     pub table: String,
     pub rollup: bool,
+    pub rollup_width_us: Option<i64>,
+    pub tenant: Option<String>,
+    pub series: Option<String>,
     pub start_us: Option<i64>,
     pub end_us: Option<i64>,
     pub empty: bool,
@@ -72,31 +75,126 @@ pub fn plan_with_catalog(
     }
 
     let (relation, alias) = plain_table(&from.relation)?;
-    let (table, rollup) = resolve_table(relation, table_names, catalog)?;
-    if rollup {
-        return Some(ScanPlan {
-            table,
-            rollup: true,
-            start_us: None,
-            end_us: None,
-            empty: false,
-        });
-    }
-
+    let (table, rollup, rollup_width_us) = resolve_table(relation, table_names, catalog)?;
     let qualifier = alias.unwrap_or(relation);
-    let bounds = select
+    let bounds = if rollup {
+        // Raw timestamps and aggregate bucket timestamps have different semantics.
+        Bounds::default()
+    } else {
+        select
+            .selection
+            .as_ref()
+            .map(|selection| extract_bounds(selection, qualifier))
+            .unwrap_or_default()
+    };
+    let series = select
         .selection
         .as_ref()
-        .map(|selection| extract_bounds(selection, qualifier))
+        .map(|selection| extract_series(selection, qualifier))
         .unwrap_or_default();
 
     Some(ScanPlan {
         table,
-        rollup: false,
+        rollup,
+        rollup_width_us,
+        tenant: series.tenant,
+        series: series.series,
         start_us: bounds.start,
         end_us: bounds.end,
-        empty: bounds.empty,
+        empty: bounds.empty || series.empty,
     })
+}
+
+impl ScanPlan {
+    pub fn matches_series(&self, tenant: &str, series: &str) -> bool {
+        !self.empty
+            && self
+                .tenant
+                .as_deref()
+                .is_none_or(|expected| tenant == expected)
+            && self
+                .series
+                .as_deref()
+                .is_none_or(|expected| series == expected)
+    }
+}
+
+#[derive(Default)]
+struct SeriesFilter {
+    tenant: Option<String>,
+    series: Option<String>,
+    empty: bool,
+}
+
+impl SeriesFilter {
+    fn intersection(self, other: Self) -> Self {
+        let conflict = self
+            .tenant
+            .as_ref()
+            .zip(other.tenant.as_ref())
+            .is_some_and(|(left, right)| left != right)
+            || self
+                .series
+                .as_ref()
+                .zip(other.series.as_ref())
+                .is_some_and(|(left, right)| left != right);
+        Self {
+            tenant: self.tenant.or(other.tenant),
+            series: self.series.or(other.series),
+            empty: self.empty || other.empty || conflict,
+        }
+    }
+}
+
+fn extract_series(expr: &Expr, qualifier: &Ident) -> SeriesFilter {
+    match expr {
+        Expr::Nested(inner) => extract_series(inner, qualifier),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::And,
+            right,
+        } => extract_series(left, qualifier).intersection(extract_series(right, qualifier)),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::Eq,
+            right,
+        } => {
+            for (column, value) in [
+                (left.as_ref(), right.as_ref()),
+                (right.as_ref(), left.as_ref()),
+            ] {
+                let Some(value) = string_constant(value) else {
+                    continue;
+                };
+                if is_column(column, qualifier, "tenant") {
+                    return SeriesFilter {
+                        tenant: Some(value.into()),
+                        ..Default::default()
+                    };
+                }
+                if is_column(column, qualifier, "series") {
+                    return SeriesFilter {
+                        series: Some(value.into()),
+                        ..Default::default()
+                    };
+                }
+            }
+            SeriesFilter::default()
+        }
+        // No inference through OR, NOT, casts, functions, parameters or collations.
+        _ => SeriesFilter::default(),
+    }
+}
+
+fn string_constant(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Nested(inner) => string_constant(inner),
+        Expr::Value(value) => match &value.value {
+            Value::SingleQuotedString(value) => Some(value),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn storage_free_plan() -> ScanPlan {
@@ -104,6 +202,9 @@ fn storage_free_plan() -> ScanPlan {
         // Valid Varve table names are non-empty, so this cannot select a storage table.
         table: String::new(),
         rollup: false,
+        rollup_width_us: None,
+        tenant: None,
+        series: None,
         start_us: None,
         end_us: None,
         empty: true,
@@ -238,18 +339,18 @@ fn resolve_table(
     relation: &Ident,
     table_names: &[String],
     catalog: &QueryCatalog,
-) -> Option<(String, bool)> {
+) -> Option<(String, bool, Option<i64>)> {
     let mut candidates = Vec::new();
 
     for table in table_names {
         if identifier_matches(relation, table) {
-            candidates.push((table.clone(), false));
+            candidates.push((table.clone(), false, None));
         }
 
         if let Some(base) = strip_rollup_suffix(&relation.value)
             && base.eq_ignore_ascii_case(table)
         {
-            candidates.push((table.clone(), true));
+            candidates.push((table.clone(), true, None));
         }
     }
 
@@ -257,7 +358,7 @@ fn resolve_table(
         if identifier_matches(relation, &alias.name) {
             for table in table_names {
                 if table.eq_ignore_ascii_case(&alias.source) {
-                    candidates.push((table.clone(), true));
+                    candidates.push((table.clone(), true, Some(alias.width_us)));
                 }
             }
         }
@@ -428,12 +529,15 @@ fn reversed_comparison_for_value(operator: &BinaryOperator, value: i64) -> Bound
 }
 
 fn is_timestamp(expr: &Expr, qualifier: &Ident) -> bool {
+    is_column(expr, qualifier, "timestamp_us")
+}
+
+fn is_column(expr: &Expr, qualifier: &Ident, name: &str) -> bool {
     match expr {
-        Expr::Nested(inner) => is_timestamp(inner, qualifier),
-        Expr::Identifier(column) => identifier_matches(column, "timestamp_us"),
+        Expr::Nested(inner) => is_column(inner, qualifier, name),
+        Expr::Identifier(column) => identifier_matches(column, name),
         Expr::CompoundIdentifier(parts) if parts.len() == 2 => {
-            identifier_matches(&parts[0], &qualifier.value)
-                && identifier_matches(&parts[1], "timestamp_us")
+            identifier_matches(&parts[0], &qualifier.value) && identifier_matches(&parts[1], name)
         }
         _ => false,
     }
@@ -507,6 +611,9 @@ mod tests {
             ScanPlan {
                 table: "metrics".to_string(),
                 rollup: false,
+                rollup_width_us: None,
+                tenant: None,
+                series: None,
                 start_us: None,
                 end_us: None,
                 empty: false,
@@ -517,6 +624,9 @@ mod tests {
             ScanPlan {
                 table: "metrics".to_string(),
                 rollup: false,
+                rollup_width_us: None,
+                tenant: None,
+                series: None,
                 start_us: None,
                 end_us: None,
                 empty: false,
@@ -631,6 +741,9 @@ mod tests {
             ScanPlan {
                 table: "metrics".to_string(),
                 rollup: true,
+                rollup_width_us: None,
+                tenant: None,
+                series: None,
                 start_us: None,
                 end_us: None,
                 empty: false,
@@ -733,11 +846,68 @@ mod tests {
             Some(ScanPlan {
                 table: "metrics".to_string(),
                 rollup: true,
+                rollup_width_us: Some(3_600_000_000),
+                tenant: None,
+                series: None,
                 start_us: None,
                 end_us: None,
                 empty: false,
             })
         );
+    }
+
+    #[test]
+    fn series_equalities_are_binary_and_conjunctive() {
+        let plan = planned(
+            "SELECT * FROM metrics m WHERE 'O''Brien' = m.tenant AND (m.series) = ('東京') AND timestamp_us >= -1",
+        );
+        assert_eq!(plan.tenant.as_deref(), Some("O'Brien"));
+        assert_eq!(plan.series.as_deref(), Some("東京"));
+        assert_eq!(plan.start_us, Some(-1));
+        assert!(plan.matches_series("O'Brien", "東京"));
+        assert!(!plan.matches_series("o'brien", "東京"));
+        assert!(planned("SELECT * FROM metrics WHERE tenant='a' AND tenant='A'").empty);
+        assert!(planned("SELECT * FROM metrics WHERE series='a' AND series='b'").empty);
+        assert!(!planned("SELECT * FROM metrics WHERE tenant='a' AND tenant='a'").empty);
+    }
+
+    #[test]
+    fn contradictory_count_query_needs_no_storage() {
+        let sql = "SELECT count(*)::BIGINT AS n FROM metrics WHERE tenant='a' AND tenant='b'";
+        let projection = plan(sql, &tables());
+        assert!(
+            projection.as_ref().is_some_and(|plan| plan.empty),
+            "{projection:?}"
+        );
+    }
+
+    #[test]
+    fn uncertain_string_semantics_never_prune_series() {
+        for predicate in [
+            "tenant='a' OR series='b'",
+            "NOT (tenant='a')",
+            "tenant IN ('a','b')",
+            "tenant COLLATE NOCASE = 'A'",
+            "tenant = ('A' COLLATE NOCASE)",
+            "lower(tenant)='a'",
+            "tenant::VARCHAR='a'",
+            "tenant LIKE 'a%'",
+            "metrics.tenant='a'",
+            "tenant=$1",
+            "tenant=1",
+        ] {
+            let plan = planned(&format!("SELECT * FROM metrics m WHERE {predicate}"));
+            assert_eq!((plan.tenant, plan.series), (None, None), "{predicate}");
+            assert!(!plan.empty, "{predicate}");
+        }
+        let plan = planned("SELECT * FROM metrics WHERE tenant='a' AND (series='b' OR series='c')");
+        assert_eq!(plan.tenant.as_deref(), Some("a"));
+        assert_eq!(plan.series, None);
+    }
+
+    #[test]
+    fn unsupported_escaped_string_syntax_falls_back_without_pruning() {
+        assert!(plan("SELECT * FROM metrics WHERE tenant=E'a'", &tables()).is_none());
     }
 
     #[test]

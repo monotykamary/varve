@@ -1,0 +1,16 @@
+# Candidate v4 — retained Railway evidence
+
+Single-trial comparison on 2026-09-16. Both databases: 2 CPU / 2 GB; unchanged driver: 2 CPU / 1 GB. Actual runtime regions: Singapore. Same durability, configuration and workload as [v3](../v3/README.md); fresh data directories on retained volumes. Local fsync only; S3 was not exercised.
+
+- `frontier003`: **passed**, 550,000-row common watermark. Initial ingest: Varve 59.1k vs Timescale 98.1k rows/sec. Mixed 5k offered rows/sec: all 300k acknowledged, zero dropped/failed/ambiguous. ACK p95: 118.59 vs 31.72 ms; concurrent read p95: 254.51 vs 19.58 ms. Columnar selective p95: 74.19 vs 2.32 ms (50 samples).
+- `frontier004`: **overloaded**, not passed. One million initial rows completed at 48.9k vs 98.0k rows/sec. Time to durable data plus fresh aggregate: **20.46 vs 13.81 seconds**, including Timescale's explicit refresh and ANALYZE barrier. Varve maintains aggregates on the write path; raw ingest alone is not identical aggregate work.
+- The paired 20k-row/sec generator offered 600k mixed rows: **532k acknowledged, 68k dropped before submission, zero failed/ambiguous**. The 1,532,000-row common watermark and query oracles verified. ACK p95: 798.09 vs 42.85 ms; concurrent read p95: 955.83 vs 21.64 ms (25 read observations). This paired queue does not independently establish either backend's saturation limit.
+- Not every query lost: larger-run columnar cross-series grouping p95 was **83.70 vs 121.79 ms**. Full count/sum was 71.15 vs 59.62 ms; named aggregate 146.89 vs 1.20 ms; selective query 70.85 vs 1.29 ms; window query 349.50 vs 1.11 ms (30 samples each). No general engine-win claim follows from one favorable case.
+- Actual same-volume restarts preserved **2,082,000 rows per backend**, exact raw/aggregate statistics and integer timestamp sums. Both native process identities and PostgreSQL start time changed. This is not power-loss, lost-volume, upgrade or S3 qualification.
+- Pre-restart cgroup lifetime peaks: Varve 761,069,568 bytes; Timescale 1,134,272,512; driver 70,369,280. No OOM kills. Varve had zero CPU throttling events. These are lifetime cgroup statistics, not phase-resolved profiles; the unchanged driver lifetime also includes earlier work.
+
+`source.tar.gz` contains the exact 43 staged files plus `SOURCE_MANIFEST.json`. Source manifest SHA-256: `74a0f2e87554420cfce5f55cfed804bb446a66b63dc5b1eb706693f40d5e9ba1`. The manifest records a dirty snapshot over its Git base, not a claim that the base commit alone built the binary. Runtime binary/config hashes, driver source and witnesses are retained. `MANIFEST.json` checksums every evidence file except itself. Exact deployment credential values were checked absent before preservation.
+
+The five-observation empty-database diagnostic is not a tail benchmark or phase attribution: bare DuckDB SELECT 1 took 28.1–48.5 ms, configured CLI 25.2–29.0 ms, loopback HTTP 36.0–40.9 ms. DuckDB detected two threads correctly. It demonstrates substantial fixed query-boundary cost but cannot explain every workload delay.
+
+V4 improves several observed write/mixed-load metrics relative to v3; it does not improve every query. These are not repeated, counterbalanced A/B trials. The 20k target still failed; performance-frontier and production claims remain unsupported. Experimental labels remain.

@@ -1,0 +1,196 @@
+{
+  "format_version": 1,
+  "candidate": "v5",
+  "outcomes": {
+    "baseline": "passed",
+    "large": "failed_derived_budget"
+  },
+  "known_credential_values_absent": true,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4918,
+      "sha256": "32be8495b15548cb6001fd877353c74dbef8a20b13c4a3986319f72ee36847c7"
+    },
+    {
+      "path": "analysis-baseline.json",
+      "bytes": 2419,
+      "sha256": "74807718fa48e4d6d57de4e301c12e545ad806a05e0ce54a7eea55b388863bc0"
+    },
+    {
+      "path": "analysis-stress.json",
+      "bytes": 2395,
+      "sha256": "6104f39cd944fc86732ac2daed22086530e6ef0e03f92f4259550c2bbec0edd5"
+    },
+    {
+      "path": "cleanup-verified.json",
+      "bytes": 1359,
+      "sha256": "4f1000cca3fb9c8e10142118ff1e71211b30a7d70b80d40d24d14a1a312bce60"
+    },
+    {
+      "path": "driver/Dockerfile",
+      "bytes": 378,
+      "sha256": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+    },
+    {
+      "path": "driver/benchmark.py",
+      "bytes": 61260,
+      "sha256": "f5488311247210b118410c155408a5be5af9ce2d28d6d480585a9c315125f637"
+    },
+    {
+      "path": "driver/core.py",
+      "bytes": 8139,
+      "sha256": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a"
+    },
+    {
+      "path": "driver/requirements.txt",
+      "bytes": 219,
+      "sha256": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    {
+      "path": "metrics-after-baseline.json",
+      "bytes": 21434,
+      "sha256": "345a6118bbae32bf99d7c2f35f527cd316768a2f5b810087548844f2311ece3d"
+    },
+    {
+      "path": "metrics-after-stress.json",
+      "bytes": 21559,
+      "sha256": "5e8645acdf77c9518c320caa344c82e1459b2fd775a22e9c70949d5c7980812e"
+    },
+    {
+      "path": "metrics-before.json",
+      "bytes": 21091,
+      "sha256": "eca9dae8c20952593f87fac5536a326087638e806c1748967180375a7c519f4a"
+    },
+    {
+      "path": "resources-driver-after-workload.txt",
+      "bytes": 429,
+      "sha256": "9edb8a2cf604aae22894cdf2c2697a5085c7df9e9307b6fcdb252e48c92cabdd"
+    },
+    {
+      "path": "resources-driver-before.txt",
+      "bytes": 422,
+      "sha256": "7206c9a7c340ef37ce996ce1ff7aa16e5aaf7ffdf9613acfa3b57bdecb6c33d6"
+    },
+    {
+      "path": "resources-timescale-after-workload.txt",
+      "bytes": 446,
+      "sha256": "91862106ff209527c95ac91fa305ee11d21fe0e62389c4e382b1fc2982e43e70"
+    },
+    {
+      "path": "resources-timescale-before.txt",
+      "bytes": 442,
+      "sha256": "e259d3d738da4cf9e1a983cfc2b728cb5cecc0beccdbc14b4a5787872f5f6ae7"
+    },
+    {
+      "path": "resources-varve-after-workload.txt",
+      "bytes": 433,
+      "sha256": "019e30ef7d720bc7a29400d9398378527c7fab4797eeec98e9f13d4788b2d40e"
+    },
+    {
+      "path": "resources-varve-before.txt",
+      "bytes": 423,
+      "sha256": "a0bd9f236fc95810ab41b73dcdfba227bcb844fa2e89806ed53c981bc85bc437"
+    },
+    {
+      "path": "reuse001.json",
+      "bytes": 134851,
+      "sha256": "cf55bb6a55e07cb2b9dc78eb4de89b9766b1b9ad5ab833cdbde3ac4ebb1bd001"
+    },
+    {
+      "path": "reuse001.launch.json",
+      "bytes": 410,
+      "sha256": "dba4cfc439f97f103b4e2854482e38c036ac17bb60507e91898cdfa37011625c"
+    },
+    {
+      "path": "reuse001.log",
+      "bytes": 874,
+      "sha256": "c241255d8f2c9172c6b0e3867d91ad0157ec1c27fcf050dacadc465d46e66bec"
+    },
+    {
+      "path": "reuse002.json",
+      "bytes": 68236,
+      "sha256": "9bd11fa7e77c928e4e6983dabc89e7607c0a4caee7d8213808c1a30fa7179f88"
+    },
+    {
+      "path": "reuse002.launch.json",
+      "bytes": 408,
+      "sha256": "adecc689095861c85ddf7fca270ea75fa1ec28e2fa89f9bbaedd26b4bf26ba56"
+    },
+    {
+      "path": "reuse002.log",
+      "bytes": 535,
+      "sha256": "13891105ec0be1d68c41ce6f37b576617f4f57a79b45fb6eed3e22ceb2265c4e"
+    },
+    {
+      "path": "runtime-driver.json",
+      "bytes": 713,
+      "sha256": "69afe593544fae92096a1e7e08b07e1a597e7293164f955d5029552ecd37b9cb"
+    },
+    {
+      "path": "runtime-varve.json",
+      "bytes": 2025,
+      "sha256": "887964bf33cd168623d23967b67cf486c282533bdd1d55e4d66ae01caf952547"
+    },
+    {
+      "path": "source-manifest.json",
+      "bytes": 8049,
+      "sha256": "ea15372e2de15f3e1db739d02e339b4ab46270332e0121dffdc2b69f644101bc"
+    },
+    {
+      "path": "source.tar.gz",
+      "bytes": 218041,
+      "sha256": "38310ce76611da6783647e3bce8e05d690eb32331e5b9fa4ea2977e0d9e4be47"
+    },
+    {
+      "path": "varve-config.json",
+      "bytes": 710,
+      "sha256": "51aaee9c4238a933dcdb964e4877cec3296456ab92f4698fa0eafe78a8977dc7"
+    },
+    {
+      "path": "witness/analyze-phases.py",
+      "bytes": 1641,
+      "sha256": "b40c95f23641788f67e2fb726d92d7bdd31f29dfd66f964b8103aa5f41a74809"
+    },
+    {
+      "path": "witness/check-driver.mjs",
+      "bytes": 1271,
+      "sha256": "a9fc52d0943892f098cd38de081c18744d60a291b9f960577b636820509c810b"
+    },
+    {
+      "path": "witness/collect.py",
+      "bytes": 385,
+      "sha256": "09fbdef9cde50994ef7553a3d005cc19fca4621db4bbae51f7e740477b5a9d6c"
+    },
+    {
+      "path": "witness/launch.py",
+      "bytes": 1495,
+      "sha256": "a76df7370dcfe291e4d7402ee04fdaa32dc8b5bdba96f675ff08519d0d99ffa6"
+    },
+    {
+      "path": "witness/metrics.py",
+      "bytes": 1212,
+      "sha256": "91c4f7f6fde255d2c05403adae7cafddb0f0c2d9da054f1fb0d00c845584663b"
+    },
+    {
+      "path": "witness/probe-driver.py",
+      "bytes": 1682,
+      "sha256": "0f2bd39ef103a0dc7144ffaca5565e02bfd880764089369e5708afb5ed1a2543"
+    },
+    {
+      "path": "witness/probe-varve.py",
+      "bytes": 3825,
+      "sha256": "7419163be03f279b9b499566fe1b01aacacd1ddb47fb25edc231ce53f22316e8"
+    },
+    {
+      "path": "witness/resources.sh",
+      "bytes": 429,
+      "sha256": "b47ae01d506056a82a218733e9e309771de3871baedc842e603ee2f41bd71e22"
+    },
+    {
+      "path": "witness/verify.mjs",
+      "bytes": 4633,
+      "sha256": "04a1d8bf92dc7e9089e3ba2aceb7b5552fd94dbee5bafeb910e4496ff732b674"
+    }
+  ]
+}

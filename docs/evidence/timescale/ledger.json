@@ -1,0 +1,32 @@
+{
+  "completed": true,
+  "acceptance": {
+    "isolated_scope": "three private same-region services; original service unchanged",
+    "resource_caps": "both databases 2 vCPU / 1999998976-byte observed cgroup cap; generator 2 vCPU / 999997440 bytes",
+    "matched_durability": "Varve local_fsync; PostgreSQL logged COPY/receipts with fsync, synchronous_commit and full_page_writes on; S3 disabled",
+    "runner_regressions": "17 offline tests passed; oracle preparation offloaded with cooperative cancellation; exception-group causes redacted and retained",
+    "transport_fix": "65-second connection expiry now uses bounded graceful drain; old-code regression failed, new code passed; 28 affected Rust tests passed",
+    "baseline": "railway002 passed: 250000 initial plus 300000 late rows, both query stages and zero mixed drops/ambiguous writes",
+    "larger_run": "railway004 failed at projected checkpoint metadata budget; Varve observed403000 new rows, Timescale1000000; 20k offered-rate phase not reached",
+    "recovery": "both databases restarted; baseline retained-oracle verification passed; baseline and partial-stress raw/aggregate fingerprints unchanged without refresh",
+    "cleanup": "all three exact owned deployment IDs REMOVED; two test volumes retained; storage may still be billed",
+    "readiness": "not production-qualified or a Timescale replacement"
+  },
+  "runs": {
+    "railway001": "transport failure after250k rows; retained",
+    "railway002": "passed complete baseline",
+    "railway003": "generator event-loop starvation; zero rows on both databases; retained",
+    "railway004": "configured projected-checkpoint admission rejection; retained"
+  },
+  "observed_stress_rows": {
+    "varve": 403000,
+    "timescale": 1000000
+  },
+  "observed_stress_scope": "per-backend persisted observations, not a reconstructed acknowledgement ledger or a shared completed watermark",
+  "owned_services": {
+    "varve-benchmark": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+    "timescale-benchmark": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+    "benchmark-driver": "76fdbde0-4296-46a4-a6f2-4026432fd4a3"
+  },
+  "preserve_service": "64ddd834-6732-4582-bf4a-d86bbd0317fa"
+}
