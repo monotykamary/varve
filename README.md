@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/Rust-2024_edition-d99972?style=flat-square&amp;logo=rust&amp;logoColor=white" alt="Rust, 2024 edition" />
   <img src="https://img.shields.io/badge/DuckDB-v2_alpha-eacb87?style=flat-square" alt="DuckDB v2 alpha" />
   <img src="https://img.shields.io/badge/status-experimental-80c9bd?style=flat-square" alt="Experimental" />
+  <a href="https://www.npmjs.com/package/@monotykamary/varve"><img src="https://img.shields.io/npm/v/%40monotykamary%2Fvarve?style=flat-square&amp;color=80c9bd" alt="npm version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-9fb4df?style=flat-square" alt="Apache-2.0 license" /></a>
 </p>
 <p align="center"><a href="#quick-start">Quick start</a> · <a href="#the-data-path">Architecture</a> · <a href="#sql-management">SQL</a> · <a href="#durability-contract">Durability</a> · <a href="#verification">Evidence</a> · <a href="#documentation">Docs</a></p>

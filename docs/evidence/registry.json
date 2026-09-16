@@ -1,0 +1,38 @@
+{
+  "date": "2026-09-16",
+  "source_candidate": "5ab634c313c8c64b80162399a573d08d134caecb",
+  "source_ci": "https://github.com/monotykamary/varve/actions/runs/35061323598",
+  "npm": {
+    "name": "@monotykamary/varve",
+    "version": "0.1.0",
+    "published_with": "bun publish --access public",
+    "url": "https://www.npmjs.com/package/@monotykamary/varve",
+    "tarball": "https://registry.npmjs.org/@monotykamary/varve/-/varve-0.1.0.tgz",
+    "shasum": "3d7ad461f5439bffdc328a30f41ebf656f1b3ff2",
+    "integrity": "sha512-nFlqbeEgknshhIslH4CwPIMAF1yUDzxaqpjBLkuKvjhxX8krQATSVaszXjkxDU+o6ZJjcjKN5pxPsMlXFZqOmQ==",
+    "registry_git_head": null,
+    "source_provenance": "observed clean publication candidate, not registry-signed attestation",
+    "files": 23,
+    "tarball_bytes": 22069,
+    "integrity_verified": true,
+    "published_validation_secret_leaks": 0,
+    "fresh_registry_install": true,
+    "strict_consumer_types": true,
+    "browser_bundle": true,
+    "behavior": {"rows": 19, "sum": 2.375, "first_timestamp": "9007199254740993", "pipelined_inserts": 16, "duplicate_receipt": true, "recovered_rows": 19, "server_source": "verified local binary, not registry-installed Cargo package"}
+  },
+  "cargo": {
+    "version": "0.1.0",
+    "packages": ["varve-storage", "varve-client"],
+    "both_dry_run_package_builds_passed": true,
+    "storage_actual_upload_attempted": true,
+    "storage_actual_package_verification_passed": true,
+    "client_actual_upload_attempted": false,
+    "registry_readback": {"varve-storage": 404, "varve-client": 404},
+    "published": false,
+    "blocked_by": "crates.io account requires a verified email address",
+    "upload_error_http_status": 400,
+    "account_action": "https://crates.io/settings/profile",
+    "registry_installed_rust_probes": "pending; artifacts are not published"
+  }
+}
