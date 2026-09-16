@@ -1,0 +1,59 @@
+[package]
+name = "varvedb"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Local-first, tiered time-series storage with DuckDB SQL"
+license = "Apache-2.0"
+repository = "https://github.com/monotykamary/varve"
+readme = "README.md"
+keywords = ["timeseries", "database", "duckdb", "parquet", "s3"]
+categories = ["database-implementations"]
+
+[lib]
+name = "varve"
+path = "src/lib.rs"
+
+[[bin]]
+name = "varve"
+path = "src/main.rs"
+
+[features]
+default = []
+fault-injection = []
+
+[dependencies]
+futures-util = "0.3"
+sqlparser = { version = "0.61", features = ["visitor"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+blake3 = "1"
+fs2 = "0.4"
+uuid = { version = "1", features = ["v4", "serde"] }
+arrow-array = "60"
+arrow-schema = "60"
+parquet = { version = "60", default-features = false, features = ["arrow", "zstd"] }
+object_store = { version = "0.14.2", features = ["aws"] }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time"] }
+clap = { version = "4", features = ["derive"] }
+hyper = { version = "1", features = ["http1", "server"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+subtle = "2"
+tempfile = "3"
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false
+
+[profile.release]
+debug = 0
+strip = "debuginfo"
+lto = "thin"
+codegen-units = 8

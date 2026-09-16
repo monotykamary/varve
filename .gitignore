@@ -1,0 +1,12 @@
+/target/
+/varve-data/
+/varve-objects/
+/restored-data/
+/.tools/
+*.log
+.DS_Store
+.env
+.env.*
+*.pem
+*.key
+__pycache__/

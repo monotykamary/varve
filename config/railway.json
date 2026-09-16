@@ -1,0 +1,23 @@
+{
+  "hot_max_bytes": 16777216,
+  "metadata_max_bytes": 33554432,
+  "hot_max_rows": 50000,
+  "wal_max_bytes": 67108864,
+  "max_disk_bytes": 536870912,
+  "decoded_cache_bytes": 8388608,
+  "disk_cache_bytes": 33554432,
+  "max_batch_rows": 1000,
+  "max_batch_bytes": 1048576,
+  "max_idempotency_keys": 100000,
+  "max_rollup_groups": 100000,
+  "segment_rows": 16384,
+  "flush_interval_us": 5000000,
+  "ship_interval_us": 2000000,
+  "maintenance_interval_ms": 1000,
+  "query_executable": "/usr/local/bin/duckdb",
+  "query_memory_mb": 128,
+  "query_threads": 1,
+  "query_workers": 2,
+  "query_timeout_ms": 15000,
+  "query_max_output_bytes": 8388608
+}

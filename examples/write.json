@@ -1,0 +1,8 @@
+{
+  "table": "metrics",
+  "request_id": "example-batch-1",
+  "rows": [
+    { "timestamp_us": 1000000, "tenant": "demo", "series": "cpu", "value": 12.5, "tags": { "host": "one" } },
+    { "timestamp_us": 2000000, "tenant": "demo", "series": "cpu", "value": 17.5, "tags": { "host": "one" } }
+  ]
+}

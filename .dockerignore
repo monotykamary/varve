@@ -1,0 +1,10 @@
+.git
+.tools
+target
+varve-data
+.env
+.env.*
+*.log
+*.pem
+*.key
+**/__pycache__

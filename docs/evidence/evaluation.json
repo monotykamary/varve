@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-15",
+  "verdict": "experimental evaluation; not production-certified",
+  "url": "https://varve-production.up.railway.app",
+  "build_deployment": "e57b9f08-4852-4db8-9b0e-da6ef49e7452",
+  "current_deployment": "dbd59af2-5c4c-4e8e-a452-72914ca69528",
+  "current_replica": "6c3d1955-e2c1-4185-b7f4-b4fcf85b4784",
+  "database_id": "0b4811ee-e6e7-42c4-9be7-54bb57ba8711",
+  "runtime_input_manifest_sha256": "35339dfeb77e5e315593cc66f6e297919f17aad1a6a1c6b5b9b596839176b145",
+  "varve_binary_sha256": "16888b054c6d36bf3ebf47862d707fcc31641ac491bea91df5d4975ca39872f6",
+  "local_checks": {"rust_passed": 138, "python_passed": 14, "live_test_ignored_by_default": 1, "strict_clippy": true, "rustsec_dependencies_scanned": 275},
+  "live_remote_restore": {"backend": "s3", "rows": 4000, "sum": 249750.0, "namespace": "probe-f4c87505-e9f2-45e6-9352-6ac96bc4a1c7", "passed": true},
+  "retained_workload": {
+    "table": "stress_717e16716b4e4885", "aggregate": "agg_046e1610929344e5",
+    "rows": 100000, "sum": 6243750.0, "elapsed_seconds": 51.44015533395577,
+    "rows_per_second": 1944.0065713407703, "batch_rows": 512, "writers": 2, "retries": 0,
+    "write_ms": {"p50": 459.7258330322802, "p95": 862.2069170232862, "p99": 1252.6303339982405},
+    "query_ms": {"p50": 812.8662500530481, "p95": 1150.6269170204177, "p99": 1175.9226660942659},
+    "expired_id_rejected": true, "verified_after_replica_recreation": true,
+    "raw_retention_seconds": 3600
+  },
+  "expiration_workload": {
+    "table": "stress_54ee430d1f1a4663", "aggregate": "agg_72db15ab9fe7455e",
+    "rows": 20000, "sum": 1248750.0, "elapsed_seconds": 10.775478292023763,
+    "retries": 0, "raw_rows_after_expiry": 0, "aggregate_rows_after_expiry": 20000,
+    "expired_id_rejected": true, "retained_workload_unchanged": true
+  },
+  "resources": {"vcpu_limit": 1, "memory_limit_bytes": 999997440, "observed_cgroup_peak_bytes": 203898880, "daemon_high_water_kib": 177496, "sample_window_seconds": 61.96347141265869, "sample_cpu_seconds": 13.715955},
+  "restart": {"direct_cli_restart": "timed out; container exited; root cause unresolved", "recovery": "existing-artifact redeploy, unchanged volume and executable hashes", "persistence_oracles_passed": true},
+  "limitations": ["synthetic noncompetitive workload", "DuckDB v2 alpha", "single-node and local-fsync acknowledgement", "no external audit or power-loss/long-soak qualification", "conservative busy readiness", "restart incident unresolved", "ongoing evaluation charges"]
+}

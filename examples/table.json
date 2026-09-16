@@ -1,0 +1,8 @@
+{
+  "shards": 8,
+  "window_us": 3600000000,
+  "rollup_widths_us": [60000000, 3600000000],
+  "archive_after_us": 86400000000,
+  "retention_us": 2592000000000,
+  "rollup_retention_us": 31536000000000
+}
