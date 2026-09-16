@@ -16,4 +16,6 @@ Experimental scope remains explicit. Every row requires implementation and direc
 | C10 | Integrated verification | `scripts/verify.sh` exit 0: 181 storage/server tests, 24 Rust SDK tests including live/doctest, 18 TS units plus integration, 14 Python tests; fmt/Clippy/audits; public exports confirmed | passed locally |
 | C11 | crates.io and npm publication | `cargo publish` for `varve-storage` and `varve-client`; `bun publish` for `@monotykamary/varve`; clean package builds, registry readback and install/import smoke tests | pending publication |
 
+Linux CI exposed a transport-fixture readiness race after the original local gate. A deterministic new test failed before the helper fix; all 18 transport tests and strict targeted Clippy now pass. The helper waits for every configured listener, without changing production code. The corrected full Linux run is tracked separately.
+
 The local suite deliberately leaves one real-S3 contract test opt-in; the local object-store probe is not cloud evidence. Only new task-owned Railway validation resources may be mutated; the existing evaluation is not a scratchpad. No enqueue-time acknowledgment, silent mutation replay, or unbounded buffers. Template publication remains gated on actual live success and advertises the accepted Varve/DuckDB-alpha experimental scope.

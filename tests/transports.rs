@@ -98,7 +98,7 @@ impl Server {
                     .unwrap();
                 panic!("startup {status}: {err}");
             }
-            if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            if listeners_ready(port, pg.then_some(pg_port)) {
                 break;
             }
             assert!(Instant::now() < deadline, "startup deadline");
@@ -142,6 +142,25 @@ impl Drop for Server {
         let _ = self.child.wait();
     }
 }
+fn listeners_ready(port: u16, pg: Option<u16>) -> bool {
+    TcpStream::connect(("127.0.0.1", port)).is_ok()
+        && pg.is_none_or(|port| TcpStream::connect(("127.0.0.1", port)).is_ok())
+}
+
+#[tokio::test]
+async fn startup_waits_for_every_configured_listener() {
+    let http = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = http.local_addr().unwrap().port();
+    // Reserve the PG address without listening, so no port-reuse race is needed.
+    let pending_pg = tokio::net::TcpSocket::new_v4().unwrap();
+    pending_pg.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let pg = pending_pg.local_addr().unwrap().port();
+    assert!(listeners_ready(port, None));
+    assert!(!listeners_ready(port, Some(pg)));
+    let _pg_listener = pending_pg.listen(16).unwrap();
+    assert!(listeners_ready(port, Some(pg)));
+}
+
 fn free_port() -> u16 {
     TcpListener::bind("127.0.0.1:0")
         .unwrap()

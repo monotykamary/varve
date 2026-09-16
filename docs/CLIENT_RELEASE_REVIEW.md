@@ -36,6 +36,12 @@ Contour reported advisory TypeScript validation/dispatch complexity and test-to-
 
 Each frame uses a file plus directory sync. This is one local, in-process burst workload, not a production throughput guarantee, an always-sequential SDK loop, or an S3 durability measurement. See [INGESTION.md](INGESTION.md) and [machine-readable evidence](evidence/clients.json).
 
+## Linux CI fixture correction
+
+The first Linux CI run reached the transport suite and exposed a startup race: the fixture waited for the HTTP TCP socket but immediately connected to PostgreSQL before its listener was bound. Production initialization binds both before serving requests; a TCP handshake alone was not application readiness.
+
+A deterministic fixture regression reserves a PG address without listening and proves HTTP-only readiness is insufficient. It failed before the helper correction. The helper now waits for every configured listener; all 18 transport tests and strict targeted Clippy pass. This adds one test to the inventory and does not change production code or weaken frame, authentication or durability assertions. A new full Linux CI run verifies the corrected candidate.
+
 ## Remaining gates
 
 Railway source/build, live S3/protocol checks, both two-minute soaks, persistence redeploy, rendered template/button and cleanup are recorded separately in the template repository. Registry publication and clean installed-package probes remain pending until explicitly recorded in [CLIENT_INGEST_ACCEPTANCE.md](CLIENT_INGEST_ACCEPTANCE.md). Experimental single-node and DuckDB-alpha limitations remain unchanged.
