@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-16",
+  "scope": "Experimental single-node validation; no throughput, zero-error-rate or HA certification",
+  "workspace": {"name": "Tom", "id": "18857f84-0af6-4379-9217-e62e2d14b48f"},
+  "template": {"id": "d38051a6-00ca-4156-93de-383be81a2af3", "code": "varve", "url": "https://railway.com/deploy/varve", "status": "PUBLISHED", "demo_project_id": null, "config_exact": true, "generated_token": true, "bucket_references": true, "daily_volume_backups_configured": true},
+  "source": {"varve_commit": "45d7c014ea9070e6a2f299a752c121c748434762", "archive_sha256": "05d2432253724e9c53a070a66f2fdd928af3927241fb0a4fc439690e3e3eee5c", "tested_wrapper_commit": "f273c388360ff8e383df62424ed6bf7cac86cba4", "duckdb": "v2.0.0-alpha41533", "duckdb_commit": "10de957379"},
+  "resources": {"project_id": "c4a086d0-f659-47f7-b688-7222f61d508f", "environment_id": "6d42a262-14c6-4be9-8878-70d814f4e987", "service_id": "3ddb2967-d7ea-400b-b547-63257e70560e", "volume_id": "54c3cd3f-1876-496a-8e5a-50e43bacdc52", "bucket_id": "632dbc64-fa88-4143-94e5-4865b65926f5", "process_uid": 10001, "process_gid": 10001},
+  "deployments": ["0aa91cc3-13a9-438f-b797-0c2005129bb8", "ca69ff95-c500-4eef-a248-0f69c9c969b4", "94f348ed-a301-46af-9de3-3234087d26f2", "a17a3a1e-91c8-4dd4-83b7-c38fcf84fc5c", "be5cb45a-d17c-4763-a536-5351076077a9"],
+  "healthy_deployments": ["a17a3a1e-91c8-4dd4-83b7-c38fcf84fc5c", "be5cb45a-d17c-4763-a536-5351076077a9"],
+  "data_oracle": {"rows": 37, "sum": 83.25, "maximum_timestamp": "9007199254740993", "pipelined_single_inserts": 32, "raw_and_rollups_match": true, "http_duplicate_receipt_survives_redeploy": true, "local_sequence": 6, "checkpoint_sequence": 6, "remote_sequence": 6, "segments": 2},
+  "soaks": [{"phase": "initial", "duration_ms": 121010, "samples": 12, "busy_readiness_responses": 1, "maximum_readiness_wait_ms": 513}, {"phase": "redeployed", "duration_ms": 121906, "samples": 12, "busy_readiness_responses": 0, "maximum_readiness_wait_ms": 497}],
+  "s3_probe": {"rows": 256, "sum": 4080, "verified": ["immutable_collision", "bounded_read", "conditional_create", "conditional_update", "stale_cas_rejection", "identical_payload_token_freshness", "delete_list", "paged_list", "bulk_delete", "local_fsync", "idempotent_retry", "parquet", "archive", "sql", "named_rollup", "remote_restore", "raw_retention", "derived_history_retention", "remote_vacuum"]},
+  "render": {"title": "Deploy & Host Varve | Railway", "creator": "Tom", "source_and_pin_verified": true, "icon_dimensions": [512, 512], "theme": "dark", "github_button_followed": true, "background_only_tabs_closed": true},
+  "cleanup": {"delete_accepted": true, "deleted_at": "2026-09-16T05:37:56.169Z", "recovery_listing_retains_record": true, "service_and_deployment_lookup": "Project not found", "former_domain_status": 404, "former_domain_message": "Application not found", "template_still_published": true, "exact_purge_deadline_not_exposed": true, "local_containers_used": false},
+  "limitations": ["Readiness intentionally returns false on mutex contention; only that exact condition was bounded and counted", "The first bucket definition lacked a production instance; corrected provisioning was revalidated", "A light media preference did not change Railway's explicit dark theme", "Existing evaluation resources were not modified"]
+}

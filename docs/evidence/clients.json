@@ -3,6 +3,8 @@
   "verification_script": "scripts/verify.sh",
   "verification_exit_code": 0,
   "storage_server_tests_passed": 181,
+  "corrected_linux_storage_server_tests_passed": 182,
+  "corrected_linux_ci": "https://github.com/monotykamary/varve/actions/runs/35055893569",
   "external_s3_tests_ignored_locally": 1,
   "rust_client_tests_including_doctest_and_service": 24,
   "typescript_unit_tests": 18,

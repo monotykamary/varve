@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="media/cover.svg" alt="Varve — time settles into layers: hot rows, cached reads, Parquet, and asynchronous object-store recovery" width="1100" />
+  <img src="https://raw.githubusercontent.com/monotykamary/varve/main/media/cover.svg" alt="Varve — time settles into layers: hot rows, cached reads, Parquet, and asynchronous object-store recovery" width="1100" />
 </p>
 
 <h1 align="center">Varve</h1>
@@ -73,6 +73,10 @@ Varve makes that lifecycle a first-class concern **without inheriting an entire 
 
 ## Quick start
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/varve)
+
+The [verified template](https://github.com/monotykamary/railway-template-varve) provisions one service, a persistent volume and a dedicated bucket with generated credentials. It retains the experimental, single-owner durability boundaries.
+
 Requirements: Rust/Cargo (tested with 1.98.1), a POSIX filesystem with atomic rename, directory fsync and advisory locking, and DuckDB v2 on `PATH`. The server crate is **`varve-storage`**; its binary and Rust library remain **`varve`**. Registry publication is recorded in the [release ledger](docs/CLIENT_INGEST_ACCEPTANCE.md).
 
 ```sh
@@ -118,13 +122,21 @@ Both SDKs keep one WebSocket connection open, correlate concurrent requests, bou
 | Rust | `varve-client` | [API, TLS, errors and example](clients/rust/README.md) |
 | TypeScript / Node 22+ / browsers | `@monotykamary/varve` | [API, bigint timestamps and browser origins](clients/typescript/README.md) |
 
-Package publication status is tracked in the [release acceptance ledger](docs/CLIENT_INGEST_ACCEPTANCE.md). Source installation and package verification work before a registry release.
+Registry installation (publication receipts are recorded in the [release acceptance ledger](docs/CLIENT_INGEST_ACCEPTANCE.md)):
+
+```sh
+cargo install varve-storage --version 0.1.0 --locked # CLI; DuckDB remains external
+cargo add varve-client@0.1.0                       # Rust network client
+bun add @monotykamary/varve@0.1.0                  # TypeScript / Node / browser client
+```
 
 ```ts
 import { connect } from "@monotykamary/varve";
 
+const token = process.env.VARVE_API_TOKEN;
+if (!token) throw new Error("VARVE_API_TOKEN is required");
 const db = await connect("wss://your-database.example/v1/ws", {
-  token: process.env.VARVE_API_TOKEN,
+  token,
   maxPendingRequests: 32,
 });
 await db.createTable("metrics", {});
