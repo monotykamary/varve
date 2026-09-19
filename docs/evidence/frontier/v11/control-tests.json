@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-17T02:52:03.661Z",
+  "source_digest": "572bc1423656e266d81c8fe7ce1388e0ed8954e40277d5537b2cf6cb9090731c",
+  "redeploy_fixture_cases": 8,
+  "campaign_fixture_cases": 4,
+  "external_commands": 0,
+  "infra_mutations": 0,
+  "scope": "Actual controller VM fixtures; no live benchmark qualification",
+  "helpers": {
+    "prepare.mjs": "563e16f68a6f1492a862674b5bef00d59774439d5452d83c5f0c6b6d303e8b17",
+    "configure.mjs": "8c681d197ba4abaced4b0df0d8477fd953652faf0720f1b1a976d45242e3903f",
+    "remote.mjs": "d37eee4dc71f5c30b0cd3cf544340cbf0eb678223e79785dd9f0e6dfa8309edc",
+    "redeploy.mjs": "b0f1afa33045ef6242bc3b93e0a3f55925fda2ae5273f9533adfdf635bae29d2",
+    "status.mjs": "168f94352578bdd491652658bb14f0c420e8d4c46be96e47be97f001c107b858",
+    "ssh.mjs": "0573ec91c68a39e19b6bb341005033bb46fe81a19aa48afb257d2d6805c1ab29",
+    "launch.py": "0a3fd6a19cdd314cea4e0abb84a053043985e4e592ff476a9e1e7fa2d77ef5be",
+    "unpack.mjs": "5c35d28ad3ac594bcaffd242fd25b2c0be63e7ac543aa56a36bbbb38c259737d",
+    "stop-attempt.mjs": "1ba2f43433acdb79572ff6c1133f71d66261eb555398a53576ffc6d73aeb842a",
+    "probe-varve.py": "f998da4e2dc7d647d04394f98b484624b35a71a851ee4cd62971cb00f8ca495d",
+    "check-driver.mjs": "88cd73568ee9fb21a7b1f6b9059ffe939fbcc257885ce1381edd114638f0d86c",
+    "probe-driver.py": "951bd00f22ce5101347dc2fe91fed20b5ff2577914a63be10b138841cce361f5",
+    "collect.py": "1f38ede0786eb3d425942b24364233ebc5753b9fc77f5df0e134e0cf47a79c20",
+    "recovery.py": "a933f61df98be5b14627cb90d26a36be3423b35ed551fbbb5bb261fbb266823f",
+    "check-recovery.mjs": "9aa2143d9d572bd7616f043cd6e868f31ca54c5341ca87e4b078e9d049246a89",
+    "metrics.py": "59a46219473ff40261c0ae5f967711332c5d78f6755e4a0dc928700e44fcda79",
+    "resources.sh": "b47ae01d506056a82a218733e9e309771de3871baedc842e603ee2f41bd71e22",
+    "restart.mjs": "0cf7e6a2e400b274f25739d380af89cf83b4a880ea49c1ae3b470e18eeb37e54",
+    "verify-stop.mjs": "053c990c9a32069f7c640987f281ca1d8a9857f1e72e285ea065814e1e5a95db",
+    "run-campaign.mjs": "6be7927772550f1056bc94e4398187884d8035645c894cd7a3f967591106ed9c",
+    "install-driver.py": "5419dbf8d6d57eecba91b99d62a1a1eeabbd498bbe09331149b03ccaf5bc8241"
+  }
+}

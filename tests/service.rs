@@ -278,6 +278,176 @@ fn wait_for_checkpoint(port: u16, sequence: u64) {
 }
 
 #[test]
+fn ingestion_diagnostics_are_authenticated_and_opt_in() {
+    let _guard = service_test_guard();
+    let temporary = TempDir::new().unwrap();
+    let config = temporary.path().join("config.json");
+    write_config(&config, 1000, 5_000_000);
+    let port = free_port();
+    let _service = Service::start_with_env(
+        &temporary.path().join("data"),
+        &config,
+        port,
+        &[
+            ("VARVE_API_TOKEN", "trace-fixture-token-0123456789abcdef"),
+            ("VARVE_INGEST_TRACE_CAPACITY", "8"),
+        ],
+    );
+    assert_eq!(
+        request(port, "GET", "/v1/diagnostics/ingest", None, &[])
+            .unwrap()
+            .0,
+        401
+    );
+    let auth = [(
+        "Authorization",
+        "Bearer trace-fixture-token-0123456789abcdef",
+    )];
+    assert_eq!(
+        request(port, "POST", "/v1/tables", Some(&table()), &auth)
+            .unwrap()
+            .0,
+        200
+    );
+    let (status, receipt) = request(
+        port,
+        "POST",
+        "/v1/write",
+        Some(&batch("trace-a", 1.0)),
+        &auth,
+    )
+    .unwrap();
+    assert_eq!(status, 200);
+    let (status, traces) = request(port, "GET", "/v1/diagnostics/ingest", None, &auth).unwrap();
+    assert_eq!(status, 200);
+    assert_eq!(traces["capacity"], 8);
+    assert_eq!(traces["groups"][0]["sequences"][0], receipt["sequence"]);
+    assert_eq!(traces["groups"][0]["failed"], 0);
+    assert_eq!(
+        request(
+            port,
+            "POST",
+            "/v1/diagnostics/ingest",
+            Some(&json!({})),
+            &auth
+        )
+        .unwrap()
+        .0,
+        405
+    );
+}
+
+#[test]
+fn retained_query_metrics_witness_reuse_and_only_new_raw_rows() {
+    let _guard = service_test_guard();
+    let temporary = TempDir::new().unwrap();
+    let data = temporary.path().join("data");
+    let config = temporary.path().join("config.json");
+    fs::write(
+        &config,
+        serde_json::to_vec(&json!({
+            "query_retained_inputs": true,
+            "flush_policy": "pressure_only",
+            "maintenance_interval_ms": 3_600_000,
+            "query_timeout_ms": 5_000
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let port = free_port();
+    let _service = Service::start(&data, &config, port);
+    post(port, "/v1/tables", table());
+    let rows: Vec<_> = (0..130)
+        .map(|timestamp| {
+            json!({
+                "timestamp_us": timestamp, "tenant": "a", "series": "cpu", "value": 1.0
+            })
+        })
+        .collect();
+    post(
+        port,
+        "/v1/write",
+        json!({
+            "table": "metrics", "request_id": "initial", "rows": rows
+        }),
+    );
+    let query = json!({"sql": "SELECT count(*) AS count, sum(value) AS total FROM metrics"});
+    assert_eq!(
+        post(port, "/v1/query", query.clone()),
+        json!([{"count":130,"total":130.0}])
+    );
+    let first = metrics_text(port);
+    assert_eq!(
+        metric_count(&first, "varve_query_resident_full_loads_total"),
+        1
+    );
+    assert_eq!(
+        metric_count(&first, "varve_query_resident_raw_staged_rows_total"),
+        130
+    );
+    assert!(metric_count(&first, "varve_query_resident_raw_staged_bytes_total") > 0);
+    assert_eq!(
+        metric_count(&first, "varve_query_resident_dynamic_loads_total"),
+        0
+    );
+    assert_eq!(
+        metric_count(&first, "varve_query_resident_dynamic_staged_bytes_total"),
+        0
+    );
+    assert_eq!(
+        post(port, "/v1/query", query.clone()),
+        json!([{"count":130,"total":130.0}])
+    );
+    let repeated = metrics_text(port);
+    assert_eq!(
+        metric_count(&repeated, "varve_query_resident_raw_staged_rows_total"),
+        130
+    );
+    assert_eq!(
+        metric_count(&repeated, "varve_query_resident_raw_staged_bytes_total"),
+        metric_count(&first, "varve_query_resident_raw_staged_bytes_total")
+    );
+    assert!(metric_count(&repeated, "varve_query_resident_hits_total") >= 1);
+    let delta = post(port, "/v1/write", batch("delta", 2.0));
+    assert_eq!(
+        post(port, "/v1/query", query),
+        json!([{"count":132,"total":135.0}])
+    );
+    let after = metrics_text(port);
+    assert_eq!(
+        metric_count(&after, "varve_query_resident_raw_staged_rows_total"),
+        132
+    );
+    assert!(metric_count(&after, "varve_query_resident_delta_loads_total") >= 1);
+    assert_eq!(metric_count(&after, "varve_query_resident_idle_rows"), 132);
+    assert!(metric_count(&after, "varve_query_resident_idle_bytes") > 0);
+    assert!(metric_count(&after, "varve_query_resident_idle_materialized_bytes") > 0);
+    assert_eq!(
+        after
+            .lines()
+            .filter(|line| line.starts_with("varve_query_resident_idle_materialized_bytes "))
+            .count(),
+        1
+    );
+    assert_eq!(metric_count(&after, "varve_query_workers_active"), 0);
+    assert_eq!(
+        metric_count(&after, "varve_query_resident_dynamic_loads_total"),
+        0
+    );
+    assert_eq!(
+        post(
+            port,
+            "/v1/query",
+            json!({"sql": "SELECT CAST(sequence AS BIGINT) AS sequence FROM varve_status()"})
+        ),
+        json!([{"sequence": delta["sequence"]}])
+    );
+    let metadata = metrics_text(port);
+    assert!(metric_count(&metadata, "varve_query_resident_dynamic_loads_total") > 0);
+    assert!(metric_count(&metadata, "varve_query_resident_dynamic_staged_bytes_total") > 0);
+}
+
+#[test]
 fn http_ingest_is_idempotent_queries_expected_rows_and_scheduler_ticks() {
     let _guard = service_test_guard();
     let temporary = TempDir::new().unwrap();
@@ -308,6 +478,24 @@ fn http_ingest_is_idempotent_queries_expected_rows_and_scheduler_ticks() {
     assert!(phase_count(&before, "wal_encode") >= 2);
     assert!(phase_count(&before, "wal_sync") >= 4);
     assert!(phase_count(&before, "state_lock_wait") > 0);
+    for phase in [
+        "disk_lock_wait",
+        "disk_lock_hold",
+        "wal_disk_lock_wait",
+        "group_prepare",
+    ] {
+        assert!(phase_count(&before, phase) > 0, "{phase}");
+    }
+    for phase in [
+        "derived_verify",
+        "derived_publish",
+        "raw_verify",
+        "raw_publish",
+    ] {
+        assert!(before.contains(&format!(
+            "varve_phase_duration_seconds_count{{phase=\"{phase}\"}} "
+        )));
+    }
     for _ in 0..2 {
         assert_eq!(
             post(port, "/v1/query", json!({"sql":"SELECT 1 AS value"})),
@@ -335,6 +523,21 @@ fn http_ingest_is_idempotent_queries_expected_rows_and_scheduler_ticks() {
     assert!(metric_count(&after, "varve_control_root_bytes") > 0);
     assert!(metric_count(&after, "varve_derived_resident_bytes") > 0);
     assert_eq!(metric_count(&after, "varve_derived_working_bytes"), 0);
+    for name in [
+        "full_loads_total",
+        "delta_loads_total",
+        "hits_total",
+        "invalidations_total",
+        "raw_staged_rows_total",
+        "raw_staged_bytes_total",
+        "idle_rows",
+        "idle_bytes",
+    ] {
+        assert_eq!(
+            metric_count(&after, &format!("varve_query_resident_{name}")),
+            0
+        );
+    }
 
     let (status, body) = request(
         port,
@@ -561,5 +764,88 @@ fn service_refuses_public_bind() {
         String::from_utf8_lossy(&output.stderr).contains("non-loopback"),
         "unexpected stderr: {}",
         String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn rebuilt_http_pipeline_recovers_receipts_and_cancels_timed_out_native_queries() {
+    let _guard = service_test_guard();
+    let temporary = TempDir::new().unwrap();
+    let data = temporary.path().join("data");
+    let config = temporary.path().join("config.json");
+    let library = std::env::var("VARVE_DUCKDB_V2_LIBRARY").expect("pinned native library required");
+    fs::write(
+        &config,
+        serde_json::to_vec(&json!({
+            "segmented_journal": true,
+            "checkpoint_frozen_prefix": true,
+            "derived_pages": true,
+            "duckdb_library": library,
+            "query_executable": "/varve-test-no-cli-fallback",
+            "query_timeout_ms": 5000,
+            "maintenance_interval_ms": 60000
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let port = free_port();
+    let env = [
+        ("VARVE_HTTP_HEADER_TIMEOUT_MS", "50"),
+        ("VARVE_HTTP_BODY_TIMEOUT_MS", "50"),
+        ("VARVE_HTTP_REQUEST_TIMEOUT_MS", "250"),
+        ("VARVE_HTTP_CONNECTION_TIMEOUT_MS", "5000"),
+    ];
+    let mut service = Service::start_with_env(&data, &config, port, &env);
+    post(port, "/v1/tables", table());
+    let receipt = post(port, "/v1/write", batch("durable-native", 2.0));
+    assert_eq!(receipt["durability"], "local_fsync");
+    assert_eq!(
+        post(
+            port,
+            "/v1/query",
+            json!({"sql":"SELECT count(*) AS count, sum(value) AS total FROM metrics"})
+        ),
+        json!([{"count":2,"total":5.0}])
+    );
+    let (_, status) = request(port, "GET", "/v1/status", None, &[]).unwrap();
+    assert_eq!(status["segmented_journal"], true);
+    assert_eq!(status["native_query"]["version"], "v2.0.0-alpha41533");
+    let (code, body) = request(port, "POST", "/v1/query", Some(&json!({"sql":"SELECT sum(m.value + r.i) FROM metrics m CROSS JOIN range(1000000000) r(i)"})), &[]).unwrap();
+    assert_eq!(code, 504, "{body}");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let (_, status) = request(port, "GET", "/v1/status", None, &[]).unwrap();
+        if status["active_snapshots"] == 0 && status["active_queries"] == 0 {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "native cancellation retained pins: {status}"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    let metrics = metrics_text(port);
+    assert_eq!(
+        metric_count(&metrics, "varve_query_workers_spawned_total"),
+        0
+    );
+    assert!(
+        phase_count(&metrics, "query_run") >= 2,
+        "native query timing must be recorded"
+    );
+    // SIGKILL deliberately bypasses clean shutdown: the acknowledged journal
+    // frame must replay and deduplicate without a checkpoint or CLI fallback.
+    service.kill();
+    let _restarted = Service::start_with_env(&data, &config, port, &env);
+    let duplicate = post(port, "/v1/write", batch("durable-native", 2.0));
+    assert_eq!(duplicate["duplicate"], true);
+    assert_eq!(duplicate["sequence"], receipt["sequence"]);
+    assert_eq!(
+        post(
+            port,
+            "/v1/query",
+            json!({"sql":"SELECT count(*) AS count, sum(value) AS total FROM metrics"})
+        ),
+        json!([{"count":2,"total":5.0}])
     );
 }

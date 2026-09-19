@@ -1,0 +1,1 @@
+{"fsync": "on", "full_page_writes": "on", "synchronous_commit": "on", "track_wal_io_timing": "off", "wal_init_zero": "on", "wal_recycle": "on", "wal_segment_size": "16MB", "wal_sync_method": "fdatasync"}

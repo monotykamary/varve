@@ -1,0 +1,1 @@
+cargo test --locked --offline -p varve-storage --lib --features fault-injection real_remote_cas_fence_before_sync_and_after_sync_preserves_only_old_receipts -- --test-threads=1

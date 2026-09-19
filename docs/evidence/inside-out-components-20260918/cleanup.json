@@ -1,0 +1,13 @@
+{
+  "campaign": "varve-inside-out-20260918",
+  "project_id": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+  "environment_id": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+  "owned_sandbox_id": "d61734d7-61eb-4658-aa85-bae3a52e6373",
+  "destroy_result": "success",
+  "subsequent_sandbox_list": [],
+  "retained_checkpoint_keys": ["varve-inside-out-20260918-d61734d7"],
+  "checkpoint_created_at": "2026-09-18T10:41:41.173Z",
+  "checkpoint_is_running_compute": false,
+  "other_services_mutated_by_campaign": false,
+  "local_builds_or_benchmark_fixtures_created": false
+}

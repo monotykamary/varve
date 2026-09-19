@@ -1,0 +1,51 @@
+{
+  "claim_boundary": {
+    "automatic_write_retries": 0,
+    "excluded": "first/last/OHLC because independent receipt ordering does not prove equal-timestamp ties",
+    "mutation_or_refresh": false,
+    "supplemental_not_replacement": true,
+    "verified": "every deterministic raw identity, exact quarter value, empty tags, multiplicity, and every named minute count/sum/min/max group"
+  },
+  "execution": {
+    "freshness": "uses the source report existing fresh barrier; performs no refresh",
+    "query_order": "sequential Varve then Timescale pages",
+    "query_workers": 1
+  },
+  "failure": "RuntimeError: raw tags differ from the deterministic empty map",
+  "finished_at": "2026-09-18T15:20:44.494152+00:00",
+  "format_version": 1,
+  "kind": "supplemental_exact_verification",
+  "run_id": "ior6_smoke_03",
+  "source_artifact": {
+    "files": {
+      "Dockerfile": "c215796089bd3af2aa93b07863f6a2cda477665e6bb7dc80deccd520e3383d1a",
+      "benchmark.py": "082e871f53797759ea8e658ac460788b7308cb9bc13b4143794957a3ab2e8ed9",
+      "core.py": "cc0049651b6e767c401ebdbb065e41c6e178b51fc8209c4c490cdd52f4d8da7e",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    "format_version": 1,
+    "sha256": "609f2dcc13148d6f5ade4457c66fb920ca303974237ed985107252a165dbd8f9"
+  },
+  "source_final_fingerprints_sha256": "36931a59530dff2296aea2f788550f898f608fbc826c78972e81cf9067695c2f",
+  "source_report_sha256": "192655071406d7d109899f6f91030a46abc6f79e95d4b3aff6c204cea15ba114",
+  "started_at": "2026-09-18T15:20:44.204863+00:00",
+  "state": "failed",
+  "verdict": {
+    "performance_approval": false,
+    "source_benchmark": "overloaded",
+    "source_benchmark_preserved": true,
+    "statement": "Exact verification is diagnostic only and does not promote or approve benchmark performance."
+  },
+  "verifier_artifact": {
+    "Dockerfile": "c215796089bd3af2aa93b07863f6a2cda477665e6bb7dc80deccd520e3383d1a",
+    "benchmark.py": "082e871f53797759ea8e658ac460788b7308cb9bc13b4143794957a3ab2e8ed9",
+    "core.py": "cc0049651b6e767c401ebdbb065e41c6e178b51fc8209c4c490cdd52f4d8da7e",
+    "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+    "verify_exact.py": "6097d779106ad1cf25884b53346d2e0e0724a293a61d411b296a0ba59779f645"
+  },
+  "workload": {
+    "acknowledged_late_rows": 50,
+    "initial_rows": 1024,
+    "total_rows": 1074
+  }
+}

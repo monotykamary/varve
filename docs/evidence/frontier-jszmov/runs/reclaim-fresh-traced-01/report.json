@@ -1,0 +1,869 @@
+{
+  "status": "passed",
+  "workload": {
+    "rows": 102400,
+    "batch": 1000,
+    "writers": 4,
+    "rate": 5000.0,
+    "seconds": 10.0,
+    "read_interval": 0.1,
+    "read_mode": "fresh",
+    "trace_capacity": 512
+  },
+  "claims": {
+    "timescale_win": false,
+    "cloud_qualification": false,
+    "power_loss": false
+  },
+  "identity": {
+    "binary": "/private/tmp/varve-frontier-gate.JsZmOV/reclaim-varve",
+    "binary_sha256": "1192d311724831a12b8162d1afb67a5f4c094043ff3180d4853786a98a4fb051",
+    "profile_sha256": "23ae83270630d881127817f0a39547cd327144635a99597c476374a6401b675c",
+    "profile": {
+      "hot_max_bytes": 134217728,
+      "metadata_max_bytes": 67108864,
+      "hot_max_rows": 100000,
+      "wal_max_bytes": 268435456,
+      "max_disk_bytes": 4294967296,
+      "decoded_cache_bytes": 33554432,
+      "disk_cache_bytes": 268435456,
+      "max_batch_rows": 10000,
+      "max_batch_bytes": 4194304,
+      "max_idempotency_keys": 100000,
+      "max_rollup_groups": 200000,
+      "segment_rows": 65536,
+      "flush_interval_us": 5000000,
+      "ship_interval_us": 2000000,
+      "maintenance_interval_ms": 1000,
+      "query_executable": "/Users/monotykamary/VCS/working-remote/open-source/varve/.tools/duckdb",
+      "query_memory_mb": 256,
+      "query_threads": 2,
+      "query_workers": 2,
+      "query_timeout_ms": 30000,
+      "query_max_output_bytes": 16777216,
+      "derived_pages": true,
+      "derived_max_bytes": 536870912,
+      "query_retained_inputs": true,
+      "checkpoint_frozen_prefix": true
+    },
+    "duckdb_sha256": "f2eaf202ecec36546039076a19373e7b4b37bc3d535f11731794f53a77686205",
+    "probe_sha256": "164ae4111319fa76392566c28de75295a6571e356cafe89f4e239de8b9ace86a",
+    "core_sha256": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.14",
+    "resource_scope": "local host; no cgroup or dedicated-CPU parity claim"
+  },
+  "server_pid": 49009,
+  "database_id": "8e6f8c15-6579-4eea-9617-10b4f25a644f",
+  "base_us": 1789616460000000,
+  "preload": {
+    "rows": 102400,
+    "seconds": 1.7492133749183267,
+    "rows_per_s": 58540.599716590434,
+    "receipts": [
+      {
+        "sequence": 3,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 5,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 6,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 6,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 7,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 7,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 8,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 8,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 9,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 9,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 10,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 11,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 13,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 14,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 15,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 16,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 17,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 17,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 18,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 18,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 19,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 19,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 20,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 20,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 21,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 21,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 22,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 22,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 23,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 23,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 24,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 24,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 25,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 25,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 26,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 26,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 26,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 26,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 27,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 27,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 27,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 27,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 28,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 28,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 29,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 29,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 30,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 30,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 32,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 32,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 32,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 34,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 34,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 35,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 35,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 36,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 36,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 38,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 38,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 39,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 40,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 40,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 41,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 41,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 42,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 42,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 43,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 43,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 44,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 44,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 45,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 47,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 47,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 47,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 48,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 49,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 51,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 52,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 52,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 52,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 53,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 54,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 55,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 55,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 56,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 56,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 57,
+        "rows": 400,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 57,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      }
+    ]
+  },
+  "partial_load": {
+    "offered": 50000,
+    "acknowledged": 50000,
+    "dropped": 0,
+    "failed": 0,
+    "pending": 0
+  },
+  "load": {
+    "offered": 50000,
+    "acknowledged": 50000,
+    "dropped": 0,
+    "failed": 0,
+    "pending": 0,
+    "clean": true,
+    "elapsed_with_drain_s": 10.00194708397612,
+    "acknowledged_rows_per_s": 4999.026647531839,
+    "ack_latency": {
+      "samples": 50,
+      "p50_ms": 27.533959015272558,
+      "p95_ms": 140.52858401555568,
+      "p99_ms": 461.0660409089178,
+      "max_ms": 461.0660409089178,
+      "p99_minimum_sample_gate": false
+    },
+    "arrival_latency": {
+      "samples": 50,
+      "p50_ms": 32.53445902373642,
+      "p95_ms": 143.88808410149068,
+      "p99_ms": 520.6008749082685,
+      "max_ms": 520.6008749082685,
+      "p99_minimum_sample_gate": false
+    },
+    "queue_latency": {
+      "samples": 50,
+      "p50_ms": 1.2417089892551303,
+      "p95_ms": 5.868084030225873,
+      "p99_ms": 42.548333993181586,
+      "max_ms": 42.548333993181586,
+      "p99_minimum_sample_gate": false
+    },
+    "read_latency": {
+      "samples": 26,
+      "p50_ms": 247.135957935825,
+      "p95_ms": 494.5088329259306,
+      "p99_ms": 630.4937080712989,
+      "max_ms": 630.4937080712989,
+      "p99_minimum_sample_gate": false
+    }
+  },
+  "load_phase_deltas": {
+    "varve_http_requests_total": 78.0,
+    "varve_http_errors_total": 0.0,
+    "varve_http_auth_failures_total": 0.0,
+    "varve_http_request_timeouts_total": 0.0,
+    "varve_http_connection_timeouts_total": 0.0,
+    "varve_http_rejected_connections_total": 0.0,
+    "varve_http_body_bytes_total": 5616564.0,
+    "varve_query_workers_spawned_total": 0.0,
+    "varve_query_workers_reused_total": 26.0,
+    "varve_query_workers_resets_total": 26.0,
+    "varve_query_workers_discarded_total": 0.0,
+    "varve_query_resident_full_loads_total": 0.0,
+    "varve_query_resident_delta_loads_total": 26.0,
+    "varve_query_resident_hits_total": 0.0,
+    "varve_query_resident_invalidations_total": 0.0,
+    "varve_query_resident_raw_staged_rows_total": 75400.0,
+    "varve_query_resident_raw_staged_bytes_total": 864332.0,
+    "varve_query_resident_dynamic_loads_total": 26.0,
+    "varve_query_resident_dynamic_staged_bytes_total": 101535737.0,
+    "varve_ingest_submitted_total": 50.0,
+    "varve_ingest_rejected_total": 0.0,
+    "varve_ingest_completed_total": 50.0,
+    "varve_ingest_groups_total": 49.0,
+    "varve_ingest_dropped_receivers_total": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"state_lock_wait\"}": 230.0,
+    "varve_phase_duration_seconds_sum{phase=\"state_lock_wait\"}": 0.039095952999999996,
+    "varve_phase_duration_seconds_count{phase=\"state_lock_hold\"}": 230.0,
+    "varve_phase_duration_seconds_sum{phase=\"state_lock_hold\"}": 0.8589510370000001,
+    "varve_phase_duration_seconds_count{phase=\"write_prepare\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"write_prepare\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"wal_encode\"}": 49.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_encode\"}": 0.030219331000000002,
+    "varve_phase_duration_seconds_count{phase=\"wal_write\"}": 49.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_write\"}": 0.906169789,
+    "varve_phase_duration_seconds_count{phase=\"wal_sync\"}": 98.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_sync\"}": 0.8709052540000001,
+    "varve_phase_duration_seconds_count{phase=\"snapshot\"}": 26.0,
+    "varve_phase_duration_seconds_sum{phase=\"snapshot\"}": 0.248462457,
+    "varve_phase_duration_seconds_count{phase=\"query_build\"}": 26.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_build\"}": 6.189404751,
+    "varve_phase_duration_seconds_count{phase=\"query_wait\"}": 26.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_wait\"}": 0.051136372,
+    "varve_phase_duration_seconds_count{phase=\"query_run\"}": 26.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_run\"}": 0.719326419,
+    "varve_phase_duration_seconds_count{phase=\"query_spawn\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_spawn\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"query_reset\"}": 26.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_reset\"}": 0.012657872,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_prepare\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_prepare\"}": 0.21929775,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_publish\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_publish\"}": 0.012180666000000003,
+    "varve_phase_duration_seconds_count{phase=\"compaction_prepare\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"compaction_prepare\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"compaction_publish\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"compaction_publish\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"disk_account\"}": 98.0,
+    "varve_phase_duration_seconds_sum{phase=\"disk_account\"}": 0.065062376,
+    "varve_phase_duration_seconds_count{phase=\"remote_io\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"remote_io\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_capture\"}": 2.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_capture\"}": 0.007983375000000001,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_locked\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_locked\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"root_prepare\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"root_prepare\"}": 0.13105554200000002,
+    "varve_phase_duration_seconds_count{phase=\"manifest_commit\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"manifest_commit\"}": 0.006090000000000002,
+    "varve_phase_duration_seconds_count{phase=\"disk_lock_wait\"}": 167.0,
+    "varve_phase_duration_seconds_sum{phase=\"disk_lock_wait\"}": 0.0012996639999999999,
+    "varve_phase_duration_seconds_count{phase=\"disk_lock_hold\"}": 167.0,
+    "varve_phase_duration_seconds_sum{phase=\"disk_lock_hold\"}": 0.446455406,
+    "varve_phase_duration_seconds_count{phase=\"wal_disk_lock_wait\"}": 98.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_disk_lock_wait\"}": 0.00132687,
+    "varve_phase_duration_seconds_count{phase=\"group_prepare\"}": 49.0,
+    "varve_phase_duration_seconds_sum{phase=\"group_prepare\"}": 0.23894253900000006,
+    "varve_phase_duration_seconds_count{phase=\"derived_verify\"}": 10.0,
+    "varve_phase_duration_seconds_sum{phase=\"derived_verify\"}": 0.005904292,
+    "varve_phase_duration_seconds_count{phase=\"derived_publish\"}": 13.0,
+    "varve_phase_duration_seconds_sum{phase=\"derived_publish\"}": 0.060213582999999994,
+    "varve_phase_duration_seconds_count{phase=\"raw_verify\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"raw_verify\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"raw_publish\"}": 16.0,
+    "varve_phase_duration_seconds_sum{phase=\"raw_publish\"}": 0.07481837499999999,
+    "varve_phase_duration_seconds_count{phase=\"append_accounting\"}": 50.0,
+    "varve_phase_duration_seconds_sum{phase=\"append_accounting\"}": 0.06300407599999999,
+    "varve_phase_duration_seconds_count{phase=\"commit_lock_wait\"}": 115.0,
+    "varve_phase_duration_seconds_sum{phase=\"commit_lock_wait\"}": 0.044327624999999996,
+    "varve_phase_duration_seconds_count{phase=\"commit_detach\"}": 49.0,
+    "varve_phase_duration_seconds_sum{phase=\"commit_detach\"}": 0.032459079,
+    "varve_phase_duration_seconds_count{phase=\"commit_install\"}": 49.0,
+    "varve_phase_duration_seconds_sum{phase=\"commit_install\"}": 0.046644920000000006,
+    "varve_phase_duration_seconds_count{phase=\"admission_checkpoint\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"admission_checkpoint\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_reclaim\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_reclaim\"}": 0.005180333,
+    "varve_phase_duration_seconds_count{phase=\"wal_file_sync\"}": 49.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_file_sync\"}": 0.600363748,
+    "varve_phase_duration_seconds_count{phase=\"wal_directory_sync\"}": 49.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_directory_sync\"}": 0.27047637599999996
+  },
+  "oracles": {
+    "n": 152400,
+    "total": 190426150.0,
+    "min": 0.0,
+    "max": 2499.75
+  },
+  "final_status": {
+    "database_id": "8e6f8c15-6579-4eea-9617-10b4f25a644f",
+    "sequence": 106,
+    "checkpoint_sequence": 106,
+    "remote_sequence": 0,
+    "unshipped_batches": 106,
+    "hot_rows": 0,
+    "hot_bytes": 0,
+    "wal_bytes": 0,
+    "disk_bytes": 6263054,
+    "metadata_bytes": 4943961,
+    "control_root_bytes": 9032,
+    "derived_encoded_bytes": 4963799,
+    "derived_resident_bytes": 20792635,
+    "derived_working_bytes": 0,
+    "decoded_cache_bytes": 22402800,
+    "disk_cache_bytes": 0,
+    "tables": 1,
+    "segments": 24,
+    "rollup_groups": 12288,
+    "idempotency_keys": 153,
+    "active_queries": 0,
+    "active_snapshots": 0,
+    "fenced": null,
+    "last_maintenance_error": null
+  },
+  "owned_server_reaped": true,
+  "server_returncode": -9
+}

@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "deployment": "d5a80f14-dee0-4c53-9f92-4c5447db769c",
+  "instance": "4b61b1bb-f322-4f7a-89a1-b084556c7bb3",
+  "uid": 10001,
+  "identity": {
+    "RAILWAY_PROJECT_ID": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+    "RAILWAY_ENVIRONMENT_ID": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+    "RAILWAY_SERVICE_ID": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+    "RAILWAY_DEPLOYMENT_ID": "d5a80f14-dee0-4c53-9f92-4c5447db769c"
+  },
+  "cgroups": {
+    "cpu.max": "200000 100000",
+    "memory.max": "1999998976",
+    "memory.current": "25985024",
+    "cpu.stat": "usage_usec 118410\nuser_usec 16332\nsystem_usec 102078\nnice_usec 0\nnr_periods 30\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0"
+  },
+  "process": {
+    "pid": 1,
+    "uid": [
+      10001,
+      10001,
+      10001,
+      10001
+    ],
+    "argv": [
+      "varve",
+      "--data",
+      "/data/probes/runtime-e9ihkn-s1",
+      "--config",
+      "/data/probes/benchmark.json",
+      "serve",
+      "--bind",
+      "::",
+      "--port",
+      "8080",
+      "--allow-remote"
+    ],
+    "start_ticks": "568705379",
+    "executable": "/usr/local/bin/varve"
+  },
+  "data_directory": "/data/probes/runtime-e9ihkn-s1",
+  "volume_mounted": true,
+  "root_exists": true,
+  "sha256": {
+    "binary": "46c7408e8231329fc805e4e2b40e39a1ada520983073ce246e556bafff8be7ce",
+    "duckdb": "1dd0a1596505613a439dced4fb5f5800471badec82b2dc3b2c0efbd46fafbf6d",
+    "config": "5c208cf044f95ead1986bb13ab68cf7ded02bee4252ccdb58acbc7d733fb81b5",
+    "entrypoint": "31f2d6b01a2e18c26c30a5d59f3f52771a52e434ab003facf32d4c99efe724c5",
+    "source_manifest": "030f1f68a5f0c88b38b47e9089c1b8066ccc97624b3ca49cbc016a57141e4369"
+  },
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "duckdb_version": "v2.0.0-alpha41533 (Cyanoptera) 10de957379",
+  "free_bytes": 48398499840
+}

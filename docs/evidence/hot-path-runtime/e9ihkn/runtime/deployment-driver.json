@@ -1,0 +1,7 @@
+{
+  "role": "driver",
+  "service": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+  "deployment": "87b79e52-90f2-4458-8686-1946298e4257",
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "stage_sha256": "fca136ceca22cad676db693c03eaa32c8cc93ab6a92c26adb23f8bf7974cf81c"
+}

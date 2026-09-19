@@ -27,6 +27,8 @@ members = [".", "clients/rust"]
 resolver = "3"
 
 [dependencies]
+libloading = "0.8"
+sha2 = "0.11"
 crossbeam-channel = "0.5"
 tokio-tungstenite = "0.28"
 pgwire = { version = "0.41", default-features = false, features = ["server-api-ring"] }
@@ -55,6 +57,7 @@ tempfile = "3"
 
 [dev-dependencies]
 tokio-postgres = "0.7"
+tokio = { version = "1", features = ["test-util"] }
 
 [profile.dev]
 debug = 0

@@ -1,0 +1,32 @@
+{
+  "cases": 18,
+  "case_names": [
+    "status.mjs/uploaded_building",
+    "status.mjs/uploaded_success",
+    "status.mjs/all_success",
+    "status.mjs/foreign_active",
+    "status.mjs/wrong_owner",
+    "status.mjs/wrong_id",
+    "status.mjs/unrecorded_active",
+    "status.mjs/overwrite_upload",
+    "status.mjs/missing_active",
+    "stop-attempt.mjs/early_varve_only",
+    "stop-attempt.mjs/overwrite_upload",
+    "verify-stop.mjs/early_varve_only",
+    "verify-stop.mjs/all_removed",
+    "verify-stop.mjs/unrecorded_active",
+    "verify-stop.mjs/wrong_id",
+    "verify-stop.mjs/wrong_owner",
+    "verify-stop.mjs/wrong_receipt",
+    "verify-stop.mjs/missing_response"
+  ],
+  "actual_sources_exercised": true,
+  "early_cleanup_only_uploaded_varve": true,
+  "external_commands": 0,
+  "infra_mutations": 0,
+  "helpers": {
+    "status.mjs": "218a9a0ddbc6f107f4aab6d0bdaf5fc5c40575578756a68410c9937e7cca7aac",
+    "stop-attempt.mjs": "b592952923749f7bcac58a55b0dd6e1e0497733322ff2b5b44e0efc29fabc1a9",
+    "verify-stop.mjs": "3b134dd4307ab19d027a1850e8a7adbb53b430405ab3873c83630814c239dacf"
+  }
+}

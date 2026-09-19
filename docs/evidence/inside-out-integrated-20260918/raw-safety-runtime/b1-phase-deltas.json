@@ -1,0 +1,37 @@
+{
+  "run_id": "io13_b1_01",
+  "window": [
+    "after_isolated_setup",
+    "after_initial_drain"
+  ],
+  "scope": "Cumulative additive count/sum deltas; nested spans overlap; WAL write is not a pure fsync timer",
+  "deltas": {
+    "varve_ingest_submitted_total": 1024,
+    "varve_ingest_completed_total": 1024,
+    "varve_ingest_groups_total": 429,
+    "varve_phase_duration_seconds_count{phase=\"state_lock_wait\"}": 915,
+    "varve_phase_duration_seconds_sum{phase=\"state_lock_wait\"}": 0.00020565499999999903,
+    "varve_phase_duration_seconds_count{phase=\"state_lock_hold\"}": 915,
+    "varve_phase_duration_seconds_sum{phase=\"state_lock_hold\"}": 0.27898734299999894,
+    "varve_phase_duration_seconds_count{phase=\"wal_encode\"}": 429,
+    "varve_phase_duration_seconds_sum{phase=\"wal_encode\"}": 0.010243016,
+    "varve_phase_duration_seconds_count{phase=\"wal_write\"}": 429,
+    "varve_phase_duration_seconds_sum{phase=\"wal_write\"}": 2.5599073850000003,
+    "varve_phase_duration_seconds_count{phase=\"disk_account\"}": 439,
+    "varve_phase_duration_seconds_sum{phase=\"disk_account\"}": 0.14844038799999998,
+    "varve_phase_duration_seconds_count{phase=\"disk_lock_wait\"}": 449,
+    "varve_phase_duration_seconds_sum{phase=\"disk_lock_wait\"}": 8.0808e-05,
+    "varve_phase_duration_seconds_count{phase=\"disk_lock_hold\"}": 449,
+    "varve_phase_duration_seconds_sum{phase=\"disk_lock_hold\"}": 0.3299060359999988,
+    "varve_phase_duration_seconds_count{phase=\"group_prepare\"}": 429,
+    "varve_phase_duration_seconds_sum{phase=\"group_prepare\"}": 0.049281152,
+    "varve_phase_duration_seconds_count{phase=\"append_accounting\"}": 1024,
+    "varve_phase_duration_seconds_sum{phase=\"append_accounting\"}": 0.005969575,
+    "varve_phase_duration_seconds_count{phase=\"commit_lock_wait\"}": 464,
+    "varve_phase_duration_seconds_sum{phase=\"commit_lock_wait\"}": 0.08383447699999999,
+    "varve_phase_duration_seconds_count{phase=\"commit_detach\"}": 429,
+    "varve_phase_duration_seconds_sum{phase=\"commit_detach\"}": 0.000233802,
+    "varve_phase_duration_seconds_count{phase=\"commit_install\"}": 429,
+    "varve_phase_duration_seconds_sum{phase=\"commit_install\"}": 0.015848728
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "at": "2026-09-17T04:38:51.705Z",
+  "deployments": {
+    "timescale": "83232bed-bae0-4503-8195-23a6a527ca9e",
+    "driver": "f0bcb2d9-3faf-46c0-97bf-5b27807dc6ef"
+  },
+  "oldState": {
+    "driver": {
+      "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+      "id": "fd3d1f84-8efc-4d27-8296-a67733599d89",
+      "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "serviceId": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+      "status": "REMOVED"
+    },
+    "timescale": {
+      "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+      "id": "87eb3575-ec4b-4c51-9c62-7eb5285ef41e",
+      "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "serviceId": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+      "status": "REMOVED"
+    }
+  },
+  "usePreviousImageTag": true
+}

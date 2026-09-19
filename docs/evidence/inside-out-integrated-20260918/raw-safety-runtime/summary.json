@@ -1,0 +1,322 @@
+[
+  {
+    "run_id": "io13_b1_01",
+    "state": "passed",
+    "configuration": {
+      "automatic_retries_after_ambiguous_ack": 0,
+      "batch": 1,
+      "drain_seconds": 60,
+      "mixed_read_interval_seconds": 0.5,
+      "mixed_readers": 1,
+      "mixed_seconds": 2,
+      "offered_rate_rows_per_second": 25.0,
+      "outer_wall_clock_seconds": 120,
+      "per_call_timeout_seconds": 35.0,
+      "query_samples": 1,
+      "require_rebuilt": true,
+      "rows": 1024,
+      "writers": 4
+    },
+    "initial_ingest_order": [
+      "varve",
+      "timescale"
+    ],
+    "ingest": {
+      "timescale": {
+        "rows": 1024,
+        "rows_per_second": 699.8239655991945,
+        "seconds": 1.4632251113653183,
+        "ack": {
+          "max_ms": 39.02927413582802,
+          "p50_ms": 4.31610643863678,
+          "p95_ms": 13.385575264692307,
+          "p99_ms": 27.8891921043396,
+          "samples": 1024
+        },
+        "fresh_seconds": 1.5498761348426342,
+        "failed_or_ambiguous_rows": 0,
+        "never_submitted_rows": 0
+      },
+      "varve": {
+        "rows": 1024,
+        "rows_per_second": 291.8185457828635,
+        "seconds": 3.5090298913419247,
+        "ack": {
+          "max_ms": 59.46675315499306,
+          "p50_ms": 10.879851877689362,
+          "p95_ms": 31.553827226161957,
+          "p99_ms": 50.18805339932442,
+          "samples": 1024
+        },
+        "fresh_seconds": 3.509833499789238,
+        "failed_or_ambiguous_rows": 0,
+        "never_submitted_rows": 0
+      }
+    },
+    "mixed": {
+      "state": "passed",
+      "clean": true,
+      "data_complete": true,
+      "schedule_met": true,
+      "offered_rows": 50,
+      "acknowledged_rows": 50,
+      "dropped_rows": 0,
+      "pending_rows": 0,
+      "failed_or_ambiguous_rows": 0
+    },
+    "queries": {
+      "columnar_checkpointed": {
+        "timescale": {
+          "cross_series_group": {
+            "observed_ms": 21.390285342931747,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 11.654026806354523,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 18.4827521443367,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 19.761018455028534,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 19.206348806619644,
+            "samples": 1
+          }
+        },
+        "varve": {
+          "cross_series_group": {
+            "observed_ms": 70.10441645979881,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 61.08995899558067,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 74.61876794695854,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 67.34565272927284,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 88.87303993105888,
+            "samples": 1
+          }
+        }
+      },
+      "default_tiers": {
+        "timescale": {
+          "cross_series_group": {
+            "observed_ms": 3.2602138817310333,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 3.2608546316623688,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 2.6724040508270264,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 2.9500052332878113,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 4.47285920381546,
+            "samples": 1
+          }
+        },
+        "varve": {
+          "cross_series_group": {
+            "observed_ms": 134.12318006157875,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 98.96069765090942,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 73.652233928442,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 98.658487200737,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 102.116908878088,
+            "samples": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "run_id": "io13_b128_01",
+    "state": "passed",
+    "configuration": {
+      "automatic_retries_after_ambiguous_ack": 0,
+      "batch": 128,
+      "drain_seconds": 60,
+      "mixed_read_interval_seconds": 0.5,
+      "mixed_readers": 1,
+      "mixed_seconds": 2,
+      "offered_rate_rows_per_second": 128.0,
+      "outer_wall_clock_seconds": 120,
+      "per_call_timeout_seconds": 35.0,
+      "query_samples": 1,
+      "require_rebuilt": true,
+      "rows": 8192,
+      "writers": 4
+    },
+    "initial_ingest_order": [
+      "varve",
+      "timescale"
+    ],
+    "ingest": {
+      "timescale": {
+        "rows": 8192,
+        "rows_per_second": 21520.931625425208,
+        "seconds": 0.38065266609191895,
+        "ack": {
+          "max_ms": 54.92262914776802,
+          "p50_ms": 20.35944163799286,
+          "p95_ms": 40.43816030025482,
+          "p99_ms": 54.92262914776802,
+          "samples": 64
+        },
+        "fresh_seconds": 0.5757939592003822,
+        "failed_or_ambiguous_rows": 0,
+        "never_submitted_rows": 0
+      },
+      "varve": {
+        "rows": 8192,
+        "rows_per_second": 34285.86197833537,
+        "seconds": 0.238932304084301,
+        "ack": {
+          "max_ms": 28.512634336948395,
+          "p50_ms": 11.84491440653801,
+          "p95_ms": 24.767260998487473,
+          "p99_ms": 28.512634336948395,
+          "samples": 64
+        },
+        "fresh_seconds": 0.2390352040529251,
+        "failed_or_ambiguous_rows": 0,
+        "never_submitted_rows": 0
+      }
+    },
+    "mixed": {
+      "state": "passed",
+      "clean": true,
+      "data_complete": true,
+      "schedule_met": true,
+      "offered_rows": 256,
+      "acknowledged_rows": 256,
+      "dropped_rows": 0,
+      "pending_rows": 0,
+      "failed_or_ambiguous_rows": 0
+    },
+    "queries": {
+      "columnar_checkpointed": {
+        "timescale": {
+          "cross_series_group": {
+            "observed_ms": 11.27324253320694,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 9.866811335086823,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 4.806216806173325,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 3.376379609107971,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 4.6668946743011475,
+            "samples": 1
+          }
+        },
+        "varve": {
+          "cross_series_group": {
+            "observed_ms": 67.33814626932144,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 73.36745411157608,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 92.73401275277138,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 70.73386386036873,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 100.61954706907272,
+            "samples": 1
+          }
+        }
+      },
+      "default_tiers": {
+        "timescale": {
+          "cross_series_group": {
+            "observed_ms": 5.243964493274689,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 3.095325082540512,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 1.9343718886375427,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 5.993697792291641,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 2.251129597425461,
+            "samples": 1
+          }
+        },
+        "varve": {
+          "cross_series_group": {
+            "observed_ms": 88.88234198093414,
+            "samples": 1
+          },
+          "full_count_sum": {
+            "observed_ms": 62.06757575273514,
+            "samples": 1
+          },
+          "minute_continuous_aggregate": {
+            "observed_ms": 98.77407923340797,
+            "samples": 1
+          },
+          "recent_series_time_filter": {
+            "observed_ms": 60.48554182052612,
+            "samples": 1
+          },
+          "window_top_five": {
+            "observed_ms": 80.4814100265503,
+            "samples": 1
+          }
+        }
+      }
+    }
+  }
+]

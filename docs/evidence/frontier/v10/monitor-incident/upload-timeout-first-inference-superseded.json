@@ -1,0 +1,9 @@
+{
+  "deployment_id": "760674f1-f2a5-4df8-8aa5-b7422be8061b",
+  "scope": "varve-benchmark only",
+  "upload_receipt_preserved": true,
+  "local_command_timed_out": true,
+  "matching_local_upload_or_controller_processes_after_timeout": 0,
+  "upload_retried": false,
+  "explanation": "The CLI wrote an accepted deployment receipt but did not return before the 180-second command/185-second executor deadline. The controller step was not reached. Query this exact deployment; command timeout is not a deployment failure verdict."
+}

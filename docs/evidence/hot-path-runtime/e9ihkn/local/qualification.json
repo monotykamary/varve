@@ -1,0 +1,146 @@
+{
+  "passed": true,
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "runtime_baseline_source_sha256": "f2b18507d7f83b9680c9ceba90e47c091e62563e501ee51594667dfdf5b41967",
+  "test_only_refinement": {
+    "file": "src/engine.rs",
+    "test": "competing_same_sequence_root_stales_frozen_candidate_without_control_change",
+    "focused_passes": 1,
+    "production_and_all_other_files_byte_identical": true
+  },
+  "rust_tests": 268,
+  "targets": [
+    {
+      "target": "unittests src/lib.rs",
+      "binary": "target/debug/deps/varve-3154452b3c441921",
+      "passed": 152,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/engine.rs",
+      "binary": "target/debug/deps/engine-965c91186ba45f7d",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/group_commit.rs",
+      "binary": "target/debug/deps/group_commit-c155902d10638ee1",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/ingest.rs",
+      "binary": "target/debug/deps/ingest-8060e681a952600f",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/prefix_admission.rs",
+      "binary": "target/debug/deps/prefix_admission-cceaec2d0fa694db",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/prefix_checkpoint.rs",
+      "binary": "target/debug/deps/prefix_checkpoint-7ae6db2abd1c62e1",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/prepared_publication.rs",
+      "binary": "target/debug/deps/prepared_publication-15a1c16b63782541",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/publication.rs",
+      "binary": "target/debug/deps/publication-c6f6ecc5ac496c44",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/query_catalog_exposure.rs",
+      "binary": "target/debug/deps/query_catalog_exposure-0af9c932bd823fe0",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/query_residency.rs",
+      "binary": "target/debug/deps/query_residency-4af0e59d364929fd",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/query_typed_inputs.rs",
+      "binary": "target/debug/deps/query_typed_inputs-41b0479e2d9c9131",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/query_workers.rs",
+      "binary": "target/debug/deps/query_workers-a73cdacbae5445aa",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/residency.rs",
+      "binary": "target/debug/deps/residency-2c24137f906ebc1e",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    },
+    {
+      "target": "tests/service.rs",
+      "binary": "target/debug/deps/service-cbef0444ecc1ef58",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "ok": true
+    }
+  ],
+  "default_binary_smokes": 2,
+  "driver_tests": 21,
+  "default_binary_sha256": "d4982ca5b897e0a80e62e0167b30e9495037964c2888b9ab153d11ac205fd9f4",
+  "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01) (Homebrew)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: aarch64-apple-darwin\nrelease: 1.98.1\nLLVM version: 22.1.8",
+  "evidence": {
+    "runtime-final.log": "b9cc93e036dbf3f0b9e0921bc3a12925a3c736710a782dab7f92500f39627890",
+    "clippy-all.log": "a77cab1bcf47a25298e19a4692694269e3862652afd7cd383a7850fe64ece8c2",
+    "clippy-default.log": "4155a466d84d30c87fad4d419361cb5f186908494274ef1786c1bd5c0972dda7",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "default-build.log": "f5b7c92b0ec57d028b4166c38133749c02a2d78f0f17eb9dc03e4e558dcf1385",
+    "default-http.log": "273c1b53c3e4f71fab339340dc8bf89c3916907ff511a44aa5760c2e07bf814a",
+    "default-restart.log": "08eb885df7a761e667a2ff168491f9b49845a10d0ba9e517746cd08e4711cb8a",
+    "driver-tests-qualified.log": "f095305824944ff6b20011431171a639bd5bbb369abac10f980ee7dd916f2f78",
+    "source-gate.log": "1228b30c65e42c32bd0c624fb4e9af3dc68a37d1c78c47bca00628cdca7eabd7",
+    "WRITE_FIX_REVIEW.md": "e2715ae1ff98a4407243b359c74a6086baa1dc9bf4ac06b13f2999ce93dff6c2",
+    "ROOT_WITNESS_REVIEW.md": "3607b595e49a5b9ed190ca56da74e0a2b61ee80bbe3086ec4e79550cb41d1d1a",
+    "root-only-final.log": "d418f748ad36adc8aa1e4a40ae011a58be12a0ca0984b859f043db1403a6340e",
+    "clippy-root-test.log": "4175e07e7788288405a7d88957f4049e7ae4cdc585be96444ff4f7fd238c87f2"
+  },
+  "claim": "Selected local runtime/fault correctness, not performance, power-cut, distributed or production certification"
+}

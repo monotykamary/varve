@@ -1,0 +1,701 @@
+{
+  "status": "failed",
+  "workload": {
+    "rows": 102400,
+    "batch": 1000,
+    "writers": 4,
+    "rate": 15000.0,
+    "seconds": 30.0,
+    "read_interval": 0.1,
+    "read_mode": "fresh",
+    "trace_capacity": 0
+  },
+  "claims": {
+    "timescale_win": false,
+    "cloud_qualification": false,
+    "power_loss": false
+  },
+  "identity": {
+    "binary": "/private/tmp/varve-frontier-gate.JsZmOV/baseline-varve",
+    "binary_sha256": "d5fe770ea8ac41d289a62ac6032145bf0b65a670123cc6a0dc8714886918fd98",
+    "profile_sha256": "23ae83270630d881127817f0a39547cd327144635a99597c476374a6401b675c",
+    "profile": {
+      "hot_max_bytes": 134217728,
+      "metadata_max_bytes": 67108864,
+      "hot_max_rows": 100000,
+      "wal_max_bytes": 268435456,
+      "max_disk_bytes": 4294967296,
+      "decoded_cache_bytes": 33554432,
+      "disk_cache_bytes": 268435456,
+      "max_batch_rows": 10000,
+      "max_batch_bytes": 4194304,
+      "max_idempotency_keys": 100000,
+      "max_rollup_groups": 200000,
+      "segment_rows": 65536,
+      "flush_interval_us": 5000000,
+      "ship_interval_us": 2000000,
+      "maintenance_interval_ms": 1000,
+      "query_executable": "/Users/monotykamary/VCS/working-remote/open-source/varve/.tools/duckdb",
+      "query_memory_mb": 256,
+      "query_threads": 2,
+      "query_workers": 2,
+      "query_timeout_ms": 30000,
+      "query_max_output_bytes": 16777216,
+      "derived_pages": true,
+      "derived_max_bytes": 536870912,
+      "query_retained_inputs": true,
+      "checkpoint_frozen_prefix": true
+    },
+    "duckdb_sha256": "f2eaf202ecec36546039076a19373e7b4b37bc3d535f11731794f53a77686205",
+    "probe_sha256": "1e0eadd5481eee113170ef277dc6bf010b085fc4dc658e1ab1406e239ab252df",
+    "core_sha256": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+    "benchmark_sha256": "23e05928cf287a4f8b59433f2079cf63610a256dabbb75138a2ea5081442df23",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.14",
+    "resource_scope": "local host; no cgroup or dedicated-CPU parity claim"
+  },
+  "server_pid": 76687,
+  "database_id": "18a24aed-a421-4842-81cc-c3f0ba56d524",
+  "base_us": 1789616820000000,
+  "preload": {
+    "rows": 102400,
+    "seconds": 8.055460624978878,
+    "rows_per_s": 12711.873940823652,
+    "receipts": [
+      {
+        "sequence": 3,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 5,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 6,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 7,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 8,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 9,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 10,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 11,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 13,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 14,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 14,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 15,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 15,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 16,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 16,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 17,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 17,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 18,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 19,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 20,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 21,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 21,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 21,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 22,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 23,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 24,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 25,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 26,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 27,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 28,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 28,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 29,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 30,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 32,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 34,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 35,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 35,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 36,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 36,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 38,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 38,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 39,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 40,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 41,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 42,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 42,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 43,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 43,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 44,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 44,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 45,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 45,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 45,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 45,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 47,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 47,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 48,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 48,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 48,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 48,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 49,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 49,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 49,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 49,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 51,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 52,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 53,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 54,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 54,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 55,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 56,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 57,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 57,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 58,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 59,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 60,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 61,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 62,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 63,
+        "rows": 400,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 63,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      }
+    ]
+  },
+  "partial_load": {
+    "offered": 294000,
+    "acknowledged": 284000,
+    "dropped": 9000,
+    "failed": 1000,
+    "pending": 0
+  },
+  "failed_read": {
+    "kind": "read",
+    "mode": "fresh",
+    "ms": 1504.8931669443846,
+    "failed": "RuntimeError: HTTP 400: {\"error\":\"DuckDB failed (exit status: 1): Out of Memory Error: failed to offload data block of size 256.0 KiB (0 bytes/0 bytes used).\\nThis limit was set by the 'max_temp_directory_size' setting.\\nBy default, this setting utilizes the available disk space on the drive where the 'temp_directory' is l"
+  },
+  "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception) | RuntimeError: HTTP 400: {\"error\":\"DuckDB failed (exit status: 1): Out of Memory Error: failed to offload data block of size 256.0 KiB (0 bytes/0 bytes used).\\nThis limit was set by the 'max_temp_directory_size' setting.\\nBy default, this setting utilizes the available disk space on the drive where the 'temp_directory' is l",
+  "owned_server_reaped": true,
+  "server_returncode": -9
+}

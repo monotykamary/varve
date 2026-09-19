@@ -2,10 +2,15 @@
 //!
 //! Durations are wall time, include failed attempts, and overlap for nested phases.
 //! Concurrent snapshots are approximate; these counters are not transaction state.
+#[path = "phase_trace.rs"]
+mod capture;
+pub use capture::PhaseTrace;
+
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{LockResult, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 /// Inclusive histogram bounds; the final bucket also contains saturated durations.
@@ -43,10 +48,30 @@ pub enum Phase {
     CompactionPublish,
     DiskAccount,
     RemoteIo,
+    CheckpointCapture,
+    CheckpointLocked,
+    RootPrepare,
+    ManifestCommit,
+    DiskLockWait,
+    DiskLockHold,
+    WalDiskLockWait,
+    GroupPrepare,
+    DerivedVerify,
+    DerivedPublish,
+    RawVerify,
+    RawPublish,
+    AppendAccounting,
+    CommitLockWait,
+    CommitDetach,
+    CommitInstall,
+    AdmissionCheckpoint,
+    CheckpointReclaim,
+    WalFileSync,
+    WalDirectorySync,
 }
 
 impl Phase {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 38] = [
         Self::StateLockWait,
         Self::StateLockHold,
         Self::WritePrepare,
@@ -65,6 +90,26 @@ impl Phase {
         Self::CompactionPublish,
         Self::DiskAccount,
         Self::RemoteIo,
+        Self::CheckpointCapture,
+        Self::CheckpointLocked,
+        Self::RootPrepare,
+        Self::ManifestCommit,
+        Self::DiskLockWait,
+        Self::DiskLockHold,
+        Self::WalDiskLockWait,
+        Self::GroupPrepare,
+        Self::DerivedVerify,
+        Self::DerivedPublish,
+        Self::RawVerify,
+        Self::RawPublish,
+        Self::AppendAccounting,
+        Self::CommitLockWait,
+        Self::CommitDetach,
+        Self::CommitInstall,
+        Self::AdmissionCheckpoint,
+        Self::CheckpointReclaim,
+        Self::WalFileSync,
+        Self::WalDirectorySync,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -87,6 +132,26 @@ impl Phase {
             Self::CompactionPublish => "compaction_publish",
             Self::DiskAccount => "disk_account",
             Self::RemoteIo => "remote_io",
+            Self::CheckpointCapture => "checkpoint_capture",
+            Self::CheckpointLocked => "checkpoint_locked",
+            Self::RootPrepare => "root_prepare",
+            Self::ManifestCommit => "manifest_commit",
+            Self::DiskLockWait => "disk_lock_wait",
+            Self::DiskLockHold => "disk_lock_hold",
+            Self::WalDiskLockWait => "wal_disk_lock_wait",
+            Self::GroupPrepare => "group_prepare",
+            Self::DerivedVerify => "derived_verify",
+            Self::DerivedPublish => "derived_publish",
+            Self::RawVerify => "raw_verify",
+            Self::RawPublish => "raw_publish",
+            Self::AppendAccounting => "append_accounting",
+            Self::CommitLockWait => "commit_lock_wait",
+            Self::CommitDetach => "commit_detach",
+            Self::CommitInstall => "commit_install",
+            Self::AdmissionCheckpoint => "admission_checkpoint",
+            Self::CheckpointReclaim => "checkpoint_reclaim",
+            Self::WalFileSync => "wal_file_sync",
+            Self::WalDirectorySync => "wal_directory_sync",
         }
     }
 }
@@ -129,6 +194,7 @@ impl Default for Metrics {
 impl Metrics {
     pub fn observe(&self, phase: Phase, duration: Duration) {
         let ns = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+        capture::observe(self, phase, ns);
         let counter = &self.counters[phase as usize];
         saturating_add(&counter.total_ns, ns);
         counter.max_ns.fetch_max(ns, Ordering::Relaxed);
@@ -136,11 +202,38 @@ impl Metrics {
         saturating_add(&counter.buckets[bucket], 1);
     }
 
+    pub(crate) fn capture<R>(&self, run: impl FnOnce() -> R) -> (R, Vec<PhaseTrace>) {
+        capture::capture(self, run)
+    }
+
     pub fn timer(&self, phase: Phase) -> PhaseTimer<'_> {
         PhaseTimer {
             metrics: self,
             phase,
             start: Instant::now(),
+        }
+    }
+
+    /// Measures the existing disk gate without changing its scope or poison policy.
+    /// A poisoned lock still returns ownership in its error, just like Mutex::lock;
+    /// that acquired guard is measured until the caller drops or recovers it.
+    pub(crate) fn lock_disk<'a>(
+        &'a self,
+        mutex: &'a Mutex<()>,
+    ) -> LockResult<MeasuredDiskGuard<'a>> {
+        let wait = self.timer(Phase::DiskLockWait);
+        let acquired = mutex.lock();
+        drop(wait);
+        let hold = self.timer(Phase::DiskLockHold);
+        match acquired {
+            Ok(guard) => Ok(MeasuredDiskGuard {
+                _hold: hold,
+                _guard: guard,
+            }),
+            Err(poison) => Err(PoisonError::new(MeasuredDiskGuard {
+                _hold: hold,
+                _guard: poison.into_inner(),
+            })),
         }
     }
 
@@ -180,6 +273,14 @@ impl Drop for PhaseTimer<'_> {
     fn drop(&mut self) {
         self.metrics.observe(self.phase, self.start.elapsed());
     }
+}
+
+/// Keeps the underlying mutex locked for exactly the caller's guard lifetime.
+/// Field order records hold time before releasing the mutex, including on unwind.
+#[must_use = "keep the guard alive for the existing disk admission scope"]
+pub(crate) struct MeasuredDiskGuard<'a> {
+    _hold: PhaseTimer<'a>,
+    _guard: MutexGuard<'a, ()>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -286,6 +387,220 @@ mod tests {
         let names: std::collections::BTreeSet<_> =
             Phase::ALL.into_iter().map(Phase::as_str).collect();
         assert_eq!(names.len(), Phase::ALL.len());
+    }
+
+    #[test]
+    fn every_phase_is_registered_observed_and_exported_exactly_once() {
+        let metrics = Metrics::default();
+        for (index, phase) in Phase::ALL.into_iter().enumerate() {
+            assert_eq!(phase as usize, index);
+            metrics.observe(phase, Duration::from_nanos(index as u64 + 1));
+        }
+        let snapshot = metrics.snapshot();
+        let text = snapshot.prometheus();
+        assert_eq!(snapshot.phases.len(), Phase::ALL.len());
+        for (index, phase) in Phase::ALL.into_iter().enumerate() {
+            let sample = &snapshot.phases[phase.as_str()];
+            assert_eq!(sample.count, 1);
+            assert_eq!(sample.total_ns, index as u64 + 1);
+            assert_eq!(sample.max_ns, index as u64 + 1);
+            let line = format!(
+                "varve_phase_duration_seconds_count{{phase=\"{}\"}} 1\n",
+                phase.as_str()
+            );
+            assert_eq!(text.matches(&line).count(), 1);
+        }
+    }
+
+    #[test]
+    fn phase_indices_and_names_preserve_the_original_twenty_two() {
+        let expected = [
+            "state_lock_wait",
+            "state_lock_hold",
+            "write_prepare",
+            "wal_encode",
+            "wal_write",
+            "wal_sync",
+            "snapshot",
+            "query_build",
+            "query_wait",
+            "query_run",
+            "query_spawn",
+            "query_reset",
+            "checkpoint_prepare",
+            "checkpoint_publish",
+            "compaction_prepare",
+            "compaction_publish",
+            "disk_account",
+            "remote_io",
+            "checkpoint_capture",
+            "checkpoint_locked",
+            "root_prepare",
+            "manifest_commit",
+            "disk_lock_wait",
+            "disk_lock_hold",
+            "wal_disk_lock_wait",
+            "group_prepare",
+            "derived_verify",
+            "derived_publish",
+            "raw_verify",
+            "raw_publish",
+            "append_accounting",
+            "commit_lock_wait",
+            "commit_detach",
+            "commit_install",
+            "admission_checkpoint",
+            "checkpoint_reclaim",
+            "wal_file_sync",
+            "wal_directory_sync",
+        ];
+        assert_eq!(Phase::ALL.len(), expected.len());
+        for (index, (phase, name)) in Phase::ALL.into_iter().zip(expected).enumerate() {
+            assert_eq!(phase as usize, index);
+            assert_eq!(phase.as_str(), name);
+        }
+    }
+
+    #[test]
+    fn appended_phase_timers_record_errors_and_unwinds_in_isolation() {
+        fn fail(metrics: &Metrics, phase: Phase) -> Result<(), ()> {
+            let _timer = metrics.timer(phase);
+            Err(())?;
+            Ok(())
+        }
+        let metrics = Metrics::default();
+        let other = Metrics::default();
+        for phase in Phase::ALL.into_iter().skip(22) {
+            assert!(fail(&metrics, phase).is_err());
+            assert!(
+                std::panic::catch_unwind(|| {
+                    let _timer = metrics.timer(phase);
+                    panic!("failed measured attempt");
+                })
+                .is_err()
+            );
+        }
+        for (index, phase) in Phase::ALL.into_iter().enumerate() {
+            assert_eq!(
+                metrics.snapshot().phases[phase.as_str()].count,
+                if index < 22 { 0 } else { 2 }
+            );
+            assert_eq!(other.snapshot().phases[phase.as_str()].count, 0);
+        }
+    }
+
+    #[test]
+    fn disk_guard_records_only_completed_scopes_and_releases_on_error() {
+        let metrics = Metrics::default();
+        let other = Metrics::default();
+        let mutex = Mutex::new(());
+        let guard = metrics
+            .lock_disk(&mutex)
+            .unwrap_or_else(|_| panic!("unexpected poison"));
+        assert!(matches!(
+            mutex.try_lock(),
+            Err(std::sync::TryLockError::WouldBlock)
+        ));
+        assert_eq!(metrics.snapshot().phases["disk_lock_wait"].count, 1);
+        assert_eq!(metrics.snapshot().phases["disk_lock_hold"].count, 0);
+        drop(guard);
+        assert!(mutex.try_lock().is_ok());
+        assert_eq!(metrics.snapshot().phases["disk_lock_hold"].count, 1);
+
+        let attempt = || -> Result<(), ()> {
+            let _guard = metrics.lock_disk(&mutex).map_err(|_| ())?;
+            Err(())
+        };
+        assert!(attempt().is_err());
+        assert!(mutex.try_lock().is_ok());
+        for phase in Phase::ALL {
+            let expected =
+                u64::from(matches!(phase, Phase::DiskLockWait | Phase::DiskLockHold)) * 2;
+            assert_eq!(metrics.snapshot().phases[phase.as_str()].count, expected);
+            assert_eq!(other.snapshot().phases[phase.as_str()].count, 0);
+        }
+    }
+
+    #[test]
+    fn disk_guard_unwinds_and_preserves_poison_ownership() {
+        let metrics = Metrics::default();
+        let mutex = Mutex::new(());
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _guard = metrics
+                    .lock_disk(&mutex)
+                    .unwrap_or_else(|_| panic!("unexpected poison"));
+                panic!("poison while holding disk");
+            })
+            .is_err()
+        );
+        assert!(mutex.is_poisoned());
+        assert_eq!(metrics.snapshot().phases["disk_lock_wait"].count, 1);
+        assert_eq!(metrics.snapshot().phases["disk_lock_hold"].count, 1);
+        let recovered = match metrics.lock_disk(&mutex) {
+            Ok(_) => panic!("poison was swallowed"),
+            Err(poison) => poison.into_inner(),
+        };
+        assert!(matches!(
+            mutex.try_lock(),
+            Err(std::sync::TryLockError::WouldBlock)
+        ));
+        assert_eq!(metrics.snapshot().phases["disk_lock_wait"].count, 2);
+        assert_eq!(metrics.snapshot().phases["disk_lock_hold"].count, 1);
+        drop(recovered);
+        assert_eq!(metrics.snapshot().phases["disk_lock_hold"].count, 2);
+        assert!(mutex.is_poisoned());
+        // Engine's unchanged map_err rejects poison, dropping its acquired guard.
+        assert!(metrics.lock_disk(&mutex).map_err(|_| ()).is_err());
+        assert_eq!(metrics.snapshot().phases["disk_lock_wait"].count, 3);
+        assert_eq!(metrics.snapshot().phases["disk_lock_hold"].count, 3);
+        assert!(matches!(
+            mutex.try_lock(),
+            Err(std::sync::TryLockError::Poisoned(_))
+        ));
+    }
+
+    #[test]
+    fn disk_guard_contention_uses_barriers_not_elapsed_thresholds() {
+        use std::sync::{Barrier, TryLockError};
+        let metrics = Metrics::default();
+        let mutex = Mutex::new(());
+        let ready = Barrier::new(2);
+        let acquired = Barrier::new(2);
+        let release = Barrier::new(2);
+        let (blocked, before_release, second_held) = std::thread::scope(|scope| {
+            let first = metrics
+                .lock_disk(&mutex)
+                .unwrap_or_else(|_| panic!("unexpected poison"));
+            let worker = scope.spawn(|| {
+                let blocked = matches!(mutex.try_lock(), Err(TryLockError::WouldBlock));
+                ready.wait();
+                let second = metrics
+                    .lock_disk(&mutex)
+                    .unwrap_or_else(|_| panic!("unexpected poison"));
+                acquired.wait();
+                release.wait();
+                drop(second);
+                blocked
+            });
+            ready.wait();
+            // The second acquisition cannot finish until the first guard is dropped.
+            let before_release = metrics.snapshot();
+            drop(first);
+            acquired.wait();
+            let second_held = metrics.snapshot();
+            // Release and join before asserting, so a count regression cannot strand a barrier.
+            release.wait();
+            (worker.join().unwrap(), before_release, second_held)
+        });
+        assert!(blocked);
+        assert_eq!(before_release.phases["disk_lock_wait"].count, 1);
+        assert_eq!(before_release.phases["disk_lock_hold"].count, 0);
+        assert_eq!(second_held.phases["disk_lock_wait"].count, 2);
+        assert_eq!(second_held.phases["disk_lock_hold"].count, 1);
+        assert_eq!(metrics.snapshot().phases["disk_lock_wait"].count, 2);
+        assert_eq!(metrics.snapshot().phases["disk_lock_hold"].count, 2);
+        assert!(mutex.try_lock().is_ok());
     }
 
     #[test]

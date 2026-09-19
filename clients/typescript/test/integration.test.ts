@@ -50,7 +50,10 @@ test("runs the public client against an actual Varve server", { timeout: 30_000 
   const port = await unusedPort();
   const token = "integration-token-at-least-32-bytes";
   let stderr = "";
-  const child = spawn(binary, ["--data", join(directory, "data"), "serve", "--port", String(port)], {
+  const args = ["--data", join(directory, "data")];
+  if (process.env.VARVE_TEST_CONFIG) args.push("--config", process.env.VARVE_TEST_CONFIG);
+  args.push("serve", "--port", String(port));
+  const child = spawn(binary, args, {
     env: { ...process.env, VARVE_API_TOKEN: token },
     stdio: ["ignore", "ignore", "pipe"],
   });

@@ -1,0 +1,10 @@
+{
+  "at": "2026-09-16T23:56:59.704Z",
+  "source_digest": "9ed8187afb8b8f9846ee62e80a8ddf32b442c6ca188d1dd330d07728018dca81",
+  "baseline_report_sha256": "5cb8c998ea8646eaa77f916e2b4b7c0502e51fec9f229077b7e24d723ecd71bc",
+  "baseline_rerun": false,
+  "remaining_workload": "prefix002 stress",
+  "retained_database_directory": "prefix-2q0icf",
+  "intervening_restart": true,
+  "fresh_uninterrupted_trial": false
+}

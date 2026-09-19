@@ -1,0 +1,7 @@
+{
+  "role": "timescale",
+  "service": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+  "deployment": "d79c7afb-94cb-4591-b6ab-503fc8fd484b",
+  "image": "timescale/timescaledb:2.30.0-pg17@sha256:3113d12b78392c064aa7475caf7a52b447b29ddd4f9bfd23526733fcb03e3459",
+  "guarded_existing_pgdata": true
+}

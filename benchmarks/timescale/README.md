@@ -1,41 +1,74 @@
 # Varve / Timescale bounded comparison
 
-This directory is a synthetic capability benchmark, not a production certification or evidence that either database fits an unsupplied user workload. Provision isolated services in one Railway region: 2 CPU / 2 GB for each database and 2 CPU / 1 GB for this generator. TimescaleDB must come from an official Timescale image with the extension already installed. The runner never creates or drops the extension, changes system settings, deletes data, or operates outside its new per-run namespace.
+This is a synthetic single-node capability benchmark, not production certification or evidence for an unsupplied workload. Provision isolated services in one Railway region: 2 CPU / 2,000,000,000 bytes for each database and 2 CPU / 1,000,000,000 bytes for the driver. Use fresh volumes and restart policy `NEVER`. TimescaleDB must use the supplied official full image with the extension already installed. The runner never creates or drops extensions, changes system settings, deletes data, or leaves its unique per-run namespace.
 
-The image intentionally idles so both databases can become ready before execution. `/results` is created and owned by the unprivileged runtime user; it works as ephemeral writable storage without a third volume. Copy reports out before stopping or redeploying the driver. The same live driver can retain the report while only the two databases are restarted for the verification drill.
+Run from the already deployed driver after all services are ready:
 
 ```sh
-docker build -t varve-timescale-bench .
-# Railway SSH, after both databases are ready:
-python benchmark.py --run-id run001 --output /results/run001.json
-# After restarting both databases:
-python benchmark.py --verify-only /results/run001.json
+python benchmark.py \
+  --run-id run001 \
+  --output /results/run001.json \
+  --require-rebuilt \
+  --attestation '{"candidate_image":"...","candidate_binary":"...","config":"...","resources":"..."}'
 ```
 
-Runtime credentials are accepted **only** through:
-
-- `VARVE_URL`, `VARVE_API_TOKEN`
-- `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`
-
-Do not put credentials in arguments. Reports and progress events omit connection fields and redact credential values from errors. Varve uses one persistent `aiohttp` session. Timescale uses persistent psycopg 3 async connections and transactional `COPY` batches; a receipt row is committed in the same transaction so stable batch IDs deduplicate retries. The runner performs no automatic retry after an ambiguous acknowledgement.
-
-The baseline records the supplied official full/non-OSS TimescaleDB 2.30.0 / PostgreSQL 17 image digest `sha256:3113d12b78392c064aa7475caf7a52b447b29ddd4f9bfd23526733fcb03e3459` and the supplied Varve benchmark limits (10,000 maximum configured batch rows, 128 MiB hot, 64 MiB metadata, 256 MiB/query worker, two query threads, two workers, 30 seconds). Runtime preflight independently records actual database versions and requires `fsync`, `synchronous_commit`, and `full_page_writes` to be on. Timescale receives an idiomatic `(tenant, series, ts DESC) INCLUDE (value)` index and `ANALYZE`.
-
-Defaults are 250,000 initial rows, 1,000 rows/batch, 4 writers, 50 timed samples per query, a 60 second mixed phase at 5,000 offered rows/s, and a 1,200 second outer ceiling. Hard maxima are enforced by `--help`. Encoding/generation time is reported separately from acknowledgement latency. The mixed phase records intended-arrival queue delay, end-to-end latency, drops, failed/ambiguous batch rows, and offered/acknowledged rows. Queue drops produce an `overloaded` report and nonzero exit; unavailable/failed Timescale conversion produces `partial_unsupported` and nonzero exit rather than a fabricated columnar result.
-
-The deterministic quarter-valued dataset uses 1,024 series, four tenants, empty tags, and a minute-aligned base about 24 hours old. Python integer oracles independently verify count/sum/min/max, tenant groups, selected series groups, minute buckets, and a window query. Varve's 60-second built-in aggregate is eager. Timescale's native continuous aggregate is explicitly refreshed at every comparison barrier; ingest acknowledgement and durable-data-plus-fresh-aggregate times are reported separately.
-
-The first suite compares Varve's default automatic tiering with Timescale rowstore, and records the observed hot-row/segment counts. It is not a hot-only Varve claim: the configured thresholds and scheduler can flush rows before the first query. Freshness elapsed time includes each backend's immediate barrier (including Timescale ANALYZE), not a delayed sum that hides intervening work. The runner then explicitly checkpoints and compacts its Varve table and selects a Timescale columnstore/compression path by Timescale procedure introspection. It records the exact path/configuration. If conversion is unavailable or fails, the columnar suite is marked unsupported/failed rather than reported as a pass. No cache-dropping, S3, or local Parquet “cold disk” claim is made.
-
-Oracle preparation runs off the event loop with cooperative deadline/cancellation checks, so a large fixture cannot starve pooled-connection cleanup. Redacted exception-group causes and completed partial query samples are retained. A failed initial ingestion does not reconstruct every in-flight acknowledgement; distinguish observed stored rows from known acknowledgements. Mixed writes share a paired queue, while reads are closed-loop, so neither is an independent database-capacity or fixed-query-QPS SLA measurement.
-
-The 17 offline tests require the pinned runtime dependencies but make no network connections:
+After Main performs the explicit restart durability drill, run against the same retained volumes and source report:
 
 ```sh
+python benchmark.py \
+  --verify-only /results/run001.json \
+  --output /results/run001.verify.json \
+  --require-rebuilt \
+  --attestation '{"before_after_process_identity":"..."}'
+```
+
+`--attestation` accepts a JSON object of at most 64 KiB. It is stored verbatim as **externally supplied, unverified metadata** and is never described as runtime proof. Main owns image, binary, source/config, resource, platform CPU/memory/disk, and before/after process-identity attestations. Timestamped `/v1/status`, `/metrics`, and `pg_stat_database` snapshots plus phase durations are included so Main can join that evidence; the driver does not claim to have measured remote cgroups.
+
+Runtime credentials are accepted only through `VARVE_URL`, `VARVE_API_TOKEN`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, and `PGDATABASE`. Reports and progress events omit connection fields and redact credential values from failures. Varve uses one persistent `aiohttp` session. Timescale uses persistent psycopg 3 async connections: one atomic autocommit statement for a single event plus its receipt, and transactional `COPY` for multi-row batches.
+
+## Strict contracts
+
+With `--require-rebuilt`, preflight reads actual Varve `/v1/status` and requires the persisted `segmented_journal` marker plus exact native DuckDB identity: version `v2.0.0-alpha41533`, Linux library SHA-256 `69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d`, and `duckdb_v2.h` SHA-256 `62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544`. Actual status is retained even when the gate fails. Timescale preflight independently records versions, database identity, and requires `fsync`, `synchronous_commit`, and `full_page_writes` to be on.
+
+Every initial and mixed Varve receipt is checked for exact row count, `duplicate=false`, `durability=local_fsync`, and a positive integer sequence. Normal writes are never retried after an ambiguous acknowledgement. The Timescale-owned receipt relation stores row count and a canonical SHA-256 of the ordered logical payload. For one row, a CTE inserts its receipt and event atomically in one autocommit statement; duplicate-only reads verify the existing immutable receipt digest. Multi-row receipt insertion and `COPY` share one explicit transaction with a locked duplicate check. Both paths reject conflicting payloads and avoid inserting duplicate events.
+
+Before final verification, both backends receive explicit identical and conflicting retries of the same initial stable ID. Identical retries must report duplicate, conflicting retries must be rejected, and raw fingerprints must remain unchanged. Fingerprints contain count/sum/extrema, exact microsecond first/last moments, and persistent database identity. `--verify-only` requires the source fingerprint and identities after restart, repeats the identical retry on both backends, and again requires unchanged fingerprints.
+
+## Supplemental exact verification
+
+Run the shipped read-only verifier before and after an explicit restart, using distinct output files:
+
+```sh
+python verify_exact.py \
+  --report /results/run001.json \
+  --output /results/run001.exact-before.json \
+  --max-seconds 600
+```
+
+It compares every deterministic raw identity, quarter value, empty tag map and multiplicity, plus every named minute count/sum/min/max group, using sequential bounded pages. JSON text and decoded-object tags must represent the same empty map; malformed or nonempty values fail. It checks database identities and frozen driver hashes, performs no writes or refreshes, and refuses incomplete conservation or existing output paths. Keep the original driver dependencies with the report when source changes. It can diagnose data-complete `overloaded` reports but never promotes their performance verdict. First/last/OHLC equal-timestamp tie equivalence is explicitly excluded.
+
+## Workload and boundedness
+
+The frozen `config/railway-rebuild-benchmark.json` profile remains external to this harness: 128 MiB hot, 64 MiB metadata, 256 MB/query worker (DuckDB units), two query threads/workers, 10,000 rows and 4 MiB per batch, and 200,000 idempotency keys. The harness does not modify it. CLI bounds additionally cap initial plus intended mixed rows at 1,000,000 and intended request IDs at 200,000.
+
+Defaults are 250,000 initial rows, 1,000 rows/batch, four writers, 50 query samples, and a finite 60-second mixed trace at 5,000 intended rows/s. Initial ingest order is hash-counterbalanced; query backend order is recorded and reversed to counterbalance it. Query generation/encoding is reported separately from acknowledgement latency.
+
+Mixed writes use a bounded lossless cursor and backpressure, never queue-full shedding. The complete intended trace remains the denominator through drain. Reports conserve paired acknowledgements, per-backend observed acknowledgements, failed/ambiguous rows, pending rows, never-submitted rows, queue peaks, original intended-arrival latency, and drain time. A missed scheduling gate is `overloaded` with nonzero exit even if the drain eventually stores every row.
+
+Mixed reads have their own finite intended clock, bounded queue, and workers. Their end-to-end arrival latency is distinct from backend service latency; closed-loop samples are not substituted. `--mixed-read-interval`, `--mixed-readers`, and `--drain-seconds` are bounded. Short-run p50/p95/p99 values are observational pilot summaries, not p99 qualification.
+
+The deterministic quarter-valued dataset uses 1,024 series, four tenants, empty tags, and a minute-aligned base about 24 hours old. Independent Python integer oracles verify count/sum/min/max, tenant groups, selected series groups, minute buckets, and a deterministic window. Varve's aggregate is eager. Timescale's continuous aggregate is explicitly refreshed at comparison barriers. Conversion unavailability/failure is non-passing rather than fabricated support. No cache-dropping, S3, distributed, high-availability, or power-loss claim is made.
+
+Failed or cancelled initial, query, and mixed phases retain completed diagnostic samples, bounded error descriptions, and conserved pending/ambiguous work; they never become passes. Synthetic data is retained. Copy reports before stopping services, and do not delete relations or volumes without owner authorization.
+
+## Offline validation
+
+The offline tests require the pinned Python dependencies but make no network connections:
+
+```sh
+cd benchmarks/timescale
 python -m unittest discover -s tests -v
-python -m py_compile core.py benchmark.py
+python -m py_compile core.py benchmark.py verify_exact.py tests/test_core.py tests/test_runner.py tests/test_exact.py
 ```
 
-Synthetic data is retained. After copying reports, stop only the owned deployments; retain volumes unless their owner authorizes deletion. Retained volumes can still incur storage charges. Do not teach this runner to drop relations.
-
-The completed Railway run, retained failures and recovery evidence are documented in [TIMESCALE_BENCHMARK.md](../../docs/TIMESCALE_BENCHMARK.md).
+Main runs executable validation remotely. The completed Railway comparison history is documented in [TIMESCALE_BENCHMARK.md](../../docs/TIMESCALE_BENCHMARK.md).

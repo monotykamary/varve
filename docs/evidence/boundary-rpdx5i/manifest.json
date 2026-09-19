@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "claim_boundary": "Two old-source cloud pilots, subsequent local-only query-setup fix. No overall Timescale win, sustained qualification, live-S3 or power-loss claim.",
+  "cloud_source_digest": "c064a7f0b0f35309501a1356564469f33f4c21efce653c354145f95be80f1d60",
+  "cloud_report_hashes": [
+    {
+      "path": "p1-report.json",
+      "bytes": 75438,
+      "sha256": "2c53ac8b90ff3bfbf81d321894dfc3b9c2f9da97f7d40635f12f7abd057cea9a"
+    },
+    {
+      "path": "p2-report.json",
+      "bytes": 75469,
+      "sha256": "cc03378fb3b32916fbc4a4c72800cb7ad08d6ee548bcf28da9c9910a8ccd8c6d"
+    }
+  ],
+  "local_order": [
+    "before-1",
+    "after-1",
+    "after-2",
+    "before-2"
+  ],
+  "local_args": [
+    "--retained-inputs",
+    "--rows",
+    "1024",
+    "--iterations",
+    "20",
+    "--duckdb",
+    ".tools/duckdb"
+  ],
+  "binaries": {
+    "before": {
+      "sha256": "440188a4fb9dafe8e3c14e00e4ee40c892a0396b491586e0093c4e3bd118a2e1",
+      "profile": "cargo build --offline --locked --release --example query_readiness_probe"
+    },
+    "after": {
+      "sha256": "2910c37e6271507299608caab27b68fb85cb0227de9e6b5cef5142f01b9ffc40",
+      "profile": "cargo build --offline --locked --release --example query_readiness_probe"
+    }
+  },
+  "files": [
+    {
+      "path": "p1-report.json",
+      "bytes": 75438,
+      "sha256": "2c53ac8b90ff3bfbf81d321894dfc3b9c2f9da97f7d40635f12f7abd057cea9a"
+    },
+    {
+      "path": "p1-benchmark.log",
+      "bytes": 891,
+      "sha256": "4d909c4a8317a079a2a6704b82691b45da4be3fa515c0f3890fb5dc5cd20666a"
+    },
+    {
+      "path": "p1-outcome.json",
+      "bytes": 111,
+      "sha256": "3a9c519dc39a616cbf552a4a9b91df7fe84a54a49af1998021cb8a9d2bf19152"
+    },
+    {
+      "path": "p1-postload.json",
+      "bytes": 38282,
+      "sha256": "f9f585256281a6c02c1a657e211a7ec709034e9b90b18769cc36d1d7a2d4bb79"
+    },
+    {
+      "path": "p2-report.json",
+      "bytes": 75469,
+      "sha256": "cc03378fb3b32916fbc4a4c72800cb7ad08d6ee548bcf28da9c9910a8ccd8c6d"
+    },
+    {
+      "path": "p2-benchmark.log",
+      "bytes": 891,
+      "sha256": "ba72a7af66ef2b9196552edb744fef3b24c54fd401f110afff4125b81dfab25d"
+    },
+    {
+      "path": "p2-outcome.json",
+      "bytes": 112,
+      "sha256": "4e6bad370d25cf1e545bb2747eecbf3dc0fe9762ba4e8e6d7a53b716b2200e19"
+    },
+    {
+      "path": "p2-postload.json",
+      "bytes": 38248,
+      "sha256": "26cd9bc7f43e80278331d2def8c53a57ab70f2eb4db3cbd0af33cf746486aeb3"
+    },
+    {
+      "path": "resident-hit-before-1.json",
+      "bytes": 14908,
+      "sha256": "dfaa6c2eb69d6bf7c7a30169d7823a6c62da5f62ba5101c39df6bfdaedcb48e5"
+    },
+    {
+      "path": "resident-hit-after-1.json",
+      "bytes": 14584,
+      "sha256": "ed836554c074b669d544b837dafd19ea1a6bc59879831f54e22ddfd7da0b9a7a"
+    },
+    {
+      "path": "resident-hit-after-2.json",
+      "bytes": 14703,
+      "sha256": "df30016492cc461e02319a8f83c4cdfbd36add5881b556ee1cb898546d9b9bf8"
+    },
+    {
+      "path": "resident-hit-before-2.json",
+      "bytes": 14879,
+      "sha256": "521ce8f408a2966a0d717db63a61721655376c97afc779ce9a76e53e26a0d4f4"
+    },
+    {
+      "path": "resident-hit-workspace.log",
+      "bytes": 48149,
+      "sha256": "1c74ea25b714c7734c74b866f3467b8a0932c3e83dc55418d68a57f3ebb21776"
+    },
+    {
+      "path": "resident-hit-tests.log",
+      "bytes": 4616,
+      "sha256": "a2d0d65520eb74ed6b06b09a6250dd906764878bb32b4ea6c0c39b0994b64b13"
+    },
+    {
+      "path": "resident-hit-integration.log",
+      "bytes": 4645,
+      "sha256": "b3e5e9a92f3cd5e624e1c0a71eacb94722e6e577fac4bbf95b80e204ed2540b8"
+    },
+    {
+      "path": "resident-hit-clippy-fault.log",
+      "bytes": 154,
+      "sha256": "d84b1e4dcffc39202e20ff6f02f2cc05c2940efe19ec3b1d6aa4492933aba59e"
+    },
+    {
+      "path": "resident-hit-clippy-default.log",
+      "bytes": 154,
+      "sha256": "687e4fbb12f2a0a15724718f72e60f952e5cf078e1b73c0c40da3bdce558b7e5"
+    },
+    {
+      "path": "resident-hit-probe-admission.md",
+      "bytes": 725,
+      "sha256": "3d06707ecdc3598c675ce437f7496040f2948b8e34a21d46fabe6eb3a05c5fd2"
+    },
+    {
+      "path": "cleanup-varve.json",
+      "bytes": 696,
+      "sha256": "9298950d4f9fc91a8cb89b2434fc0e053887f72d064bc1bb7773cf1c4e0a6293"
+    },
+    {
+      "path": "cleanup-timescale.json",
+      "bytes": 700,
+      "sha256": "9c05dd9653e118dd8a90ce8715ef6bf551fd697fd59662e5a2fee8c1f3d7c0ea"
+    },
+    {
+      "path": "cleanup-driver.json",
+      "bytes": 697,
+      "sha256": "3a4a61f73bee52551fe217763c97bac244ae2ea4878e51e0e1151e5974ec0cf7"
+    },
+    {
+      "path": "local-inputs.json",
+      "sha256": "2ec1aa8cbdf5c8bfb0a7af76ccc448a1bf4839fa7ce42c9453e531dcd9b2eb59"
+    }
+  ]
+}

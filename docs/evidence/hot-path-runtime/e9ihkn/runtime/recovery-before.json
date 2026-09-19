@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "expected": {
+    "n": "550000",
+    "ts_sum": "984266656142921261256",
+    "ts_square_sum": "1761419727990492667899370724547625448",
+    "ts_value_sum": "2235990904177562648338408"
+  },
+  "varve": {
+    "n": "550000",
+    "ts_square_sum": "1761419727990492667899370724547625448",
+    "ts_sum": "984266656142921261256",
+    "ts_value_sum": "2235990904177562648338408"
+  },
+  "timescale": {
+    "n": "550000",
+    "ts_sum": "984266656142921261256",
+    "ts_square_sum": "1761419727990492667899370724547625448",
+    "ts_value_sum": "2235990904177562648338408"
+  },
+  "status": {
+    "database_id": "114c0891-dfa4-4fa2-beb2-288c4132913b",
+    "sequence": 434,
+    "checkpoint_sequence": 434,
+    "remote_sequence": 0,
+    "unshipped_batches": 434,
+    "hot_rows": 0,
+    "hot_bytes": 0,
+    "wal_bytes": 0,
+    "disk_bytes": 11283321,
+    "metadata_bytes": 8750699,
+    "control_root_bytes": 9706,
+    "derived_encoded_bytes": 8792769,
+    "derived_resident_bytes": 36582836,
+    "derived_working_bytes": 0,
+    "decoded_cache_bytes": 0,
+    "disk_cache_bytes": 0,
+    "tables": 1,
+    "segments": 16,
+    "rollup_groups": 21504,
+    "idempotency_keys": 550,
+    "active_queries": 0,
+    "active_snapshots": 0,
+    "fenced": null,
+    "last_maintenance_error": null
+  },
+  "postgres": {
+    "started": "2026-09-17 15:54:49.777774+00:00",
+    "timescaledb_version": "2.30.0",
+    "fsync": "on",
+    "synchronous_commit": "on",
+    "full_page_writes": "on"
+  },
+  "receipts_per_backend": 550,
+  "driver_deployment": "87b79e52-90f2-4458-8686-1946298e4257"
+}

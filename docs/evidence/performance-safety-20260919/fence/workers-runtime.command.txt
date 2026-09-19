@@ -1,0 +1,1 @@
+cargo test --locked --offline -p varve-storage --lib --features fault-injection query::workers:: -- --test-threads=2 

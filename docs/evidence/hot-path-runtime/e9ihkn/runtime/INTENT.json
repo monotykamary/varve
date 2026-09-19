@@ -1,0 +1,50 @@
+{
+  "created_at": "2026-09-17T15:51:17.535Z",
+  "authority": "User: do all local runtime checks, then resume Railway. Main authorizes scoped activation after qualification.",
+  "project": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+  "environment": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+  "services": {
+    "varve": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+    "timescale": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+    "driver": "76fdbde0-4296-46a4-a6f2-4026432fd4a3"
+  },
+  "excluded": "64ddd834-6732-4582-bf4a-d86bbd0317fa",
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "stage_sha256": {
+    "varve": "810f7d4885fb9e0c554e61991778b95586de5979e551b34a9dd9e85f9550f825",
+    "driver": "fca136ceca22cad676db693c03eaa32c8cc93ab6a92c26adb23f8bf7974cf81c"
+  },
+  "profile_sha256": "5c208cf044f95ead1986bb13ab68cf7ded02bee4252ccdb58acbc7d733fb81b5",
+  "previous_profile_sha256": "215f100b13ba1ba3d012d39117fa1895ed7978657434057a93390c6f359aa089",
+  "timescale_image": "timescale/timescaledb:2.30.0-pg17@sha256:3113d12b78392c064aa7475caf7a52b447b29ddd4f9bfd23526733fcb03e3459",
+  "timescale_pgdata": "/var/lib/postgresql/data/accounting-s13-r1",
+  "storage": "fresh Varve roots; fresh Timescale schemas in retained initialized cluster; no pristine-cluster parity claim",
+  "trials": [
+    {
+      "run_id": "runtime_e9ihkn_p1",
+      "varve_first": true,
+      "varve_root": "/data/probes/runtime-e9ihkn-p1"
+    },
+    {
+      "run_id": "runtime_e9ihkn_p2",
+      "varve_first": true,
+      "varve_root": "/data/probes/runtime-e9ihkn-p2"
+    },
+    {
+      "run_id": "runtime_e9ihkn_p4",
+      "varve_first": false,
+      "varve_root": "/data/probes/runtime-e9ihkn-p4"
+    }
+  ],
+  "workload": {
+    "rows": 250000,
+    "batch": 1000,
+    "writers": 4,
+    "query_samples": 20,
+    "mixed_seconds": 10,
+    "rate": 5000,
+    "max_seconds": 600,
+    "max_rows_per_backend_per_trial": 300000
+  },
+  "scope": "Activate existing three benchmark services only. No deletion, extension installation, original-app mutation, old controller, package/GitHub write, resource/profile tuning. No load until exact-ID runtime attestation; first trial is pilot, remaining two conditional on valid success. Preserve outputs before authorized benchmark compute stop."
+}

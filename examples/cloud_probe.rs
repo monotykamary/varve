@@ -10,6 +10,11 @@ use varve::{Config, Database, Row, TableConfig};
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let local = args.iter().any(|arg| arg == "--local");
+    let native_library = args
+        .iter()
+        .find_map(|arg| arg.strip_prefix("--rebuilt-library="))
+        .map(std::path::PathBuf::from);
+    let rebuilt = native_library.is_some();
     let rows: usize = args
         .iter()
         .find_map(|arg| arg.strip_prefix("--rows="))
@@ -17,9 +22,10 @@ fn main() -> Result<()> {
         .parse()?;
     ensure!((1..=50_000).contains(&rows), "rows must be 1..50000");
     ensure!(
-        args.iter()
-            .all(|arg| arg == "--local" || arg.starts_with("--rows=")),
-        "usage: cloud_probe [--local] [--rows=N]"
+        args.iter().all(|arg| arg == "--local"
+            || arg.starts_with("--rows=")
+            || arg.starts_with("--rebuilt-library=")),
+        "usage: cloud_probe [--local] [--rows=N] [--rebuilt-library=/absolute/libduckdb.so]"
     );
     ensure!(
         local || std::env::var("VARVE_CLOUD_PROBE").as_deref() == Ok("true"),
@@ -139,6 +145,15 @@ fn main() -> Result<()> {
         query_threads: 1,
         query_workers: 1,
         segment_rows: 1024,
+        segmented_journal: rebuilt,
+        checkpoint_frozen_prefix: rebuilt,
+        derived_pages: rebuilt,
+        duckdb_library: native_library,
+        query_executable: if rebuilt {
+            "/nonexistent/varve-cloud-probe-no-cli".into()
+        } else {
+            Config::default().query_executable
+        },
         ..Default::default()
     };
     let local_root = temporary.path().join("source");
@@ -156,6 +171,7 @@ fn main() -> Result<()> {
     db.query("CALL varve_create_continuous_aggregate('metrics_named', 'metrics', 1000000)")?;
     let start = Instant::now();
     let mut expected = 0.0;
+    let mut first_request = None;
     for (batch_index, offset) in (0..rows).step_by(256).enumerate() {
         let batch: Vec<Row> = (offset..(offset + 256).min(rows))
             .map(|index| {
@@ -172,6 +188,9 @@ fn main() -> Result<()> {
             .collect();
         let id = format!("batch-{batch_index}");
         let first = db.write("metrics", &id, batch.clone(), 1_000_000_000)?;
+        if first_request.is_none() {
+            first_request = Some((id.clone(), batch.clone(), first.sequence));
+        }
         let retry = db.write("metrics", &id, batch, 1_000_000_000)?;
         ensure!(
             retry.duplicate && retry.sequence == first.sequence,
@@ -179,6 +198,35 @@ fn main() -> Result<()> {
         );
     }
     let ingest_us = start.elapsed().as_micros();
+    let tail_sequence = db.ship()?;
+    ensure!(
+        db.status()?.checkpoint_sequence < tail_sequence,
+        "tail proof was already checkpointed"
+    );
+    drop(db);
+    let db = Database::restore(
+        temporary.path().join("tail-restored"),
+        config.clone(),
+        store.clone(),
+    )?;
+    let tail = db.query("SELECT count(*) AS n, sum(value) AS total FROM metrics")?;
+    ensure!(
+        tail[0]["n"].as_u64() == Some(rows as u64) && tail[0]["total"].as_f64() == Some(expected),
+        "uncheckpointed remote tail mismatch: {tail}"
+    );
+    let (id, batch, receipt_sequence) = first_request.context("missing retry fixture")?;
+    let replay = db.write("metrics", &id, batch, 1_000_000_000)?;
+    ensure!(
+        replay.duplicate && replay.sequence == receipt_sequence,
+        "post-restore retry changed receipt"
+    );
+    if rebuilt {
+        let status = db.status()?;
+        ensure!(
+            status.segmented_journal && status.native_query.is_some(),
+            "rebuilt backend was not selected"
+        );
+    }
     db.checkpoint()?;
     let sequence = db.ship()?;
     db.maintain(10_000_000_000)?;
@@ -216,7 +264,7 @@ fn main() -> Result<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(
-            &json!({"backend":if local{"filesystem"}else{"s3"},"isolated_namespace":namespace,"rows":rows,"sum":expected,"ingest_us":ingest_us,"published_sequence":sequence,"final_status":status,"verified":["immutable_collision","bounded_read","conditional_create","conditional_update","stale_cas_rejection","identical_payload_token_freshness","delete_list","paged_list","bulk_delete","local_fsync","idempotent_retry","parquet","archive","sql","named_rollup","remote_restore","raw_retention","derived_history_retention","remote_vacuum"],"note":"Synthetic isolated prefixes only. Remote control/checkpoint objects are retained as evidence; local temporary data is removed on exit."})
+            &json!({"backend":if local{"filesystem"}else{"s3"},"rebuilt":rebuilt,"tail_sequence":tail_sequence,"isolated_namespace":namespace,"rows":rows,"sum":expected,"ingest_us":ingest_us,"published_sequence":sequence,"final_status":status,"verified":["immutable_collision","bounded_read","conditional_create","conditional_update","stale_cas_rejection","identical_payload_token_freshness","delete_list","paged_list","bulk_delete","local_fsync","idempotent_retry","uncheckpointed_remote_tail_restore","post_restore_retry","parquet","archive","sql","named_rollup","remote_restore","raw_retention","derived_history_retention","remote_vacuum"],"note":"Synthetic isolated prefixes only. Remote control/checkpoint objects are retained as evidence; local temporary data is removed on exit."})
         )?
     );
     Ok(())

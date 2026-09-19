@@ -1,0 +1,26 @@
+{
+  "concurrent_conflict_exactly_one_event": true,
+  "concurrent_identical_one_fresh_one_duplicate": true,
+  "driver_artifact": {
+    "files": {
+      "Dockerfile": "579d48eb1e14fa6efaae0d1179b0146490aefa8bef9f444f2bd8214e12cea277",
+      "benchmark.py": "082e871f53797759ea8e658ac460788b7308cb9bc13b4143794957a3ab2e8ed9",
+      "core.py": "cc0049651b6e767c401ebdbb065e41c6e178b51fc8209c4c490cdd52f4d8da7e",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    "format_version": 1,
+    "sha256": "7d2ce4fa1d4cebb7121aa99b964a0db36b0d6a73af7299cacc6857f3fe14ef00"
+  },
+  "durability": {
+    "fsync": "on",
+    "full_page_writes": "on",
+    "synchronous_commit": "on"
+  },
+  "failed_event_rolls_back_receipt": true,
+  "namespace": "vb_ior6_atomic_02_b8a45b2a",
+  "probe_sha256": "6e0b76ba0a414ff525bc7050f5b845f40cc0971e35b711239ca8b78fc938f407",
+  "raw_rows": 3,
+  "receipts": 3,
+  "run_id": "ior6_atomic_02",
+  "state": "passed"
+}

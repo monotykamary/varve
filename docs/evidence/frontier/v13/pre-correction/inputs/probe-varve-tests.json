@@ -1,0 +1,26 @@
+{
+  "cases": 15,
+  "case_names": [
+    "valid",
+    "manifest",
+    "config",
+    "cpu",
+    "memory",
+    "phase_missing",
+    "phase_duplicate",
+    "sequence",
+    "tables",
+    "root_format",
+    "root_sequence",
+    "uid",
+    "directory",
+    "region",
+    "http_auth_failure"
+  ],
+  "actual_probe_source_exercised": true,
+  "authenticated_metrics_read_verified": true,
+  "real_http": 0,
+  "external_commands": 0,
+  "infra_mutations": 0,
+  "probe_varve_sha256": "6c095ac80bcd6000b1330f2e2b465583a49d8e0c8ff096915452d099a7e7c3e9"
+}

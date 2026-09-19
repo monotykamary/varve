@@ -1,0 +1,2 @@
+    PID    PPID    PGID                  STARTED COMMAND
+  36226       1   17037 Sat Sep 19 11:59:18 2026 /bin/sh /tmp/.tmp5LzX9W/query.sh -no-init -batch -bail -json :memory:

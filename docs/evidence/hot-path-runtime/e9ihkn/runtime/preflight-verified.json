@@ -1,0 +1,124 @@
+{
+  "passed": true,
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "trial": {
+    "run_id": "runtime_e9ihkn_p1",
+    "varve_first": true,
+    "varve_root": "/data/probes/runtime-e9ihkn-p1"
+  },
+  "uid": 10001,
+  "identity": {
+    "RAILWAY_PROJECT_ID": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+    "RAILWAY_ENVIRONMENT_ID": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+    "RAILWAY_SERVICE_ID": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+    "RAILWAY_DEPLOYMENT_ID": "87b79e52-90f2-4458-8686-1946298e4257"
+  },
+  "driver": {
+    "format_version": 1,
+    "sha256": "c0fd1f694726d44c1737a4e0a47dbc59e761f7dac7f6d8c164af6986d7d5afc5",
+    "files": {
+      "benchmark.py": "23e05928cf287a4f8b59433f2079cf63610a256dabbb75138a2ea5081442df23",
+      "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+      "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+    }
+  },
+  "checks": {
+    "timescaledb_version": "2.30.0",
+    "postgresql_version": "17.11",
+    "durability": {
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on"
+    },
+    "extension_preinstalled": true
+  },
+  "ready": {
+    "ready": true
+  },
+  "status": {
+    "database_id": "33048a6e-18fc-46db-8224-c2aa18ded467",
+    "sequence": 0,
+    "checkpoint_sequence": 0,
+    "remote_sequence": 0,
+    "unshipped_batches": 0,
+    "hot_rows": 0,
+    "hot_bytes": 0,
+    "wal_bytes": 0,
+    "disk_bytes": 748,
+    "metadata_bytes": 421,
+    "control_root_bytes": 421,
+    "derived_encoded_bytes": 0,
+    "derived_resident_bytes": 0,
+    "derived_working_bytes": 0,
+    "decoded_cache_bytes": 0,
+    "disk_cache_bytes": 0,
+    "tables": 0,
+    "segments": 0,
+    "rollup_groups": 0,
+    "idempotency_keys": 0,
+    "active_queries": 0,
+    "active_snapshots": 0,
+    "fenced": null,
+    "last_maintenance_error": null
+  },
+  "postgres": [
+    {
+      "started": "2026-09-17 15:54:49.777774+00:00",
+      "data_directory": "/var/lib/postgresql/data/accounting-s13-r1"
+    }
+  ],
+  "settings": [
+    {
+      "name": "maintenance_work_mem",
+      "setting": "131072",
+      "unit": "kB"
+    },
+    {
+      "name": "max_parallel_workers",
+      "setting": "2",
+      "unit": null
+    },
+    {
+      "name": "max_parallel_workers_per_gather",
+      "setting": "2",
+      "unit": null
+    },
+    {
+      "name": "max_worker_processes",
+      "setting": "8",
+      "unit": null
+    },
+    {
+      "name": "shared_buffers",
+      "setting": "65536",
+      "unit": "8kB"
+    },
+    {
+      "name": "timescaledb.max_background_workers",
+      "setting": "4",
+      "unit": null
+    },
+    {
+      "name": "timescaledb.telemetry_level",
+      "setting": "off",
+      "unit": null
+    },
+    {
+      "name": "work_mem",
+      "setting": "32768",
+      "unit": "kB"
+    }
+  ],
+  "activity": [
+    {
+      "active_other_clients": 0
+    }
+  ],
+  "generator_cgroups": {
+    "cpu.max": "200000 100000",
+    "memory.max": "999997440",
+    "memory.current": "63672320",
+    "cpu.stat": "usage_usec 1770904\nuser_usec 1545002\nsystem_usec 225901\nnice_usec 0\nnr_periods 30\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0"
+  }
+}

@@ -1,0 +1,1 @@
+cargo test --locked --offline -p varve-client --features service-tests --tests -- --test-threads=2 

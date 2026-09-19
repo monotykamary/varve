@@ -351,17 +351,21 @@ fn catalog_literals_match_scanner_and_fall_back_without_losing_values() {
         let fallback = text
             .as_ref()
             .is_some_and(|s| s.contains('\0') || s.len() >= 17 * 1024);
-        assert_eq!(
-            paths[0]["paths"],
-            if fallback {
-                json!([std::fs::canonicalize("/dev/stdin")
-                    .unwrap()
-                    .to_str()
-                    .unwrap()])
-            } else {
-                json!([])
-            }
-        );
+        if fallback {
+            let allowed = paths[0]["paths"].as_array().unwrap();
+            assert_eq!(allowed.len(), 1);
+            // DuckDB receives a pipe; resolving the parent's stdin can instead
+            // resolve its unrelated /dev/null. Accept only fd-zero aliases.
+            assert!(
+                matches!(
+                    allowed[0].as_str(),
+                    Some("/dev/stdin" | "/dev/fd/0" | "/proc/self/fd/0")
+                ),
+                "unexpected scanner allowlist: {allowed:?}"
+            );
+        } else {
+            assert_eq!(paths[0]["paths"], json!([]));
+        }
     }
 }
 

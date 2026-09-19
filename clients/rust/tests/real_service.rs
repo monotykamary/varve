@@ -36,9 +36,16 @@ impl Service {
         let data = tempfile::tempdir().unwrap();
         let stderr_path = data.path().join("server.stderr");
         let stderr = File::create(&stderr_path).unwrap();
-        let child = Command::new(binary)
-            .arg("--data")
-            .arg(data.path().join("db"))
+        let mut command = Command::new(binary);
+        command.arg("--data").arg(data.path().join("db"));
+        if let Some(config) = env::var_os("VARVE_TEST_CONFIG") {
+            assert!(
+                Path::new(&config).is_file(),
+                "VARVE_TEST_CONFIG is not a file"
+            );
+            command.arg("--config").arg(config);
+        }
+        let child = command
             .arg("serve")
             .arg("--port")
             .arg(port.to_string())

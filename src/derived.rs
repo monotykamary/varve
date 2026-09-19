@@ -104,6 +104,7 @@ impl RollupIndex {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(crate) fn remove(&mut self, key: &str, row: &RollupRow) {
         let Some(tenants) = self.widths.get_mut(&row.width_us) else {
             return;

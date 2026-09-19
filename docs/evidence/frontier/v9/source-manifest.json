@@ -1,0 +1,278 @@
+{
+  "at": "2026-09-16T23:13:19.087Z",
+  "base_commit": "b3814a74fa02b11a47e5ce86481781da279420c0",
+  "dirty_snapshot": true,
+  "local_qualified_source": "9ed8187afb8b8f9846ee62e80a8ddf32b442c6ca188d1dd330d07728018dca81",
+  "files": [
+    {
+      "path": ".cargo/config.toml",
+      "bytes": 17,
+      "sha256": "7af9ec6837490d1ca073d1db582eab96aff336a76a7fff3236d3dbad3bdd3756"
+    },
+    {
+      "path": ".dockerignore",
+      "bytes": 75,
+      "sha256": "247e386a9be6e9027cd6bff850c215ddb612643d2d15c13935a90e50a1d81fdd"
+    },
+    {
+      "path": "Cargo.lock",
+      "bytes": 83924,
+      "sha256": "9b086626033d66459e9db1c118c41909d8e5964136bbaf891f1a367f404303aa"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 1810,
+      "sha256": "4c526d3143cdb90ad25ccbb9d6a34843e806b1a79feafd2af384fe63a9aeb355"
+    },
+    {
+      "path": "Dockerfile",
+      "bytes": 1683,
+      "sha256": "4fc5f661cca3648c0e014e0deafd04975c5c7a45e31d88da24fa8345c510902b"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "README.md",
+      "bytes": 20778,
+      "sha256": "87520f780199dde9506f699a956b77a885a1f7f44d31266ec867111ac02bacf4"
+    },
+    {
+      "path": "clients/rust/ACCEPTANCE.md",
+      "bytes": 2855,
+      "sha256": "b5c5cb324c81d2aeac64042a572820d225740783d67f86c4cc89bbbfdd7452a2"
+    },
+    {
+      "path": "clients/rust/Cargo.toml",
+      "bytes": 1142,
+      "sha256": "496dc17ff1a27e9bf733aa5e394b47dd8e0aceaf10d53c45a8ff3f15cbb0c147"
+    },
+    {
+      "path": "clients/rust/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "clients/rust/README.md",
+      "bytes": 3729,
+      "sha256": "607ac5013336c347a4b6120a2f3d2b9bf5f0c772cad4e3baf96b2b4c3db966fb"
+    },
+    {
+      "path": "clients/rust/examples/basic.rs",
+      "bytes": 1568,
+      "sha256": "ef8bbd70e2811db34c4bbb75a5118304983ffe1163f91c5f6f1509a30530b67d"
+    },
+    {
+      "path": "clients/rust/src/client.rs",
+      "bytes": 26089,
+      "sha256": "0d1ca83bf679ccf89436c598a5b8917ee1a8a2b9caca1db909ccfb27edb45c3b"
+    },
+    {
+      "path": "clients/rust/src/client/tests.rs",
+      "bytes": 14392,
+      "sha256": "0163513fb25aa42268f725cade2f74996c7202dc56cfccd6cab62392f2e16720"
+    },
+    {
+      "path": "clients/rust/src/error.rs",
+      "bytes": 2947,
+      "sha256": "be542b66a405d94d228dc43e860355deb0f1eb8f8b984e2137bec89eb9d0c3fa"
+    },
+    {
+      "path": "clients/rust/src/lib.rs",
+      "bytes": 278,
+      "sha256": "b1fea29d816636ce3cb759e80403ab28e6cc4e107f16315a7215181f64c24c69"
+    },
+    {
+      "path": "clients/rust/src/types.rs",
+      "bytes": 4887,
+      "sha256": "6700393118f9dcb25a976da6d3b5a348a382ba493e1358a70d97b167d927e60a"
+    },
+    {
+      "path": "clients/rust/tests/protocol.rs",
+      "bytes": 12642,
+      "sha256": "6fb11ea09640245eda00e496216b3e864f575d33898952451f99c274e9fa1c5b"
+    },
+    {
+      "path": "clients/rust/tests/real_service.rs",
+      "bytes": 6567,
+      "sha256": "9be26a9e7bba5c3809baa35e4d16e519ddf377dd41f9a4d4e3e9f66c35c04565"
+    },
+    {
+      "path": "clients/rust/tests/status.rs",
+      "bytes": 1444,
+      "sha256": "b957d3bee8c3cc9df1073f8f1105775520e9e3088fffa87e79d94dc9ae5b9679"
+    },
+    {
+      "path": "clients/rust/tests/types.rs",
+      "bytes": 1588,
+      "sha256": "4963d859d9a0ad348c62b1a274b7d1932f942e9a0ab4e1e86a742df122a7c8c9"
+    },
+    {
+      "path": "config/railway.json",
+      "bytes": 644,
+      "sha256": "f33c4a1f9d864a43ebcbcabe21f0926051421f588bcdfddaa1af675432f86f70"
+    },
+    {
+      "path": "examples/cloud_probe.rs",
+      "bytes": 8754,
+      "sha256": "3dc7f0b1ffdd699341d48b89ac02f2aa83dadd98b3586e98c6c22f67bcef821f"
+    },
+    {
+      "path": "licenses/duckdb.txt",
+      "bytes": 1072,
+      "sha256": "075c33400ffcb0c586dd106a029d3e733e9da3693f8fcb9cebfc651c8a2f14e3"
+    },
+    {
+      "path": "scripts/container-entrypoint.sh",
+      "bytes": 837,
+      "sha256": "31f2d6b01a2e18c26c30a5d59f3f52771a52e434ab003facf32d4c99efe724c5"
+    },
+    {
+      "path": "scripts/install-duckdb.sh",
+      "bytes": 1764,
+      "sha256": "e3cf833c8d0dabc5967e028684ccfe77377351873d367ab4520cdca1773afa8a"
+    },
+    {
+      "path": "scripts/stress.py",
+      "bytes": 13244,
+      "sha256": "dbf6b2075b8309531419963addc992fcf9247b9350ff1dd5ccbe7033b8de72d3"
+    },
+    {
+      "path": "scripts/verify-stress.py",
+      "bytes": 2313,
+      "sha256": "54eaf4c7e722d2874be46ab398bf89ff04e64de6856ae3af4b4402952d6c72db"
+    },
+    {
+      "path": "src/control.rs",
+      "bytes": 47936,
+      "sha256": "afe76f4aaf0055ef7ac52b58664eb5545313667d5f7cde85fb25e06db0891630"
+    },
+    {
+      "path": "src/derived.rs",
+      "bytes": 21920,
+      "sha256": "ba3d7546e5060a24e49a66483a87c57f24583d682acc7a6963bca53e093d8631"
+    },
+    {
+      "path": "src/derived/tests.rs",
+      "bytes": 12025,
+      "sha256": "4edd32301682dbaae28fcba42847b7e2052ad80df177cb821b008f0439471814"
+    },
+    {
+      "path": "src/derived_root.rs",
+      "bytes": 19242,
+      "sha256": "69ce80132801b0bb783bd3f5d6b3ef6ce33f07ad3b9f8479836c6c124e55d1af"
+    },
+    {
+      "path": "src/engine.rs",
+      "bytes": 254675,
+      "sha256": "764e35e41329aeea165945f3ea0f3d4e070418beb8448d2434109a3a82fb19dd"
+    },
+    {
+      "path": "src/ingest.rs",
+      "bytes": 13208,
+      "sha256": "2215dddeb28216d1b60484e46d984a7bf94398b0e3778463d234cfa846670ff9"
+    },
+    {
+      "path": "src/job_runtime.rs",
+      "bytes": 3594,
+      "sha256": "ba664da04c668b065f0dec6baaa7da1e06730799486a7e6d60db4a2a63166117"
+    },
+    {
+      "path": "src/lib.rs",
+      "bytes": 674,
+      "sha256": "b7a33f189fafcac1b3185eef3e905f43fa22cf5890c48e7b9097448fe287e6ca"
+    },
+    {
+      "path": "src/main.rs",
+      "bytes": 10630,
+      "sha256": "e7df5454fd60b1ba990d78656b445fc4f65caa4ad30f732b02d3efc3ff99053d"
+    },
+    {
+      "path": "src/metrics.rs",
+      "bytes": 11318,
+      "sha256": "658fb6111df769c8f9f9fb361d1562f26acf3139910a2056d14c9c8a789d98fc"
+    },
+    {
+      "path": "src/model.rs",
+      "bytes": 15262,
+      "sha256": "4f30d915ba3b68bf3cd28515810a239786a38d61a00fb6eae8a57a5b2865086f"
+    },
+    {
+      "path": "src/pg_transport.rs",
+      "bytes": 13238,
+      "sha256": "d11d028a4c0f2f75e5d442b4f5a5409240eb5330cfbf9aa81e81a75f79d55751"
+    },
+    {
+      "path": "src/plan.rs",
+      "bytes": 32957,
+      "sha256": "6d93bd4e1ff27655697f465f32143bfc7ecddfb341ba65fed218c24f020e547b"
+    },
+    {
+      "path": "src/policy.rs",
+      "bytes": 19531,
+      "sha256": "c7e0d900b20c24ef8be3e58086d1dc6d17b9be84df459e2b29df9c679e7c0c19"
+    },
+    {
+      "path": "src/query.rs",
+      "bytes": 65460,
+      "sha256": "46a4885722eec69f2840b76165d782c5f953890aefa2de4a935555b94c754d4a"
+    },
+    {
+      "path": "src/query/resident.rs",
+      "bytes": 13220,
+      "sha256": "a6de95cbaf3bc186c31519eb00adce30beed014a2b6a4e7667bf29208d3b9d40"
+    },
+    {
+      "path": "src/query/resident_process_tests.rs",
+      "bytes": 9233,
+      "sha256": "483617c0f72b1544c4dad0552f3199869990f4df34fadc3ebab09946dfc923d9"
+    },
+    {
+      "path": "src/query/resident_tests.rs",
+      "bytes": 15564,
+      "sha256": "0e3fe22d13e335d5a1f7d2e17fcf87426b711f5848501abb8d5f07691878c6cb"
+    },
+    {
+      "path": "src/query/resident_types.rs",
+      "bytes": 6568,
+      "sha256": "c7a891fe6da6ea022ab0f08a950416635968c3a0dd69e147c4de25c9275a71e9"
+    },
+    {
+      "path": "src/query/workers.rs",
+      "bytes": 29874,
+      "sha256": "3b1225cad34536d438d294408a0358791ad4304dd3d72db3ad121e99530dff06"
+    },
+    {
+      "path": "src/remote.rs",
+      "bytes": 54311,
+      "sha256": "52a70eff591dc787f573b5f9b628b65b96afa72131560c35aee6eb9e4c152350"
+    },
+    {
+      "path": "src/segment.rs",
+      "bytes": 10495,
+      "sha256": "974fe340d85ab45568e5ab04ac19c8e06bbdc1f6d57ef1405b32b424b76e8067"
+    },
+    {
+      "path": "src/service.rs",
+      "bytes": 42515,
+      "sha256": "90a0be117ee4f9b610a2a13227022e356090040e8f35165b731c11c27e1cddf8"
+    },
+    {
+      "path": "src/tier.rs",
+      "bytes": 60906,
+      "sha256": "627977e1a5d7be0078126c987a1eedfe28e4316dceb00c11b83c0dea535add33"
+    },
+    {
+      "path": "src/transport.rs",
+      "bytes": 16817,
+      "sha256": "24d2823b775885e9dc263e9ab296b9a6200f9d14766f7e845e57363f6b213290"
+    },
+    {
+      "path": "src/wal.rs",
+      "bytes": 20469,
+      "sha256": "d0123bd8ef7fe5afc85eebcf5be7520b9f055957e53895ef9d68822ef965d7b2"
+    }
+  ]
+}

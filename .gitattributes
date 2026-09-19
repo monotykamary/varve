@@ -1,0 +1,4 @@
+# Preserve checksummed patch context and machine-recorded command bytes.
+docs/evidence/**/*.diff whitespace=-blank-at-eol
+docs/evidence/**/*.patch whitespace=-blank-at-eol
+docs/evidence/**/*.command.txt whitespace=-blank-at-eol

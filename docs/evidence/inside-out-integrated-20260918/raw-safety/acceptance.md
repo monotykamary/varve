@@ -1,0 +1,25 @@
+# Raw safety repair — COMPLETE QUALIFIED source checkpoint
+
+Base frozen followup full128 manifest: `0658a56988a24534b5b61f268274a71f5ed7327d42e92495d88f969dddb61c7f`.
+Final full128 manifest: `13e9198e00e6d11a26c89def8fd775a2a326236f7bd844cfdef288883e4441c0`.
+Final owned10 manifest: `326b65776dd6b89f104d7d7916b74e685c738baec282fddacbdb3c896ead21f8`.
+
+Remote source `/workspace/varve-rebuild/raw-safety-repair`; frozen source-only copy `/workspace/varve-rebuild/raw-safety-repair-qualified`; evidence `/workspace/varve-rebuild/raw-safety-repair-evidence`. Local source/frozen/evidence copies are respectively `.tools/rebuild-20260918/raw-safety-repair`, `raw-safety-repair-review`, `raw-safety-repair-evidence`. Full128 and owned10 local checks and frozen128 verification all passed. Only owned formatted paths were retrieved into the isolated source; no live/shared root or earlier frozen directory was overwritten.
+
+Exact root, AGENTS, ARCHITECTURE, ACCEPTANCE and full owner plan verified/read before editing. All builds/tests/formatting were in Railway sandbox `1dea8336-2d0c-4de4-bcf9-f1dfd63ef2f3`, jobs2, shared target, pinned baseline/.tools. No bundled DuckDB, local builds/tests/fixtures, service/deployment/resource/credential/S3 operations.
+
+- [x] Native callback Box guards outlive payload destruction AND backing deallocation. Common pre-handoff RAII and all four opaque destroy paths extract/hold credit outside the Box. Final-field red/green admission observations cover handoff, ordinary pre-handoff cleanup and unwind.
+- [x] Fixed scanner guard is outside Scratch Arc in outer execution scope. Watcher join/session close ordering remains intact; prepared specs/buffers and FINAL scratch Arc are destroyed before the guard. Normal/setup-error/setup-panic cleanup probes passed.
+- [x] Fixed covered arrays use exact requested Box layouts, not Vec capacity assumptions or posthoc admission. Partial initialization error/panic and overflow probes passed. Allocator-internal usable padding and global budget bookkeeping are explicitly excluded, not charged payload/container headers. No RSS claim or quota increase.
+- [x] Encoded-first materialization owner exists before any detachment/Row move. Every accepted frame/transient portion is detached before consuming inputs. Actual failed split retains input credit; partial detach, post-split/partial conversion errors and panic retain frame credit through cleanup. No second raw lease or payload copy.
+- [x] Direct/group failures and panics tested at four materialization phases. Ordinary error preserves independent durable duplicates/floor120, no new rows/receipts/WAL, healthy authority and checkpoint/reopen across inline/paged + exact/frozen-prefix + legacy/journal combinations. Panic fences publication authority; existing post-sync ingestion/barrier/reopen tests remain green.
+- [x] Both RawHandle and RawAllocation use private all-alias Arc::into_inner destruction. No inner Arc/Weak escapes. Opaque WeakRawRows keeps a nonreused checked global ID, not the charged header or entire row credit. Concurrent alias/pin cleanup, retained identity tokens, cross-budget non-ABA, exhaustion, construction errors/unwind and unchanged 256-byte metadata allowance passed.
+- [x] Final engine/raw/boundary112 + standalone raw-memory3 + flow12 + ingest11 + native23 + relevant integrations121 passed. Default/fault strict Clippy and fmt passed. Every one of nine final commands checked all128 hashes BEFORE and AFTER against the identical manifest; frozen base still verified. Raw memory identity callers and all callback registrations mechanically audited.
+- [x] Failure logs retained: native-cleanup-red, frame-cleanup-red-02 and raw-container-red are behavioral reproductions. frame-cleanup-red is an initial compile error, clippy-preflight is three lint findings, engine-environment-miss is two unchanged tests needing the pinned `.tools/duckdb` link. All corrected without weakening assertions; final complete matrix passed.
+- [x] Small repair checkpoint frozen and ready for Root review/coordination. Deployment eligibility is not asserted by this source/test checkpoint.
+
+## Target and paused feature state
+
+EXCLUSIVE `/workspace/varve-rebuild/target` remains HELD pending Root coordination, as instructed. No Cargo/rustc process remains after final qualification. No owner-feature resume or automatic target release.
+
+Partition-owner partial changes are preserved separately: local `.tools/rebuild-20260918/partition-owners` includes partial Arc catalog conversion/test adaptations and an unfinished detached append-view/snapshot scaffold; remote `/workspace/varve-rebuild/partition-owners` holds the earlier partial catalog conversion. Both are unqualified, neither is this repair, and neither overwrote a baseline. Future feature work must rebase after Root reviews this repair. Genuine keyed preparation, persistent partitions/P-D overlap, source-cost/performance follow-ons, deployment/production/RSS/distributed qualification remain separate gaps; no full-R1 claim.

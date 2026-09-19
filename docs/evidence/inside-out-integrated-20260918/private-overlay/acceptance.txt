@@ -1,0 +1,20 @@
+Private touched-key append overlay acceptance ledger (final qualification)
+
+Base: /workspace/varve-rebuild/raw-budget, source-files.sha256 digest 8f32e4a71f60011463a1dafaa2c83783891e3fface96a20c619d17293f355dd7.
+Worktree: /workspace/varve-rebuild/private-overlay. Evidence: /workspace/varve-rebuild/private-overlay-evidence.
+Only sandbox 1dea8336-2d0c-4de4-bcf9-f1dfd63ef2f3 used; shared target with jobs=2. No resource, service, credential or S3 operations.
+
+PASS: live preparation exclusively borrows committed State and owns final touched receipt/rollup/accounting replacements, charged raw batches, scalar projections, ordered accepted inputs/ordinals/results and separate provisional/durable duplicate floor tracks.
+PASS: production PendingAppend built directly; no detach/undo mutation of committed maps/hot/index/floors during preparation. Old mutation/undo helper is cfg(test) oracle only. Recovery still uses ValidatedAppend::recovered and checks corrupt digests/static properties/frontiers/budgets independently.
+PASS: deterministic private mixed epoch checks baseline images after every input and descriptor creation; accepted order and [0,2] request offsets/[0,1,2] row ordinals; exact result categories; provisional floor180 versus durable170; discard releases raw/derived charges; installed raw float bits/catalog/receipts/rollups/index/accounting/first-last agree with independently decoded replay.
+PASS: engine-final.log: 92 tests, includes raw budget, paused-fsync/failure/multitable, group-headroom, exact_wal_retry and later_duplicate_floor, independent corruption/recovery/accounting.
+PASS: native-final.log: --lib --features fault-injection query::native, 12 tests, 19.63s (rerun after final approved annotation). Includes pre-open resource configuration, parity, multichunk scratch scanner and cancellation/destructor races.
+PASS: integration-final.log: 88 top-level tests over audit_regressions(10), engine(14), group_commit(13), headroom_recovery(4), prefix_admission(13), prefix_checkpoint(13), prepared_publication(5), publication(13), rebuilt_engine(3). Child subprocess executions reported separately in log.
+PASS: journal-engine-final.log: 9 tests, includes five missing-manifest rejection/initialization cases. Frozen raw-budget sources and logs untouched.
+PASS: owned files remotely rustfmt formatted with skip_children=true; only owned files synchronized back.
+PASS: fmt-final.log: cargo fmt --all -- --check. clippy-default-final.log and clippy-fault-injection-final.log: cargo clippy --locked --all-targets [--features fault-injection] -- -D warnings. Main approved exactly one cfg(test) annotation on src/derived.rs RollupIndex::remove; that is its only edit. Obsolete aggregate_updates wrapper removed within engine.rs.
+
+Retained failures: compile-01.log (borrow lifetime corrected); engine-01.log (default query executable not on PATH, corrected baseline/.tools PATH); clippy-default-01.log (new dead helper cleanup).
+Review: inspected immutable view lookups, deferred derived admission ordering, raw reservation transfer, descriptor/install and ordered floor policy. Contour extension discovery was empty; no automated structural certification claimed.
+
+Remaining scope: preparation still holds global commit gate and State; static Ingestor ring P is not actual private-delta publication/prepared frontier. No independent partition owners, concurrent partition commit, lock-free, distributed or production guarantees. No WAL/journal framing or overview documentation changes.

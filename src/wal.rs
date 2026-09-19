@@ -10,6 +10,10 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
+#[path = "dependency_publication.rs"]
+mod dependency_publication;
+pub(crate) use dependency_publication::{DependencyBatch, DurableDependencies};
+
 const MAGIC: &[u8; 8] = b"VARVEW01";
 pub const MAX_FRAME_BYTES: usize = 128 * 1024 * 1024;
 const RESERVATION_CHUNK_BYTES: usize = 64 * 1024;
@@ -228,6 +232,7 @@ pub(crate) fn group_fingerprint(record: &Record) -> Result<Option<String>> {
 pub(crate) struct EncodedRecord {
     sequence: u64,
     bytes: Vec<u8>,
+    grouped: bool,
 }
 
 impl EncodedRecord {
@@ -235,7 +240,49 @@ impl EncodedRecord {
         Ok(Self {
             sequence: record.sequence,
             bytes: encode(record)?,
+            grouped: matches!(&record.operation, Operation::AppendGroup { .. }),
         })
+    }
+
+    /// Borrow immutable prepared inputs; a retry never has to recover owned rows
+    /// from a temporary Record. The persisted VARVEW01 representation is unchanged.
+    pub(crate) fn append(sequence: u64, item: &AppendItem) -> Result<Self> {
+        let record = BorrowedRecord {
+            format_version: FORMAT_VERSION,
+            sequence,
+            operation: BorrowedOperation::Append {
+                table: &item.table,
+                request_id: &item.request_id,
+                digest: &item.digest,
+                rows: &item.rows,
+            },
+        };
+        Ok(Self {
+            sequence,
+            bytes: encode_payload(&record, MAX_FRAME_BYTES)?,
+            grouped: false,
+        })
+    }
+
+    pub(crate) fn append_group(sequence: u64, items: &[&AppendItem]) -> Result<Self> {
+        ensure!(
+            !items.is_empty() && items.len() <= MAX_GROUP_REQUESTS,
+            "invalid WAL group request count"
+        );
+        let record = BorrowedRecord {
+            format_version: FORMAT_VERSION,
+            sequence,
+            operation: BorrowedOperation::AppendGroup { items },
+        };
+        Ok(Self {
+            sequence,
+            bytes: encode_payload(&record, MAX_FRAME_BYTES)?,
+            grouped: true,
+        })
+    }
+
+    pub(crate) fn sequence(&self) -> u64 {
+        self.sequence
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -245,13 +292,50 @@ impl EncodedRecord {
     pub(crate) fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
+
+    /// The owned frame was canonically encoded from a typed record. Hash its
+    /// existing payload rather than serializing the same group a second time.
+    pub(crate) fn group_fingerprint(&self) -> Option<String> {
+        if !self.grouped {
+            return None;
+        }
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"varve/append-group-proof/v1\0");
+        hasher.update(&self.bytes[16..self.bytes.len() - 32]);
+        Some(hasher.finalize().to_hex().to_string())
+    }
 }
 
 pub fn encode(record: &Record) -> Result<Vec<u8>> {
     encode_with_limit(record, MAX_FRAME_BYTES)
 }
 
+#[derive(Serialize)]
+struct BorrowedRecord<'a> {
+    format_version: u32,
+    sequence: u64,
+    operation: BorrowedOperation<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "operation", rename_all = "snake_case")]
+enum BorrowedOperation<'a> {
+    Append {
+        table: &'a str,
+        request_id: &'a str,
+        digest: &'a str,
+        rows: &'a [Row],
+    },
+    AppendGroup {
+        items: &'a [&'a AppendItem],
+    },
+}
+
 fn encode_with_limit(record: &Record, limit: usize) -> Result<Vec<u8>> {
+    encode_payload(record, limit)
+}
+
+fn encode_payload(record: &impl Serialize, limit: usize) -> Result<Vec<u8>> {
     ensure!(limit >= 48, "WAL frame exceeds format limit");
     let mut frame = Vec::with_capacity(limit.min(4096));
     frame.extend_from_slice(MAGIC);
@@ -363,6 +447,23 @@ pub(crate) fn append_encoded(
     encoded: &EncodedRecord,
     metrics: Option<&crate::metrics::Metrics>,
 ) -> Result<usize> {
+    append_encoded_with_barriers(root, encoded, metrics, |_| Ok(()))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum AppendBarrier {
+    FileSync,
+    Rename,
+    DirectorySync,
+    TempCleanup,
+}
+
+pub(crate) fn append_encoded_with_barriers(
+    root: &Path,
+    encoded: &EncodedRecord,
+    metrics: Option<&crate::metrics::Metrics>,
+    mut barrier: impl FnMut(AppendBarrier) -> Result<()>,
+) -> Result<usize> {
     use crate::metrics::Phase;
     let _publication = metrics.map(|metrics| metrics.timer(Phase::WalWrite));
     let final_path = path(root, encoded.sequence);
@@ -377,23 +478,31 @@ pub(crate) fn append_encoded(
         injected_io("wal_before_write")?;
         file.write_all(encoded.as_bytes())?;
         injected_io("wal_before_sync")?;
+        barrier(AppendBarrier::FileSync)?;
         {
             let _sync = metrics.map(|metrics| metrics.timer(Phase::WalSync));
+            let _file_sync = metrics.map(|metrics| metrics.timer(Phase::WalFileSync));
             file.sync_all()?;
         }
         failpoint("wal_synced");
         // The process lock excludes competing local publishers.
+        barrier(AppendBarrier::Rename)?;
         injected_io("wal_before_rename")?;
         fs::rename(&temp, &final_path)?;
         injected_io("wal_before_dir_sync")?;
+        barrier(AppendBarrier::DirectorySync)?;
         {
             let _sync = metrics.map(|metrics| metrics.timer(Phase::WalSync));
+            let _directory_sync = metrics.map(|metrics| metrics.timer(Phase::WalDirectorySync));
             sync_dir(parent)?;
         }
         failpoint("wal_published");
         Ok(encoded.len())
     })();
     if result.is_err() {
+        // Removal changes the same namespace traversed by disk accounting. If
+        // admission cannot be reacquired, leave the charged temporary for recovery.
+        barrier(AppendBarrier::TempCleanup)?;
         let _ = fs::remove_file(temp);
     }
     result
@@ -488,6 +597,94 @@ pub fn failpoint(name: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn borrowed_live_frames_are_byte_identical_to_owned_recovery_frames() -> Result<()> {
+        for clock in [None, Some(i64::MIN), Some(i64::MAX)] {
+            let item = AppendItem {
+                table: "metrics".into(),
+                request_id: "quote\"\\".into(),
+                digest: "digest".into(),
+                now_us: clock,
+                rows: vec![Row {
+                    timestamp_us: i64::MIN,
+                    tenant: "東京".into(),
+                    series: "s".into(),
+                    value: -0.0,
+                    tags: Default::default(),
+                }],
+            };
+            let direct = Record::new(
+                7,
+                Operation::Append {
+                    table: item.table.clone(),
+                    request_id: item.request_id.clone(),
+                    digest: item.digest.clone(),
+                    rows: item.rows.clone(),
+                },
+            );
+            let encoded = EncodedRecord::append(7, &item)?;
+            assert_eq!(encoded.as_bytes(), encode(&direct)?);
+            assert_eq!(encoded.group_fingerprint(), None);
+            for count in [1, 3] {
+                let group = Record::new(
+                    7,
+                    Operation::AppendGroup {
+                        items: vec![item.clone(); count],
+                    },
+                );
+                let refs = vec![&item; count];
+                let encoded = EncodedRecord::append_group(7, &refs)?;
+                assert_eq!(encoded.as_bytes(), encode(&group)?);
+                assert_eq!(encoded.group_fingerprint(), group_fingerprint(&group)?);
+            }
+        }
+        assert!(EncodedRecord::append_group(1, &[]).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn frame_payload_group_proof_matches_canonical_typed_replay() -> Result<()> {
+        for now_us in [None, Some(i64::MIN), Some(i64::MAX)] {
+            let record = Record::new(
+                123,
+                Operation::AppendGroup {
+                    items: vec![AppendItem {
+                        table: "metrics_東京".into(),
+                        request_id: "quoted\"\\id".into(),
+                        digest: "digest".into(),
+                        now_us,
+                        rows: [-0.0, 0.30000000000000004, f64::MIN_POSITIVE, f64::MAX]
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, value)| Row {
+                                timestamp_us: if i % 2 == 0 { i64::MIN } else { i64::MAX },
+                                tenant: "a\"\\b".into(),
+                                series: "東京".into(),
+                                value,
+                                tags: [("escaped".into(), "line\nvalue".into())].into(),
+                            })
+                            .collect(),
+                    }],
+                },
+            );
+            let encoded = EncodedRecord::new(&record)?;
+            assert_eq!(encoded.group_fingerprint(), group_fingerprint(&record)?);
+            assert_eq!(
+                encoded.group_fingerprint(),
+                group_fingerprint(&decode(encoded.as_bytes())?)?
+            );
+        }
+        let non_group = Record::new(
+            1,
+            Operation::CreateTable {
+                name: "metrics".into(),
+                config: TableConfig::default(),
+            },
+        );
+        assert_eq!(EncodedRecord::new(&non_group)?.group_fingerprint(), None);
+        Ok(())
+    }
+
     #[test]
     fn bounded_frame_encoding_is_byte_identical_to_legacy_layout() {
         let record = Record::new(

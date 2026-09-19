@@ -1,0 +1,223 @@
+{
+  "scope": "Whole workload interval including boundary delay and idle maintenance. Timers overlap; do not add them as exclusive CPU/wall time. Gauges are end values, not peaks. Counter deltas do not isolate individual query patterns.",
+  "phase": "baseline",
+  "before_at": "2026-09-17T01:59:24.278983+00:00",
+  "after_at": "2026-09-17T02:01:07.132272+00:00",
+  "observed_window_seconds": 102.854,
+  "phases": [
+    {
+      "phase": "disk_lock_hold",
+      "observations": 1512,
+      "cumulative_seconds": 13.921617496,
+      "mean_ms": 9.207418978835978
+    },
+    {
+      "phase": "state_lock_hold",
+      "observations": 2128,
+      "cumulative_seconds": 13.772141286,
+      "mean_ms": 6.471870905075188
+    },
+    {
+      "phase": "wal_write",
+      "observations": 394,
+      "cumulative_seconds": 6.26717636,
+      "mean_ms": 15.906538984771572
+    },
+    {
+      "phase": "wal_sync",
+      "observations": 788,
+      "cumulative_seconds": 6.189508689,
+      "mean_ms": 7.854706458121828
+    },
+    {
+      "phase": "checkpoint_prepare",
+      "observations": 14,
+      "cumulative_seconds": 4.887728766,
+      "mean_ms": 349.1234832857143
+    },
+    {
+      "phase": "query_run",
+      "observations": 567,
+      "cumulative_seconds": 4.038983927,
+      "mean_ms": 7.123428442680776
+    },
+    {
+      "phase": "query_build",
+      "observations": 567,
+      "cumulative_seconds": 3.861003962,
+      "mean_ms": 6.80953079717813
+    },
+    {
+      "phase": "root_prepare",
+      "observations": 22,
+      "cumulative_seconds": 3.427193657,
+      "mean_ms": 155.78152986363637
+    },
+    {
+      "phase": "group_prepare",
+      "observations": 390,
+      "cumulative_seconds": 2.733808293,
+      "mean_ms": 7.009764853846154
+    },
+    {
+      "phase": "derived_publish",
+      "observations": 173,
+      "cumulative_seconds": 2.285914186,
+      "mean_ms": 13.21337679768786
+    },
+    {
+      "phase": "raw_publish",
+      "observations": 112,
+      "cumulative_seconds": 1.50005369,
+      "mean_ms": 13.393336517857145
+    },
+    {
+      "phase": "compaction_prepare",
+      "observations": 8,
+      "cumulative_seconds": 0.955242161,
+      "mean_ms": 119.405270125
+    },
+    {
+      "phase": "state_lock_wait",
+      "observations": 2128,
+      "cumulative_seconds": 0.573468774,
+      "mean_ms": 0.26948720582706764
+    },
+    {
+      "phase": "checkpoint_publish",
+      "observations": 14,
+      "cumulative_seconds": 0.38859484099999997,
+      "mean_ms": 27.756774357142856
+    },
+    {
+      "phase": "disk_account",
+      "observations": 893,
+      "cumulative_seconds": 0.378343274,
+      "mean_ms": 0.42367667861142216
+    },
+    {
+      "phase": "manifest_commit",
+      "observations": 22,
+      "cumulative_seconds": 0.34346313399999995,
+      "mean_ms": 15.611960636363635
+    },
+    {
+      "phase": "disk_lock_wait",
+      "observations": 1512,
+      "cumulative_seconds": 0.321995151,
+      "mean_ms": 0.21295975595238092
+    },
+    {
+      "phase": "snapshot",
+      "observations": 567,
+      "cumulative_seconds": 0.186658885,
+      "mean_ms": 0.3292043827160494
+    },
+    {
+      "phase": "query_reset",
+      "observations": 567,
+      "cumulative_seconds": 0.178492493,
+      "mean_ms": 0.31480157495590827
+    },
+    {
+      "phase": "query_wait",
+      "observations": 567,
+      "cumulative_seconds": 0.16104913299999998,
+      "mean_ms": 0.28403727160493825
+    },
+    {
+      "phase": "compaction_publish",
+      "observations": 8,
+      "cumulative_seconds": 0.132349987,
+      "mean_ms": 16.543748375
+    },
+    {
+      "phase": "wal_encode",
+      "observations": 394,
+      "cumulative_seconds": 0.120900838,
+      "mean_ms": 0.3068549187817259
+    },
+    {
+      "phase": "wal_disk_lock_wait",
+      "observations": 394,
+      "cumulative_seconds": 0.106499164,
+      "mean_ms": 0.27030244670050757
+    },
+    {
+      "phase": "checkpoint_capture",
+      "observations": 95,
+      "cumulative_seconds": 0.08701383500000001,
+      "mean_ms": 0.915935105263158
+    },
+    {
+      "phase": "derived_verify",
+      "observations": 496,
+      "cumulative_seconds": 0.051744991,
+      "mean_ms": 0.10432457862903226
+    },
+    {
+      "phase": "checkpoint_locked",
+      "observations": 1,
+      "cumulative_seconds": 0.023647712000000005,
+      "mean_ms": 23.647712000000006
+    },
+    {
+      "phase": "query_spawn",
+      "observations": 16,
+      "cumulative_seconds": 0.00796938,
+      "mean_ms": 0.49808625
+    },
+    {
+      "phase": "write_prepare",
+      "observations": 0,
+      "cumulative_seconds": 0,
+      "mean_ms": null
+    },
+    {
+      "phase": "remote_io",
+      "observations": 0,
+      "cumulative_seconds": 0,
+      "mean_ms": null
+    },
+    {
+      "phase": "raw_verify",
+      "observations": 0,
+      "cumulative_seconds": 0,
+      "mean_ms": null
+    }
+  ],
+  "workers": {
+    "varve_query_workers_active": 0,
+    "varve_query_workers_idle": 2,
+    "varve_query_workers_spawned_total": 16,
+    "varve_query_workers_reused_total": 551,
+    "varve_query_workers_resets_total": 567,
+    "varve_query_workers_discarded_total": 15,
+    "varve_query_resident_full_loads_total": 16,
+    "varve_query_resident_delta_loads_total": 3,
+    "varve_query_resident_hits_total": 548,
+    "varve_query_resident_invalidations_total": 15,
+    "varve_query_resident_raw_staged_rows_total": 1466705,
+    "varve_query_resident_raw_staged_bytes_total": 268120952,
+    "varve_query_resident_dynamic_loads_total": 9,
+    "varve_query_resident_dynamic_staged_bytes_total": 8342,
+    "varve_query_resident_idle_rows": 417009,
+    "varve_query_resident_idle_bytes": 76261050,
+    "varve_ingest_submitted_total": 487,
+    "varve_ingest_rejected_total": 0,
+    "varve_ingest_completed_total": 487,
+    "varve_ingest_pending_requests": 0,
+    "varve_ingest_pending_bytes": 0,
+    "varve_ingest_groups_total": 388,
+    "varve_ingest_dropped_receivers_total": 0
+  },
+  "sizes": {
+    "metadata_bytes": 8728874,
+    "control_root_bytes": 13401,
+    "derived_encoded_bytes": 8766842,
+    "derived_resident_bytes": 36536604,
+    "derived_working_bytes": 0
+  },
+  "memory_peak": 425058304,
+  "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+}

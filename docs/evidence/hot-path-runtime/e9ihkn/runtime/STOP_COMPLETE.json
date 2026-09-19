@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "owned": {
+    "varve": "d5a80f14-dee0-4c53-9f92-4c5447db769c",
+    "timescale": "d79c7afb-94cb-4591-b6ab-503fc8fd484b",
+    "driver": "87b79e52-90f2-4458-8686-1946298e4257"
+  },
+  "status": {
+    "varve": {
+      "deployment": "d5a80f14-dee0-4c53-9f92-4c5447db769c",
+      "status": "REMOVED",
+      "active": 0
+    },
+    "timescale": {
+      "deployment": "d79c7afb-94cb-4591-b6ab-503fc8fd484b",
+      "status": "REMOVED",
+      "active": 0
+    },
+    "driver": {
+      "deployment": "87b79e52-90f2-4458-8686-1946298e4257",
+      "status": "REMOVED",
+      "active": 0
+    }
+  },
+  "original_unchanged": true,
+  "services_and_volumes_preserved": true
+}

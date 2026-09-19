@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "deployment": "d79c7afb-94cb-4591-b6ab-503fc8fd484b",
+  "instance": "80b27d52-af69-4d8e-917a-4a69d2efdda0",
+  "RAILWAY_PROJECT_ID": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+  "RAILWAY_ENVIRONMENT_ID": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+  "RAILWAY_SERVICE_ID": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+  "RAILWAY_DEPLOYMENT_ID": "d79c7afb-94cb-4591-b6ab-503fc8fd484b",
+  "PGDATA": "/var/lib/postgresql/data/accounting-s13-r1",
+  "PG_VERSION": "17",
+  "POSTMASTER_PID": "1",
+  "POSTMASTER_UID": "70",
+  "POSTMASTER_COMM": "postgres",
+  "cpu.max": "200000 100000",
+  "memory.max": "1999998976",
+  "memory.current": "62676992",
+  "VOLUME_MOUNT": "/var/lib/postgresql/data"
+}

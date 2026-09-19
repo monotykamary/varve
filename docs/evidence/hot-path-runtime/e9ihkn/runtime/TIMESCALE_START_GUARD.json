@@ -1,0 +1,8 @@
+{
+  "authorized": true,
+  "reason": "Refuse missing retained cluster before entrypoint; never bootstrap/install extension. No PostgreSQL settings changed.",
+  "service": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+  "environment": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+  "original": "/usr/local/bin/docker-entrypoint.sh postgres -c shared_buffers=512MB -c work_mem=32MB -c maintenance_work_mem=128MB -c max_parallel_workers_per_gather=2 -c max_parallel_workers=2 -c max_worker_processes=8 -c timescaledb.max_background_workers=4 -c fsync=on -c synchronous_commit=on -c full_page_writes=on -c timescaledb.telemetry_level=off",
+  "guarded": "sh -c 'test -s \"$PGDATA/PG_VERSION\" && test -s \"$PGDATA/global/pg_control\" || { echo \"Refusing uninitialized benchmark PGDATA\" >&2; exit 78; }; exec /usr/local/bin/docker-entrypoint.sh postgres -c shared_buffers=512MB -c work_mem=32MB -c maintenance_work_mem=128MB -c max_parallel_workers_per_gather=2 -c max_parallel_workers=2 -c max_worker_processes=8 -c timescaledb.max_background_workers=4 -c fsync=on -c synchronous_commit=on -c full_page_writes=on -c timescaledb.telemetry_level=off'"
+}

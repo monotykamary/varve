@@ -1,0 +1,162 @@
+{
+  "at": "2026-09-16T23:35:25.860Z",
+  "expected": {
+    "varve": "e840ec7a-7345-4210-88cd-aba4fea3f219",
+    "timescale": "7ca4127e-fc63-4ba8-917e-399694579f17",
+    "driver": "e23fadfc-f6a2-49d1-8422-1b56c93fdd20"
+  },
+  "reason": "Abort incomplete prefix campaign; no success claim. Preserve partial evidence and stop only exact owned compute.",
+  "aborting": true,
+  "volumes_retained": true,
+  "before": {
+    "project": {
+      "id": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "services": {
+        "edges": [
+          {
+            "node": {
+              "id": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+              "name": "varve-benchmark"
+            }
+          },
+          {
+            "node": {
+              "id": "64ddd834-6732-4582-bf4a-d86bbd0317fa",
+              "name": "varve"
+            }
+          },
+          {
+            "node": {
+              "id": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+              "name": "benchmark-driver"
+            }
+          },
+          {
+            "node": {
+              "id": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+              "name": "timescale-benchmark"
+            }
+          }
+        ]
+      },
+      "volumes": {
+        "edges": [
+          {
+            "node": {
+              "id": "720d3de6-3ce6-4007-b2a1-c3f6d2ee5232",
+              "name": "varve-benchmark-volume"
+            }
+          },
+          {
+            "node": {
+              "id": "a4bbfeed-de4b-4e97-ab15-94f39ba8b557",
+              "name": "varve-volume"
+            }
+          },
+          {
+            "node": {
+              "id": "cdd445af-7c7d-42b8-ba10-5a2055e5abc8",
+              "name": "timescale-benchmark-volume"
+            }
+          }
+        ]
+      },
+      "workspaceId": "18857f84-0af6-4379-9217-e62e2d14b48f"
+    },
+    "original": {
+      "activeDeployments": [
+        {
+          "id": "dbd59af2-5c4c-4e8e-a452-72914ca69528",
+          "status": "SUCCESS"
+        }
+      ],
+      "latestDeployment": {
+        "id": "dbd59af2-5c4c-4e8e-a452-72914ca69528",
+        "status": "SUCCESS"
+      },
+      "region": null,
+      "startCommand": null
+    },
+    "varve": {
+      "instance": {
+        "activeDeployments": [
+          {
+            "id": "e840ec7a-7345-4210-88cd-aba4fea3f219",
+            "status": "SUCCESS"
+          }
+        ],
+        "domains": {
+          "customDomains": [],
+          "serviceDomains": []
+        },
+        "latestDeployment": {
+          "id": "e840ec7a-7345-4210-88cd-aba4fea3f219",
+          "status": "SUCCESS"
+        },
+        "region": null,
+        "startCommand": "/usr/local/bin/varve-entrypoint sh -c 'printf %s \"$VARVE_BENCH_CONFIG\" > /data/probes/benchmark.json; exec varve --data \"${VARVE_DATA_DIR:-/data/varve}\" --config /data/probes/benchmark.json serve --bind :: --port 8080 --allow-remote'"
+      },
+      "limits": {
+        "containers": {
+          "cpu": 2,
+          "memoryBytes": 2000000000,
+          "pidLimit": 1000
+        }
+      }
+    },
+    "timescale": {
+      "instance": {
+        "activeDeployments": [
+          {
+            "id": "7ca4127e-fc63-4ba8-917e-399694579f17",
+            "status": "SUCCESS"
+          }
+        ],
+        "domains": {
+          "customDomains": [],
+          "serviceDomains": []
+        },
+        "latestDeployment": {
+          "id": "7ca4127e-fc63-4ba8-917e-399694579f17",
+          "status": "SUCCESS"
+        },
+        "region": null,
+        "startCommand": "/usr/local/bin/docker-entrypoint.sh postgres -c shared_buffers=512MB -c work_mem=32MB -c maintenance_work_mem=128MB -c max_parallel_workers_per_gather=2 -c max_parallel_workers=2 -c max_worker_processes=8 -c timescaledb.max_background_workers=4 -c fsync=on -c synchronous_commit=on -c full_page_writes=on -c timescaledb.telemetry_level=off"
+      },
+      "limits": {
+        "containers": {
+          "cpu": 2,
+          "memoryBytes": 2000000000,
+          "pidLimit": 1000
+        }
+      }
+    },
+    "driver": {
+      "instance": {
+        "activeDeployments": [
+          {
+            "id": "e23fadfc-f6a2-49d1-8422-1b56c93fdd20",
+            "status": "SUCCESS"
+          }
+        ],
+        "domains": {
+          "customDomains": [],
+          "serviceDomains": []
+        },
+        "latestDeployment": {
+          "id": "e23fadfc-f6a2-49d1-8422-1b56c93fdd20",
+          "status": "SUCCESS"
+        },
+        "region": null,
+        "startCommand": null
+      },
+      "limits": {
+        "containers": {
+          "cpu": 2,
+          "memoryBytes": 1000000000,
+          "pidLimit": 1000
+        }
+      }
+    }
+  }
+}

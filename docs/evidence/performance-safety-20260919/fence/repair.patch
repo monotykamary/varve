@@ -1,0 +1,451 @@
+--- a/src/commit_boundary.rs
++++ b/src/commit_boundary.rs
+@@ -56,6 +56,18 @@
+     }
+ 
+     pub(crate) fn sync(mut self) -> DurableEpoch {
++        if self.publication.is_some() {
++            // Remote CAS can fence State without the publication lease. Release
++            // State before arming or I/O; no-publication outcomes stay unchanged.
++            let health = self.db.lock().and_then(|s| healthy(&s));
++            if let Err(error) = health {
++                self.fail(error, false);
++                return DurableEpoch {
++                    epoch: self,
++                    size: None,
++                };
++            }
++        }
+         let size = if let Some(publication) = self.publication.as_mut() {
+             publication.commit.arm();
+             match publish_append(&self.db, &publication.encoded) {
+@@ -123,6 +135,13 @@
+                     return self.epoch.results;
+                 }
+             };
++            // A sync already in flight may be durable, but an observed remote
++            // fence forbids installing or acknowledging its pending publication.
++            if let Err(error) = healthy(&s) {
++                drop(s);
++                self.epoch.fail(error, true);
++                return self.epoch.results;
++            }
+             let publication = self.epoch.publication.take().expect("synced epoch");
+             let PreparedPublication {
+                 pending,
+--- a/src/owned_epoch_tests.rs
++++ b/src/owned_epoch_tests.rs
+@@ -2,8 +2,380 @@
+ use std::sync::mpsc;
+ use std::time::Duration;
+ use tempfile::TempDir;
++
++// Ship captures under CommitLease before pausing its real FileStore CAS. The
++// competing CAS changes only the bytes/token, not the validity of the JSON head.
++struct FenceRaceStore {
++    store: crate::remote::FileStore,
++    pause: Mutex<Option<(mpsc::Sender<()>, mpsc::Receiver<()>)>>,
++    races: AtomicUsize,
++}
++
++impl RemoteStore for FenceRaceStore {
++    fn local_root(&self) -> Option<&Path> {
++        self.store.local_root()
++    }
++    fn get(&self, key: &str) -> Result<Vec<u8>> {
++        self.store.get(key)
++    }
++    fn get_bounded(&self, key: &str, max: usize) -> Result<Vec<u8>> {
++        self.store.get_bounded(key, max)
++    }
++    fn put_immutable(&self, key: &str, bytes: &[u8]) -> Result<()> {
++        self.store.put_immutable(key, bytes)
++    }
++    fn head(&self) -> Result<Option<crate::remote::HeadObject>> {
++        self.store.head()
++    }
++    fn compare_and_swap_head(&self, expected: Option<&str>, bytes: &[u8]) -> Result<String> {
++        let pause = self.pause.lock().unwrap().take();
++        if let Some((entered, release)) = pause {
++            entered.send(())?;
++            release.recv_timeout(Duration::from_secs(10))?;
++            let mut competing = bytes.to_vec();
++            competing.push(b' ');
++            self.store.compare_and_swap_head(expected, &competing)?;
++            self.races.fetch_add(1, Ordering::SeqCst);
++        }
++        self.store.compare_and_swap_head(expected, bytes)
++    }
++    fn list(&self, prefix: &str) -> Result<Vec<String>> {
++        self.store.list(prefix)
++    }
++    fn delete(&self, key: &str) -> Result<()> {
++        self.store.delete(key)
++    }
++}
++
++fn fence_request(id: &str, now_us: i64) -> WriteRequest {
++    let mut input = request("a", id);
++    input.now_us = now_us;
++    input
++}
++
++fn remote_fence_setup(journal: bool) -> (TempDir, TempDir, Database, Arc<FenceRaceStore>) {
++    let dir = TempDir::new().unwrap();
++    let remote = TempDir::new().unwrap();
++    let store = Arc::new(FenceRaceStore {
++        store: crate::remote::FileStore::new(remote.path()).unwrap(),
++        pause: Mutex::new(None),
++        races: AtomicUsize::new(0),
++    });
++    let db = Database::open_with_remote(
++        dir.path(),
++        Config {
++            segmented_journal: journal,
++            ..Default::default()
++        },
++        Some(store.clone()),
++    )
++    .unwrap();
++    db.create_table(
++        "a",
++        TableConfig {
++            shards: 4,
++            window_us: 10,
++            rollup_widths_us: vec![10],
++            idempotency_window_us: Some(100),
++            ..Default::default()
++        },
++    )
++    .unwrap();
++    db.write_group(vec![fence_request("v1:180:seed", 180)])[0]
++        .as_ref()
++        .unwrap();
++    db.ship().unwrap();
++    (dir, remote, db, store)
++}
++
++fn pause_fence_ship(
++    db: &Database,
++    store: &FenceRaceStore,
++) -> (mpsc::Sender<()>, std::thread::JoinHandle<Result<u64>>) {
++    let (entered, wait) = mpsc::channel();
++    let (release, resume) = mpsc::channel();
++    *store.pause.lock().unwrap() = Some((entered, resume));
++    let shipper = db.clone();
++    let ship = std::thread::spawn(move || shipper.ship());
++    wait.recv_timeout(Duration::from_secs(10)).unwrap();
++    (release, ship)
++}
++
++fn observe_remote_fence(db: &Database, store: &FenceRaceStore, release: mpsc::Sender<()>) {
++    // Only ship can contend here. Its tier CAS error sets State.fenced before
++    // the outer handler waits on our lease; do not join ship while retaining it.
++    let (waiting, wait) = mpsc::channel();
++    db.inner.commit.notify_next_wait(waiting);
++    release.send(()).unwrap();
++    wait.recv_timeout(Duration::from_secs(10)).unwrap();
++    assert_eq!(store.races.load(Ordering::SeqCst), 1);
++    let s = db.lock().unwrap();
++    assert!(
++        s.fenced
++            .as_deref()
++            .is_some_and(|reason| reason.starts_with("remote publication fenced:")),
++        "the real tier CAS path must fence State before the outer handler"
++    );
++}
++
++fn fence_wal_namespace(db: &Database) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
++    fn collect(path: &Path, files: &mut BTreeMap<PathBuf, Option<Vec<u8>>>) {
++        if !path.exists() {
++            return;
++        }
++        if path.is_dir() {
++            files.insert(path.to_path_buf(), None);
++            for entry in fs::read_dir(path).unwrap() {
++                collect(&entry.unwrap().path(), files);
++            }
++        } else {
++            files.insert(path.to_path_buf(), Some(fs::read(path).unwrap()));
++        }
++    }
++    let mut files = BTreeMap::new();
++    collect(&db.inner.root.join("wal"), &mut files);
++    collect(&db.inner.root.join("journal"), &mut files);
++    files
++}
++
++#[test]
++fn real_remote_cas_fence_before_sync_and_after_sync_preserves_only_old_receipts() {
++    for journal in [false, true] {
++        for synced in [false, true] {
++            let (_dir, _remote, db, store) = remote_fence_setup(journal);
++            let (release_cas, ship) = pause_fence_ship(&db, &store);
++            let before = snapshot(&db);
++            let (sequence, generation, wal_bytes, old_receipt) = {
++                let s = db.lock().unwrap();
++                assert_eq!(s.idempotency_floors["a"], 80);
++                (
++                    s.sequence,
++                    s.generation,
++                    s.wal_bytes,
++                    s.catalog.tables["a"].receipts["v1:180:seed"].clone(),
++                )
++            };
++            let writes = db.performance().phases["wal_write"].count;
++            // Capture after ship has sealed/captured any journal segment. Remote
++            // intent files may change; every WAL/journal name and byte is checked.
++            let wal_before = fence_wal_namespace(&db);
++            let epoch = prepare(
++                &db,
++                vec![
++                    fence_request("v1:180:seed", 270),
++                    fence_request("v1:200:new", 200),
++                    fence_request("v1:200:new", 290),
++                ],
++            );
++            assert!(epoch.publication.is_some());
++            assert!(epoch.results.iter().all(Result::is_ok));
++            assert_eq!(epoch.results[0].as_ref().unwrap().sequence, sequence);
++            assert!(epoch.results[0].as_ref().unwrap().duplicate);
++            assert_eq!(epoch.results[1].as_ref().unwrap().sequence, sequence + 1);
++            assert!(!epoch.results[1].as_ref().unwrap().duplicate);
++            assert_eq!(epoch.results[2].as_ref().unwrap().sequence, sequence + 1);
++            assert!(epoch.results[2].as_ref().unwrap().duplicate);
++            assert_eq!(snapshot(&db), before);
++            assert_eq!(fence_wal_namespace(&db), wal_before);
++            let (results, durable_wal) = if synced {
++                let durable = epoch.sync();
++                assert_eq!(snapshot(&db), before, "sync must not install");
++                let durable_wal = fence_wal_namespace(&db);
++                assert_ne!(durable_wal, wal_before, "sync must perform real WAL I/O");
++                observe_remote_fence(&db, &store, release_cas);
++                (durable.install(), durable_wal)
++            } else {
++                observe_remote_fence(&db, &store, release_cas);
++                (epoch.publish(), wal_before)
++            };
++            assert!(ship.join().unwrap().is_err());
++            assert_eq!(results.len(), 3);
++            let old = results[0].as_ref().unwrap();
++            assert!(old.duplicate);
++            assert_eq!(old.sequence, sequence);
++            assert_eq!(old.rows, old_receipt.rows);
++            assert_eq!(old.durability, "local_fsync");
++            for result in &results[1..] {
++                assert!(result.as_ref().unwrap_err().to_string().contains("fenced"));
++            }
++            // Only the independently durable retry's floor (270 - 100), never
++            // the same-epoch duplicate's clock (290 - 100), survives failure.
++            let mut expected: serde_json::Value = serde_json::from_slice(&before).unwrap();
++            expected[3]["a"] = 170.into();
++            assert_eq!(
++                serde_json::from_slice::<serde_json::Value>(&snapshot(&db)).unwrap(),
++                expected
++            );
++            {
++                let s = db.lock().unwrap();
++                assert_eq!(
++                    (s.sequence, s.generation, s.wal_bytes),
++                    (sequence, generation, wal_bytes)
++                );
++                assert_eq!(s.catalog.tables["a"].receipts["v1:180:seed"], old_receipt);
++                assert!(!s.catalog.tables["a"].receipts.contains_key("v1:200:new"));
++                assert_eq!(hot_count(&s), 2);
++                assert_eq!(s.derived_working.load(Ordering::SeqCst), 0);
++            }
++            assert_eq!(
++                db.performance().phases["wal_write"].count,
++                writes + u64::from(synced)
++            );
++            assert_eq!(
++                fence_wal_namespace(&db),
++                durable_wal,
++                "never truncate durable bytes"
++            );
++            assert_eq!(db.inner.commit.is_poisoned(), synced);
++            assert!(!db.is_ready());
++            let raw = db.inner.raw_memory.status();
++            assert_eq!(raw.reserved_bytes, raw.live_bytes);
++            assert_eq!(raw.working_bytes, 0);
++        }
++    }
++}
+ 
+ #[test]
++fn real_remote_cas_fence_does_not_change_prepared_no_publication_outcomes() {
++    for journal in [false, true] {
++        let (_dir, _remote, db, store) = remote_fence_setup(journal);
++        let sequence = db.status().unwrap().sequence;
++        let (release_cas, ship) = pause_fence_ship(&db, &store);
++        let epoch = prepare(
++            &db,
++            vec![
++                fence_request("v1:180:seed", 270),
++                fence_request("v1:180:seed", 275),
++            ],
++        );
++        assert!(epoch.publication.is_none());
++        assert_eq!(db.idempotency_floor_us("a").unwrap(), Some(175));
++        let before = snapshot(&db);
++        let wal_before = fence_wal_namespace(&db);
++        let writes = db.performance().phases["wal_write"].count;
++        // This epoch has no lease. Hold one only to observe ship's post-fence
++        // wait deterministically, then let ship finish before returning outcomes.
++        let observer = db.lock_commit().unwrap();
++        observe_remote_fence(&db, &store, release_cas);
++        drop(observer);
++        assert!(ship.join().unwrap().is_err());
++        let results = epoch.publish();
++        assert_eq!(results.len(), 2);
++        for result in results {
++            let receipt = result.unwrap();
++            assert!(receipt.duplicate);
++            assert_eq!(receipt.sequence, sequence);
++            assert_eq!(receipt.durability, "local_fsync");
++        }
++        assert_eq!(snapshot(&db), before);
++        assert_eq!(fence_wal_namespace(&db), wal_before);
++        assert_eq!(db.performance().phases["wal_write"].count, writes);
++        assert!(!db.inner.commit.is_poisoned());
++        assert!(!db.is_ready());
++    }
++}
++
++#[test]
++fn real_remote_cas_fence_drains_ingestor_senders_and_barrier_without_install() {
++    struct ReleaseInstall(MaintenanceTestHook);
++    impl Drop for ReleaseInstall {
++        fn drop(&mut self) {
++            self.0.release();
++        }
++    }
++
++    for journal in [false, true] {
++        let (_dir, _remote, db, store) = remote_fence_setup(journal);
++        let sequence = db.status().unwrap().sequence;
++        let (release_cas, ship) = pause_fence_ship(&db, &store);
++        let before = snapshot(&db);
++        let hook = MaintenanceTestHook::new(MaintenanceHookPhase::EpochBeforeInstall);
++        db.set_maintenance_test_hook(Some(hook.clone())).unwrap();
++        let ingestor = crate::ingest::Ingestor::new(
++            db.clone(),
++            crate::ingest::IngestConfig {
++                max_group_requests: 1,
++                max_delay: Duration::ZERO,
++                ..Default::default()
++            },
++        )
++        .unwrap();
++        // Drop before ingestor on assertion unwind, so its shutdown cannot
++        // strand the install worker on this test's unreleased pause.
++        let release_install = ReleaseInstall(hook.clone());
++        let mut first = ingestor.submit(fence_request("v1:200:new", 200)).unwrap();
++        assert!(hook.wait_until_blocked(Duration::from_secs(10)));
++        let durable_wal = fence_wal_namespace(&db);
++        observe_remote_fence(&db, &store, release_cas);
++        // Enqueue later work only after observing ship, so it cannot consume the
++        // one-shot waiter probe intended for the real tier error handler.
++        let mut later = ingestor.submit(fence_request("v1:201:later", 201)).unwrap();
++        let mut barrier = ingestor.flush().unwrap();
++        assert!(matches!(
++            first.try_recv(),
++            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
++        ));
++        assert!(matches!(
++            later.try_recv(),
++            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
++        ));
++        assert!(matches!(
++            barrier.try_recv(),
++            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
++        ));
++        assert_eq!(snapshot(&db), before);
++        // No injected error: only the observed real remote fence rejects install.
++        drop(release_install);
++        let draining = ingestor.clone();
++        let (tx, rx) = mpsc::channel();
++        let waiter = std::thread::spawn(move || {
++            assert!(first.blocking_recv().unwrap().is_err());
++            assert!(later.blocking_recv().unwrap().is_err());
++            let terminal = barrier.blocking_recv().unwrap().unwrap();
++            assert_eq!(
++                (
++                    terminal.sequence,
++                    terminal.completed,
++                    terminal.succeeded,
++                    terminal.failed
++                ),
++                (sequence, 2, 0, 2)
++            );
++            draining.shutdown().unwrap();
++            tx.send(()).unwrap();
++        });
++        rx.recv_timeout(Duration::from_secs(10)).unwrap();
++        waiter.join().unwrap();
++        assert!(ship.join().unwrap().is_err());
++        db.set_maintenance_test_hook(None).unwrap();
++        assert_eq!(snapshot(&db), before);
++        assert_eq!(fence_wal_namespace(&db), durable_wal);
++        let stats = ingestor.stats();
++        assert_eq!((stats.submitted, stats.completed, stats.failed), (2, 2, 2));
++        assert_eq!(
++            (stats.pending_requests, stats.pending_bytes, stats.dropped_receivers),
++            (0, 0, 0)
++        );
++        let flow = ingestor.flow_stats();
++        assert_eq!(
++            (flow.claimed, flow.reclaimed, flow.charged_bytes),
++            (3, 3, 0)
++        );
++        assert_eq!(flow.stage_finished, vec![3; 4]);
++        assert!(
++            !flow.fenced,
++            "ordinary database errors must drain the flow ring"
++        );
++        assert!(db.inner.commit.is_poisoned());
++        assert!(!db.is_ready());
++        assert_eq!(db.lock().unwrap().derived_working.load(Ordering::SeqCst), 0);
++        let raw = db.inner.raw_memory.status();
++        assert_eq!(raw.reserved_bytes, raw.live_bytes);
++        assert_eq!(raw.working_bytes, 0);
++    }
++}
++
++#[test]
+ fn followup_gate_only_poison_is_visible_in_status_until_reopen() {
+     for state_reason in [None, Some("specific independently recorded fence")] {
+         let (dir, db, config) = setup(false);
+--- a/src/publication_gate.rs
++++ b/src/publication_gate.rs
+@@ -8,12 +8,18 @@
+     held: Mutex<bool>,
+     changed: Condvar,
+     poisoned: AtomicBool,
++    #[cfg(all(test, feature = "fault-injection"))]
++    wait_probe: Mutex<Option<std::sync::mpsc::Sender<()>>>,
+ }
+ 
+ impl PublicationGate {
+     pub(crate) fn lock(self: &Arc<Self>) -> Result<CommitLease> {
+         let mut held = self.held.lock().unwrap_or_else(|p| p.into_inner());
+         while *held && !self.is_poisoned() {
++            #[cfg(all(test, feature = "fault-injection"))]
++            if let Some(probe) = self.wait_probe.lock().unwrap().take() {
++                let _ = probe.send(());
++            }
+             held = self.changed.wait(held).unwrap_or_else(|p| p.into_inner());
+         }
+         ensure!(
+@@ -27,6 +33,11 @@
+         })
+     }
+ 
++    #[cfg(all(test, feature = "fault-injection"))]
++    pub(crate) fn notify_next_wait(&self, probe: std::sync::mpsc::Sender<()>) {
++        *self.wait_probe.lock().unwrap() = Some(probe);
++    }
++
+     pub(crate) fn is_poisoned(&self) -> bool {
+         self.poisoned.load(Ordering::Acquire)
+     }

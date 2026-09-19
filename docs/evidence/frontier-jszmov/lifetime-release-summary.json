@@ -1,0 +1,162 @@
+{
+  "claims": {
+    "timescale_win": false,
+    "cloud_qualification": false,
+    "p99_qualified": false,
+    "independent_read_arrivals": false
+  },
+  "summaries": [
+    {
+      "name": "lifetime-release-fresh-large-01",
+      "status": "passed",
+      "binary_sha256": "ebed1b9e75255fd4c98ac6855fb9b250fee998803584586a90dbdc762c41c922",
+      "profile_sha256": "23ae83270630d881127817f0a39547cd327144635a99597c476374a6401b675c",
+      "rows": 457200,
+      "offered": 150000,
+      "acknowledged": 150000,
+      "dropped": 0,
+      "failed": 0,
+      "pending": 0,
+      "owned_server_reaped": true,
+      "write_samples": 150,
+      "write_p95_ms": 77.11754099000245,
+      "arrival_p95_ms": 84.96820786967874,
+      "read_samples": 26,
+      "read_p95_ms": 2277.3431669920683,
+      "measured_rows_per_s": 4807.764302279335,
+      "phases": [
+        {
+          "phase": "snapshot",
+          "seconds": 0.772069669,
+          "count": 26
+        },
+        {
+          "phase": "query_wait",
+          "seconds": 0.280660875,
+          "count": 26
+        },
+        {
+          "phase": "query_build",
+          "seconds": 25.195063376,
+          "count": 26
+        },
+        {
+          "phase": "query_run",
+          "seconds": 1.9423236239999997,
+          "count": 26
+        },
+        {
+          "phase": "query_spawn",
+          "seconds": 0.038013543,
+          "count": 16
+        },
+        {
+          "phase": "query_reset",
+          "seconds": 0.050518123,
+          "count": 26
+        },
+        {
+          "phase": "checkpoint_prepare",
+          "seconds": 2.302635209,
+          "count": 6
+        },
+        {
+          "phase": "checkpoint_reclaim",
+          "seconds": 0.033627831999999996,
+          "count": 6
+        },
+        {
+          "phase": "commit_lock_wait",
+          "seconds": 0.02580508599999999,
+          "count": 353
+        },
+        {
+          "phase": "wal_file_sync",
+          "seconds": 0.549393416,
+          "count": 150
+        },
+        {
+          "phase": "wal_directory_sync",
+          "seconds": 0.467684419,
+          "count": 150
+        }
+      ]
+    },
+    {
+      "name": "lifetime-release-fresh-load-01",
+      "status": "overloaded",
+      "binary_sha256": "ebed1b9e75255fd4c98ac6855fb9b250fee998803584586a90dbdc762c41c922",
+      "profile_sha256": "23ae83270630d881127817f0a39547cd327144635a99597c476374a6401b675c",
+      "rows": 546400,
+      "offered": 450000,
+      "acknowledged": 444000,
+      "dropped": 6000,
+      "failed": 0,
+      "pending": 0,
+      "owned_server_reaped": true,
+      "write_samples": 444,
+      "write_p95_ms": 255.93041605316103,
+      "arrival_p95_ms": 413.15345792099833,
+      "read_samples": 24,
+      "read_p95_ms": 2450.9028749307618,
+      "measured_rows_per_s": 14347.90985514575,
+      "phases": [
+        {
+          "phase": "snapshot",
+          "seconds": 0.819767585,
+          "count": 24
+        },
+        {
+          "phase": "query_wait",
+          "seconds": 0.33721912400000004,
+          "count": 24
+        },
+        {
+          "phase": "query_build",
+          "seconds": 24.769449666,
+          "count": 24
+        },
+        {
+          "phase": "query_run",
+          "seconds": 1.889001546,
+          "count": 24
+        },
+        {
+          "phase": "query_spawn",
+          "seconds": 0.034169124,
+          "count": 8
+        },
+        {
+          "phase": "query_reset",
+          "seconds": 0.074444792,
+          "count": 24
+        },
+        {
+          "phase": "checkpoint_prepare",
+          "seconds": 5.772138918,
+          "count": 7
+        },
+        {
+          "phase": "checkpoint_reclaim",
+          "seconds": 0.092259042,
+          "count": 7
+        },
+        {
+          "phase": "commit_lock_wait",
+          "seconds": 0.51345367,
+          "count": 588
+        },
+        {
+          "phase": "wal_file_sync",
+          "seconds": 1.707988609,
+          "count": 390
+        },
+        {
+          "phase": "wal_directory_sync",
+          "seconds": 1.4640871869999998,
+          "count": 390
+        }
+      ]
+    }
+  ]
+}

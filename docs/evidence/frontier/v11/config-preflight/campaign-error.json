@@ -1,0 +1,1 @@
+{"at":"2026-09-17T02:45:05.549Z","message":"Command failed: node /tmp/varve-diagnostic.KOUrtH/ssh.mjs varve /tmp/varve-diagnostic.KOUrtH/probe-varve.py\nOwned SSH probe failed (status 1); Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"<string>\", line 23, in <module>\nAssertionError\n\n","code":1}

@@ -1,0 +1,1 @@
+cargo test --locked --offline -p varve-storage --features fault-injection --test group_commit --test ingest --test ingest_flush --test ingest_traces --test journal_engine --test journal_remote --test remote_store 

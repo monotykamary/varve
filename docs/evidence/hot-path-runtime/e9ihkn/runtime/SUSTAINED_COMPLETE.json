@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "trials": [
+    "runtime_e9ihkn_s1"
+  ],
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "current_varve_deployment": "d5a80f14-dee0-4c53-9f92-4c5447db769c",
+  "driver_deployment": "87b79e52-90f2-4458-8686-1946298e4257",
+  "timescale_deployment": "d79c7afb-94cb-4591-b6ab-503fc8fd484b"
+}

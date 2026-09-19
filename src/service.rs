@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::env;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, ensure};
@@ -28,6 +28,9 @@ use varve::{Config, Database, IngestConfig, Ingestor, Row, TableConfig, WriteReq
 
 #[path = "pg_transport.rs"]
 mod pg_transport;
+#[cfg(test)]
+#[path = "service_retirement_tests.rs"]
+mod retirement_tests;
 #[path = "transport.rs"]
 mod transport;
 
@@ -122,6 +125,7 @@ enum Route {
     Aggregates,
     Jobs,
     Metrics,
+    IngestTraces,
 }
 
 #[derive(Debug, Deserialize)]
@@ -327,6 +331,11 @@ impl Settings {
                         None,
                         defaults.max_group_bytes,
                     )?,
+                    trace_capacity: resolve_usize(
+                        "VARVE_INGEST_TRACE_CAPACITY",
+                        None,
+                        defaults.trace_capacity,
+                    )?,
                     max_delay: Duration::from_millis(resolve_u64(
                         "VARVE_INGEST_MAX_DELAY_MS",
                         None,
@@ -495,25 +504,60 @@ impl Drop for ActiveConnection {
     }
 }
 
-async fn serve_connection(
-    stream: tokio::net::TcpStream,
+// Signal retirement on a completed ordinary response, inside the hard lifetime.
+// Compare elapsed time rather than adding a potentially huge duration to Instant.
+#[derive(Clone, Copy)]
+struct ResponseRetirement {
+    started: tokio::time::Instant,
+    close_after: Duration,
+}
+
+impl ResponseRetirement {
+    fn new(lifetime: Duration, header_timeout: Duration) -> Self {
+        Self {
+            started: tokio::time::Instant::now(),
+            close_after: lifetime - header_timeout.min(lifetime / 2),
+        }
+    }
+
+    fn mark(&self, response: &mut HttpResponse) {
+        if response.status() != StatusCode::SWITCHING_PROTOCOLS
+            && self.started.elapsed() >= self.close_after
+        {
+            // Hyper finishes the response body/framing before closing, without
+            // admitting a subsequent request. A valid WS upgrade stays separate.
+            response.headers_mut().insert(
+                hyper::header::CONNECTION,
+                hyper::header::HeaderValue::from_static("close"),
+            );
+        }
+    }
+}
+
+async fn serve_connection<I>(
+    stream: I,
     state: Arc<State>,
     mut shutdown: watch::Receiver<bool>,
     header_timeout: Duration,
     connection_timeout: Duration,
-) -> Result<()> {
+) -> Result<()>
+where
+    I: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
     let metrics = Arc::clone(&state.metrics);
     let (upgrade_tx, mut upgrade_rx) = tokio::sync::mpsc::channel(1);
     let request_state = state.clone();
+    let retirement = ResponseRetirement::new(connection_timeout, header_timeout);
     let service = service_fn(move |request| {
         let state = Arc::clone(&request_state);
         let upgrade_tx = upgrade_tx.clone();
         async move {
-            let response = if request.uri().path() == "/v1/ws" {
+            let mut response = if request.uri().path() == "/v1/ws" {
                 transport::upgrade(request, &state, &upgrade_tx)
             } else {
                 handle_request(request, state).await
             };
+            retirement.mark(&mut response);
             Ok::<_, Infallible>(response)
         }
     });
@@ -650,14 +694,25 @@ fn preflight(request: &Request<Incoming>, state: &State) -> Result<Route, ApiErr
         (&Method::GET, "/v1/aggregates") => Ok(Route::Aggregates),
         (&Method::GET, "/v1/jobs") => Ok(Route::Jobs),
         (&Method::GET, "/metrics") => Ok(Route::Metrics),
+        (&Method::GET, "/v1/diagnostics/ingest") => Ok(Route::IngestTraces),
         (&Method::POST, "/v1/tables") => Ok(Route::CreateTable),
         (&Method::POST, "/v1/write") => Ok(Route::Write),
         (&Method::POST, "/v1/query") => Ok(Route::Query),
         (&Method::POST, "/v1/maintain") => Ok(Route::Maintain),
         (
             _,
-            "/health" | "/ready" | "/v1/status" | "/v1/tables" | "/v1/policies" | "/v1/aggregates"
-            | "/v1/jobs" | "/metrics" | "/v1/write" | "/v1/query" | "/v1/maintain",
+            "/health"
+            | "/ready"
+            | "/v1/status"
+            | "/v1/tables"
+            | "/v1/policies"
+            | "/v1/aggregates"
+            | "/v1/jobs"
+            | "/metrics"
+            | "/v1/write"
+            | "/v1/query"
+            | "/v1/maintain"
+            | "/v1/diagnostics/ingest",
         ) => Err(ApiError::new(
             StatusCode::METHOD_NOT_ALLOWED,
             "method not allowed",
@@ -767,6 +822,7 @@ async fn process_request(
             })
             .await
         }
+        Route::IngestTraces => Ok(json_response(StatusCode::OK, &state.ingestor.traces())),
         Route::Tables => query_route(&state, "SELECT * FROM varve_tables()").await,
         Route::Policies => query_route(&state, "SELECT * FROM varve_policies()").await,
         Route::Aggregates => {
@@ -809,11 +865,7 @@ async fn process_request(
         }
         Route::Query => {
             let input: QueryInput = read_json_body(request, &state).await?;
-            run_blocking(&state, move |db| {
-                let value = db.query(&input.sql).map_err(database_error)?;
-                Ok(json_response(StatusCode::OK, &value))
-            })
-            .await
+            query_route(&state, input.sql).await
         }
         Route::Maintain => {
             let _: EmptyInput = read_json_body(request, &state).await?;
@@ -829,20 +881,38 @@ async fn process_request(
 }
 
 async fn ingest(state: &State, input: WriteInput) -> Result<varve::WriteReceipt> {
-    let receipt = state.ingestor.submit(WriteRequest {
-        table: input.table,
-        request_id: input.request_id,
-        rows: input.rows,
-        now_us: system_now_us()?,
-    })?;
+    let receipt = state
+        .ingestor
+        .submit_wait(WriteRequest {
+            table: input.table,
+            request_id: input.request_id,
+            rows: input.rows,
+            now_us: system_now_us()?,
+        })
+        .await?;
     receipt
         .await
         .context("ingestion receipt unavailable; outcome may have committed")?
 }
 
-async fn query_route(state: &Arc<State>, sql: &'static str) -> Result<HttpResponse, ApiError> {
+struct QueryCancellation(Arc<AtomicBool>);
+
+impl Drop for QueryCancellation {
+    fn drop(&mut self) {
+        // Dropping a request only signals cancellation. The blocking worker
+        // owns its snapshot/file pins until the query backend has joined.
+        self.0.store(true, Ordering::Release);
+    }
+}
+
+async fn query_route(state: &Arc<State>, sql: impl Into<String>) -> Result<HttpResponse, ApiError> {
+    let sql = sql.into();
+    let cancellation = QueryCancellation(Arc::new(AtomicBool::new(false)));
+    let signal = Arc::clone(&cancellation.0);
     run_blocking(state, move |db| {
-        let value = db.query(sql).map_err(database_error)?;
+        let value = db
+            .query_cancellable(&sql, &signal)
+            .map_err(database_error)?;
         Ok(json_response(StatusCode::OK, &value))
     })
     .await
@@ -1025,6 +1095,14 @@ fn render_metrics(
             "# TYPE varve_fenced gauge\nvarve_fenced {fenced}\n",
             "# TYPE varve_unshipped_batches gauge\nvarve_unshipped_batches {unshipped_batches}\n",
             "# TYPE varve_hot_bytes gauge\nvarve_hot_bytes {hot_bytes}\n",
+            "# TYPE varve_raw_memory_limit_bytes gauge\nvarve_raw_memory_limit_bytes {raw_limit_bytes}\n",
+            "# TYPE varve_raw_memory_working_limit_bytes gauge\nvarve_raw_memory_working_limit_bytes {raw_working_limit_bytes}\n",
+            "# TYPE varve_raw_memory_reserved_bytes gauge\nvarve_raw_memory_reserved_bytes {raw_reserved_bytes}\n",
+            "# TYPE varve_raw_memory_live_bytes gauge\nvarve_raw_memory_live_bytes {raw_live_bytes}\n",
+            "# TYPE varve_raw_memory_working_bytes gauge\nvarve_raw_memory_working_bytes {raw_working_bytes}\n",
+            "# TYPE varve_raw_memory_pinned_bytes gauge\nvarve_raw_memory_pinned_bytes {raw_pinned_bytes}\n",
+            "# TYPE varve_raw_memory_peak_bytes gauge\nvarve_raw_memory_peak_bytes {raw_peak_bytes}\n",
+            "# TYPE varve_raw_memory_rejections_total counter\nvarve_raw_memory_rejections_total {raw_rejections}\n",
             "# TYPE varve_metadata_bytes gauge\nvarve_metadata_bytes {metadata_bytes}\n",
             "# TYPE varve_control_root_bytes gauge\nvarve_control_root_bytes {control_root_bytes}\n",
             "# TYPE varve_derived_encoded_bytes gauge\nvarve_derived_encoded_bytes {derived_encoded_bytes}\n",
@@ -1036,6 +1114,17 @@ fn render_metrics(
             "# TYPE varve_query_workers_reused_total counter\nvarve_query_workers_reused_total {workers_reused}\n",
             "# TYPE varve_query_workers_resets_total counter\nvarve_query_workers_resets_total {workers_resets}\n",
             "# TYPE varve_query_workers_discarded_total counter\nvarve_query_workers_discarded_total {workers_discarded}\n",
+            "# TYPE varve_query_resident_full_loads_total counter\nvarve_query_resident_full_loads_total {resident_full_loads}\n",
+            "# TYPE varve_query_resident_delta_loads_total counter\nvarve_query_resident_delta_loads_total {resident_delta_loads}\n",
+            "# TYPE varve_query_resident_hits_total counter\nvarve_query_resident_hits_total {resident_hits}\n",
+            "# TYPE varve_query_resident_invalidations_total counter\nvarve_query_resident_invalidations_total {resident_invalidations}\n",
+            "# TYPE varve_query_resident_raw_staged_rows_total counter\nvarve_query_resident_raw_staged_rows_total {resident_raw_staged_rows}\n",
+            "# TYPE varve_query_resident_raw_staged_bytes_total counter\nvarve_query_resident_raw_staged_bytes_total {resident_raw_staged_bytes}\n",
+            "# TYPE varve_query_resident_dynamic_loads_total counter\nvarve_query_resident_dynamic_loads_total {resident_dynamic_loads}\n",
+            "# TYPE varve_query_resident_dynamic_staged_bytes_total counter\nvarve_query_resident_dynamic_staged_bytes_total {resident_dynamic_staged_bytes}\n",
+            "# TYPE varve_query_resident_idle_rows gauge\nvarve_query_resident_idle_rows {resident_idle_rows}\n",
+            "# TYPE varve_query_resident_idle_bytes gauge\nvarve_query_resident_idle_bytes {resident_idle_bytes}\n",
+            "# TYPE varve_query_resident_idle_materialized_bytes gauge\nvarve_query_resident_idle_materialized_bytes {resident_idle_materialized_bytes}\n",
             "# TYPE varve_idempotency_keys gauge\nvarve_idempotency_keys {idempotency_keys}\n",
             "# TYPE varve_rollup_groups gauge\nvarve_rollup_groups {rollup_groups}\n",
             "# TYPE varve_decoded_cache_bytes gauge\nvarve_decoded_cache_bytes {decoded_cache_bytes}\n",
@@ -1065,6 +1154,14 @@ fn render_metrics(
         fenced = usize::from(status.fenced.is_some()),
         unshipped_batches = status.unshipped_batches,
         hot_bytes = status.hot_bytes,
+        raw_limit_bytes = status.raw_memory.limit_bytes,
+        raw_working_limit_bytes = status.raw_memory.working_limit_bytes,
+        raw_reserved_bytes = status.raw_memory.reserved_bytes,
+        raw_live_bytes = status.raw_memory.live_bytes,
+        raw_working_bytes = status.raw_memory.working_bytes,
+        raw_pinned_bytes = status.raw_memory.pinned_bytes,
+        raw_peak_bytes = status.raw_memory.peak_bytes,
+        raw_rejections = status.raw_memory.rejections,
         metadata_bytes = status.metadata_bytes,
         control_root_bytes = status.control_root_bytes,
         derived_encoded_bytes = status.derived_encoded_bytes,
@@ -1076,6 +1173,17 @@ fn render_metrics(
         workers_reused = workers.reused,
         workers_resets = workers.resets,
         workers_discarded = workers.discarded,
+        resident_full_loads = workers.resident_full_loads,
+        resident_delta_loads = workers.resident_delta_loads,
+        resident_hits = workers.resident_hits,
+        resident_invalidations = workers.resident_invalidations,
+        resident_raw_staged_rows = workers.resident_raw_staged_rows,
+        resident_raw_staged_bytes = workers.resident_raw_staged_bytes,
+        resident_dynamic_loads = workers.resident_dynamic_loads,
+        resident_dynamic_staged_bytes = workers.resident_dynamic_staged_bytes,
+        resident_idle_rows = workers.resident_idle_rows,
+        resident_idle_bytes = workers.resident_idle_bytes,
+        resident_idle_materialized_bytes = workers.resident_idle_materialized_bytes,
         idempotency_keys = status.idempotency_keys,
         rollup_groups = status.rollup_groups,
         decoded_cache_bytes = status.decoded_cache_bytes,

@@ -1,0 +1,20 @@
+{"case":"epoch_a_value","passed":true,"value":41}
+{"case":"epoch_a_macro","passed":true,"value":41}
+{"case":"old_view_absent","passed":true,"value":0}
+{"case":"old_macro_absent","passed":true,"value":0}
+{"case":"old_variable_absent","passed":true,"value":1}
+{"case":"old_query_log_absent","passed":true,"value":0}
+{"case":"threads_fixed","passed":true,"value":2}
+{"case":"file_read_denied","passed":true,"error_code":7003,"authority_reason":true}
+{"case":"external_access_locked","passed":true,"error_code":2001,"authority_reason":true}
+{"case":"allowlist_locked","passed":true,"error_code":2001,"authority_reason":true}
+{"case":"epoch_b_same_name","passed":true,"value":99}
+{"trial":0,"fresh_connection_reused_database_ms":0.347850}
+{"trial":1,"fresh_connection_reused_database_ms":0.339581}
+{"trial":2,"fresh_connection_reused_database_ms":0.465749}
+{"trial":3,"fresh_connection_reused_database_ms":0.431191}
+{"trial":4,"fresh_connection_reused_database_ms":0.467910}
+{"trial":5,"fresh_connection_reused_database_ms":0.370500}
+{"trial":6,"fresh_connection_reused_database_ms":0.510041}
+{"trial":7,"fresh_connection_reused_database_ms":0.503871}
+{"state":"passed","boundary":"pinned empty-file-authority C diagnostic only; no Varve callbacks, borrow-epoch, cancellation, capacity, cold reuse, or matched-resource qualification"}

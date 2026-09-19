@@ -1,0 +1,117 @@
+{
+  "state": "failed",
+  "failure": "MixedWorkloadError: mixed workload aborted after rejection or wrong result: unhandled errors in a TaskGroup (1 sub-exception)",
+  "initial_rows_per_second": {
+    "timescale": 47245.88792843215,
+    "varve": 45859.2620792225
+  },
+  "mixed": {
+    "state": "failed",
+    "seconds": 47.49829385429621,
+    "offered": 238000,
+    "acknowledged": 237000,
+    "failed_or_ambiguous": 1000,
+    "ack_p95_ms": {
+      "varve": 89.58380669355392,
+      "timescale": 132.07575678825378
+    },
+    "read_latency_recorded": false
+  },
+  "manifest": {
+    "aggregate_width_us": 60000000,
+    "base_timestamp_us": 1789523940000000,
+    "initial_rows": 250000,
+    "mixed_acknowledged_rows": 237000,
+    "seed": 20260915,
+    "series": 1024,
+    "tags": {},
+    "tenants": 4,
+    "timestamp_rule": "base + (i//1024)*1 second + (i%1024) microseconds",
+    "total_committed_watermark_rows": 487000,
+    "value_rule": "((i * 17) % 10000) / 4"
+  },
+  "counters": {
+    "varve_http_requests_total": {
+      "before": 9,
+      "after": 1076,
+      "delta": 1067
+    },
+    "varve_http_errors_total": {
+      "before": 0,
+      "after": 0,
+      "delta": 0
+    },
+    "varve_http_request_timeouts_total": {
+      "before": 0,
+      "after": 0,
+      "delta": 0
+    },
+    "varve_http_connection_timeouts_total": {
+      "before": 0,
+      "after": 1,
+      "delta": 1
+    },
+    "varve_http_rejected_connections_total": {
+      "before": 0,
+      "after": 0,
+      "delta": 0
+    },
+    "varve_http_active_connections": {
+      "before": 1,
+      "after": 1
+    },
+    "varve_http_inflight_requests": {
+      "before": 1,
+      "after": 1
+    },
+    "varve_fenced": {
+      "before": 0,
+      "after": 0
+    },
+    "varve_ingest_rejected_total": {
+      "before": 0,
+      "after": 0,
+      "delta": 0
+    },
+    "varve_ingest_pending_requests": {
+      "before": 0,
+      "after": 0
+    }
+  },
+  "query_p95_ms": {
+    "columnar_checkpointed": {
+      "timescale": {
+        "cross_series_group": 60.261428356170654,
+        "full_count_sum": 18.5638889670372,
+        "minute_continuous_aggregate": 16.250960528850555,
+        "recent_series_time_filter": 5.693860352039337,
+        "window_top_five": 16.56370609998703
+      },
+      "varve": {
+        "cross_series_group": 18.15836876630783,
+        "full_count_sum": 8.668176829814911,
+        "minute_continuous_aggregate": 12.825332581996918,
+        "recent_series_time_filter": 5.243726074695587,
+        "window_top_five": 25.682665407657623
+      }
+    },
+    "default_tiers": {
+      "timescale": {
+        "cross_series_group": 54.37880754470825,
+        "full_count_sum": 34.20228511095047,
+        "minute_continuous_aggregate": 8.670210838317871,
+        "recent_series_time_filter": 5.886197090148926,
+        "window_top_five": 4.628181457519531
+      },
+      "varve": {
+        "cross_series_group": 15.354759991168976,
+        "full_count_sum": 8.886463940143585,
+        "minute_continuous_aggregate": 11.469192802906036,
+        "recent_series_time_filter": 6.481297314167023,
+        "window_top_five": 24.65878427028656
+      }
+    }
+  },
+  "memory_peak": 425058304,
+  "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+}

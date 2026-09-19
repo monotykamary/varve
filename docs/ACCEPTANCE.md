@@ -1,6 +1,6 @@
 # Varve acceptance ledger
 
-This is the initial v0.1 baseline, verified locally on 2026-09-15. Its counts and not-yet-run cloud/CI checks are historical, not the current status. See [VERIFICATION.md](VERIFICATION.md) for that baseline, [EVALUATION.md](EVALUATION.md) for subsequent hardening and cloud evidence, and [PUBLICATION.md](PUBLICATION.md) for the GitHub publication gate. Passing these checks establishes the stated behavior, not production readiness.
+This is the initial v0.1 baseline, verified locally on 2026-09-15. Its counts and not-yet-run cloud/CI checks are historical, not the current status. See [VERIFICATION.md](VERIFICATION.md) for that baseline, [EVALUATION.md](EVALUATION.md) for subsequent hardening and cloud evidence, and [PUBLICATION.md](PUBLICATION.md) for the GitHub publication gate. Passing these checks establishes the stated behavior, not production readiness. The newer [hot-path runtime and Railway gate](HOT_PATH_RUNTIME.md) records selected real-runtime tests, repeat comparisons, recovery and current limitations on separately frozen source bytes.
 
 | ID | Guarantee | Executable evidence | Status |
 | --- | --- | --- | --- |

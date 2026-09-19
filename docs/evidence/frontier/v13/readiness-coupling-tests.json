@@ -1,0 +1,17 @@
+{
+  "cases": 5,
+  "case_names": [
+    "missing_active",
+    "active_deploying",
+    "detail_deploying",
+    "ready",
+    "never_converges"
+  ],
+  "actual_status_and_controller_call_composed": true,
+  "external_commands": 0,
+  "infra_mutations": 0,
+  "helpers": {
+    "status.mjs": "a84e1cf965f8252dc49de1d51d60a6a1856df7b4826591b3bf55917f659a796d",
+    "run-campaign.mjs": "7ecd9a296ad85ecfc899d7e6d0dee114054a030ba6191c2ee2a4a629142bb0ca"
+  }
+}

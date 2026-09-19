@@ -32,7 +32,7 @@ Varve makes that lifecycle a first-class concern **without inheriting an entire 
 | Bring | Varve handles | Keep in mind |
 | --- | --- | --- |
 | Timestamped numeric measurements | Atomic batches, stable shards, event-time windows | Fixed append-only schema, not general relational tables |
-| Hot and historical SQL | Pinned snapshots over memory and verified Parquet | DuckDB v2 alpha, bounded subprocess per query |
+| Hot and historical SQL | Pinned snapshots over memory and verified Parquet | DuckDB v2 alpha; opt-in native Rust adapter, legacy CLI compatibility |
 | Data that should age out | Compaction, archive, raw expiration and independent rollup retention | Explicit policies and capacity limits |
 | An S3-compatible object store | Asynchronous WAL/checkpoint publication and integrity-checked restore | Local acknowledgment is **not** remote acknowledgment |
 

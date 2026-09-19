@@ -16,6 +16,8 @@ struct Args {
     iterations: usize,
     #[arg(long, default_value = ".tools/duckdb")]
     duckdb: PathBuf,
+    #[arg(long)]
+    retained_inputs: bool,
 }
 
 fn measure(db: &Database, sql: &str, expected: &Value, iterations: usize) -> Result<Value> {
@@ -44,6 +46,7 @@ fn main() -> Result<()> {
     let executable = args.duckdb.canonicalize()?;
     let config = Config {
         query_executable: executable.clone(),
+        query_retained_inputs: args.retained_inputs,
         metadata_max_bytes: 64 * 1024 * 1024,
         hot_max_rows: 40000,
         segment_rows: 8192,
@@ -120,6 +123,8 @@ fn main() -> Result<()> {
         include_str!("../src/engine.rs"),
         include_str!("../src/plan.rs"),
         include_str!("../src/query.rs"),
+        include_str!("../src/query/workers.rs"),
+        include_str!("../src/query/resident.rs"),
         include_str!("../Cargo.lock"),
         include_str!("query_readiness_probe.rs"),
     ] {
@@ -136,6 +141,8 @@ fn main() -> Result<()> {
             "source_blake3":fingerprint.finalize().to_hex().to_string(),
             "os":std::env::consts::OS,"arch":std::env::consts::ARCH,
             "profile":"release","duckdb":version,"rows":args.rows,"iterations":args.iterations,
+            "retained_inputs":args.retained_inputs,"workers":db.query_worker_stats(),
+            "performance":db.performance(),
             "shards":16,"query_threads":2,"query_memory_mb":128,
             "rollup_widths_us":[1,64,256],"warmup_per_case":1,
             "durability":"local_fsync; no remote backend; ingestion excluded from timing",

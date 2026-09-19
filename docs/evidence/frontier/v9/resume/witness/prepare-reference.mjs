@@ -1,0 +1,15 @@
+import {readFileSync,writeFileSync,copyFileSync,constants} from 'node:fs';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+const parent='/tmp/varve-prefix2.2Q0Icf',root=parent+'/resume-stress';
+const bytes=readFileSync(parent+'/prefix001.json'),report=JSON.parse(bytes);
+assert.equal(report.state,'passed');assert(report.finished_at);assert.equal(report.manifest.total_committed_watermark_rows,550000);assert.equal(report.mixed_workload.failed_or_ambiguous_rows,0);
+const sha=createHash('sha256').update(bytes).digest('hex');
+const reference={state:report.state,namespaces:report.namespaces,manifest:{total_committed_watermark_rows:report.manifest.total_committed_watermark_rows},mixed_workload:{failed_or_ambiguous_rows:0},resume_reference:{original_report_sha256:sha,scope:'Minimal recovery metadata only; full original report retained locally. No baseline load rerun.'}};
+const text=JSON.stringify(reference)+'\n';
+writeFileSync(root+'/prefix001.recovery-reference.json',text,{flag:'wx',mode:0o600});
+let script=readFileSync(root+'/restore-reference.template.py','utf8').replace('__REFERENCE_LITERAL__',JSON.stringify(text)).replace('__REFERENCE_SHA__',createHash('sha256').update(text).digest('hex'));
+writeFileSync(root+'/restore-reference.py',script,{flag:'wx',mode:0o600});
+for(const name of ['prefix001.json','prefix001-bundle.json','prefix001.launch.json','prefix001.log'])copyFileSync(parent+'/'+name,root+'/'+name,constants.COPYFILE_EXCL);
+writeFileSync(root+'/resume-intent.json',JSON.stringify({at:new Date().toISOString(),source_digest:'9ed8187afb8b8f9846ee62e80a8ddf32b442c6ca188d1dd330d07728018dca81',baseline_report_sha256:sha,baseline_rerun:false,remaining_workload:'prefix002 stress',retained_database_directory:'prefix-2q0icf',intervening_restart:true,fresh_uninterrupted_trial:false},null,2)+'\n',{flag:'wx',mode:0o600});
+console.log(JSON.stringify({baseline_report_sha256:sha,baseline_rows:550000,reference_bytes:Buffer.byteLength(text),baseline_rerun:false,infra_mutations:0}));

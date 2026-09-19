@@ -1,0 +1,804 @@
+{
+  "arch": "aarch64",
+  "cold_definition": "local Parquet with warm OS cache, not cold disk or S3",
+  "duckdb": "v2.0.0-alpha41533 (Cyanoptera) 10de957379",
+  "durability": "local_fsync; no remote backend; ingestion excluded from timing",
+  "iterations": 20,
+  "os": "macos",
+  "performance": {
+    "phases": {
+      "append_accounting": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 1,
+        "max_ns": 2016167,
+        "total_ns": 2016167
+      },
+      "checkpoint_capture": {
+        "buckets": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 2,
+        "max_ns": 19447958,
+        "total_ns": 19450125
+      },
+      "checkpoint_locked": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 1,
+        "max_ns": 11825916,
+        "total_ns": 11825916
+      },
+      "checkpoint_prepare": {
+        "buckets": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 2,
+        "max_ns": 86837167,
+        "total_ns": 86839376
+      },
+      "checkpoint_publish": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 2,
+        "max_ns": 7422000,
+        "total_ns": 13507666
+      },
+      "commit_detach": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 1,
+        "max_ns": 3525709,
+        "total_ns": 3525709
+      },
+      "commit_install": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 1,
+        "max_ns": 2776042,
+        "total_ns": 2776042
+      },
+      "commit_lock_wait": {
+        "buckets": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 5,
+        "max_ns": 291,
+        "total_ns": 751
+      },
+      "compaction_prepare": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      },
+      "compaction_publish": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      },
+      "derived_publish": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      },
+      "derived_verify": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      },
+      "disk_account": {
+        "buckets": [
+          0,
+          0,
+          1,
+          19,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 21,
+        "max_ns": 1123125,
+        "total_ns": 5083331
+      },
+      "disk_lock_hold": {
+        "buckets": [
+          0,
+          0,
+          2,
+          3,
+          20,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 25,
+        "max_ns": 7329583,
+        "total_ns": 80091874
+      },
+      "disk_lock_wait": {
+        "buckets": [
+          24,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 25,
+        "max_ns": 1375,
+        "total_ns": 3834
+      },
+      "group_prepare": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      },
+      "manifest_commit": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 2,
+        "max_ns": 7208833,
+        "total_ns": 12914333
+      },
+      "query_build": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          126,
+          0,
+          0,
+          0
+        ],
+        "count": 126,
+        "max_ns": 537133542,
+        "total_ns": 19415842828
+      },
+      "query_reset": {
+        "buckets": [
+          0,
+          0,
+          0,
+          103,
+          22,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 126,
+        "max_ns": 19317208,
+        "total_ns": 116907292
+      },
+      "query_run": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          113,
+          13,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 126,
+        "max_ns": 32187125,
+        "total_ns": 682967587
+      },
+      "query_spawn": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 1,
+        "max_ns": 1633042,
+        "total_ns": 1633042
+      },
+      "query_wait": {
+        "buckets": [
+          0,
+          0,
+          20,
+          106,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 126,
+        "max_ns": 335292,
+        "total_ns": 18973548
+      },
+      "raw_publish": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 16,
+        "max_ns": 4257666,
+        "total_ns": 55107542
+      },
+      "raw_verify": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      },
+      "remote_io": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      },
+      "root_prepare": {
+        "buckets": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 2,
+        "max_ns": 23020833,
+        "total_ns": 23035874
+      },
+      "snapshot": {
+        "buckets": [
+          0,
+          0,
+          80,
+          45,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 126,
+        "max_ns": 1878667,
+        "total_ns": 13643043
+      },
+      "state_lock_hold": {
+        "buckets": [
+          1,
+          0,
+          80,
+          45,
+          7,
+          3,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 136,
+        "max_ns": 19449458,
+        "total_ns": 90390255
+      },
+      "state_lock_wait": {
+        "buckets": [
+          134,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 136,
+        "max_ns": 3042,
+        "total_ns": 38830
+      },
+      "wal_disk_lock_wait": {
+        "buckets": [
+          4,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 4,
+        "max_ns": 542,
+        "total_ns": 1291
+      },
+      "wal_encode": {
+        "buckets": [
+          0,
+          2,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 3,
+        "max_ns": 1289542,
+        "total_ns": 1297458
+      },
+      "wal_sync": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          6,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 6,
+        "max_ns": 2911917,
+        "total_ns": 14245167
+      },
+      "wal_write": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 3,
+        "max_ns": 5706250,
+        "total_ns": 15737750
+      },
+      "write_prepare": {
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "count": 0,
+        "max_ns": 0,
+        "total_ns": 0
+      }
+    }
+  },
+  "profile": "release",
+  "query_memory_mb": 128,
+  "query_threads": 2,
+  "results": [
+    {
+      "case": "raw_selective",
+      "measurement": {
+        "median_ms": 153.482625,
+        "samples_ms": [
+          159.904833,
+          173.512,
+          121.468125,
+          144.834833,
+          148.790334,
+          153.482625,
+          169.63087499999997,
+          180.09112499999998,
+          147.530334,
+          209.581583,
+          149.198417,
+          146.018542,
+          167.424083,
+          124.62258299999999,
+          157.473209,
+          148.102667,
+          184.989083,
+          142.272458,
+          180.31766599999997,
+          142.234667
+        ],
+        "sql": "SELECT count(*)::BIGINT AS n, sum(value) AS total FROM metrics WHERE tenant = 'tenant-1' AND series = 'series-1'"
+      },
+      "phase": "hot"
+    },
+    {
+      "case": "aggregate_selective",
+      "measurement": {
+        "median_ms": 162.104792,
+        "samples_ms": [
+          153.30212500000002,
+          216.5675,
+          158.04095800000002,
+          210.653333,
+          161.642875,
+          139.9645,
+          133.55004200000002,
+          162.104792,
+          206.065625,
+          177.033417,
+          139.496167,
+          562.570542,
+          271.46520899999996,
+          163.66445800000002,
+          143.746125,
+          214.73904199999998,
+          153.224792,
+          178.133792,
+          143.96283400000002,
+          159.75025000000002
+        ],
+        "sql": "SELECT sum(count)::BIGINT AS n, sum(sum) AS total FROM metrics_one WHERE tenant = 'tenant-1' AND series = 'series-1'"
+      },
+      "phase": "hot"
+    },
+    {
+      "case": "raw_full",
+      "measurement": {
+        "median_ms": 146.599584,
+        "samples_ms": [
+          137.099042,
+          139.65629199999998,
+          186.16429100000002,
+          139.266042,
+          144.35704199999998,
+          148.700708,
+          162.59658299999998,
+          138.190708,
+          137.152458,
+          146.599584,
+          158.68558299999998,
+          140.330334,
+          149.627459,
+          315.83120799999995,
+          293.835291,
+          156.75675,
+          140.072917,
+          139.754042,
+          140.25454200000001,
+          164.57595899999998
+        ],
+        "sql": "SELECT count(*)::BIGINT AS n, sum(value) AS total FROM metrics"
+      },
+      "phase": "hot"
+    },
+    {
+      "case": "raw_selective",
+      "measurement": {
+        "median_ms": 135.41133399999998,
+        "samples_ms": [
+          112.217833,
+          125.09200000000001,
+          132.987,
+          144.53845800000002,
+          118.334083,
+          126.997792,
+          134.177708,
+          135.41133399999998,
+          140.321042,
+          169.054375,
+          137.190041,
+          174.971791,
+          211.495166,
+          154.287709,
+          139.836333,
+          130.24987499999997,
+          132.926625,
+          157.695625,
+          131.92712500000002,
+          133.214458
+        ],
+        "sql": "SELECT count(*)::BIGINT AS n, sum(value) AS total FROM metrics WHERE tenant = 'tenant-1' AND series = 'series-1'"
+      },
+      "phase": "parquet"
+    },
+    {
+      "case": "aggregate_selective",
+      "measurement": {
+        "median_ms": 142.814417,
+        "samples_ms": [
+          128.086,
+          133.189625,
+          171.649041,
+          137.74225,
+          137.133542,
+          166.042875,
+          147.808875,
+          154.969042,
+          130.108042,
+          189.893042,
+          302.354375,
+          146.755541,
+          133.6415,
+          141.52141600000002,
+          130.171458,
+          143.278042,
+          134.158625,
+          142.814417,
+          132.703875,
+          147.930583
+        ],
+        "sql": "SELECT sum(count)::BIGINT AS n, sum(sum) AS total FROM metrics_one WHERE tenant = 'tenant-1' AND series = 'series-1'"
+      },
+      "phase": "parquet"
+    },
+    {
+      "case": "raw_full",
+      "measurement": {
+        "median_ms": 145.95487500000002,
+        "samples_ms": [
+          134.35525,
+          160.913834,
+          179.05058300000002,
+          145.47970800000002,
+          136.376666,
+          145.95487500000002,
+          134.451666,
+          140.5405,
+          123.866167,
+          182.42183400000002,
+          156.538916,
+          153.514958,
+          136.889,
+          167.26975,
+          138.34675,
+          142.118875,
+          130.763417,
+          161.95379200000002,
+          178.199417,
+          192.734583
+        ],
+        "sql": "SELECT count(*)::BIGINT AS n, sum(value) AS total FROM metrics"
+      },
+      "phase": "parquet"
+    }
+  ],
+  "retained_inputs": true,
+  "rollup_widths_us": [
+    1,
+    64,
+    256
+  ],
+  "rows": 1024,
+  "scope": "Varve-only local query probe; not a Timescale comparison",
+  "shards": 16,
+  "source_blake3": "3e04fd9dfe75dfa04a6118051bc2e4e0988463658ed37c18620135721205553e",
+  "warmup_per_case": 1,
+  "workers": {
+    "active": 0,
+    "discarded": 0,
+    "idle": 1,
+    "resets": 126,
+    "resident_delta_loads": 0,
+    "resident_dynamic_loads": 4,
+    "resident_dynamic_staged_bytes": 10930,
+    "resident_full_loads": 1,
+    "resident_hits": 125,
+    "resident_idle_bytes": 242791,
+    "resident_idle_rows": 1024,
+    "resident_invalidations": 0,
+    "resident_raw_staged_bytes": 11190,
+    "resident_raw_staged_rows": 1024,
+    "reused": 125,
+    "spawned": 1
+  }
+}

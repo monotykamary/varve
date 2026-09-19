@@ -1,0 +1,8 @@
+{
+  "cases": 2,
+  "actual_readiness_source_exercised": true,
+  "semantically_equal_but_different_payload_rejected": true,
+  "external_commands": 0,
+  "infra_mutations": 0,
+  "verify_ready_sha256": "1f283dfbf3de036be20d729e1011cef4bf7c6e40cd72a3abdf78e78621f680a1"
+}

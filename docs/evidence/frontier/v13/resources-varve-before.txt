@@ -1,0 +1,10 @@
+at=2026-09-17T05:33:16Z
+region=asia-southeast1-eqsg3a
+boot_id=ab52f94c-7280-4dc1-b06a-306e952c584b
+process_start_ticks=564805493
+uid=10001
+cpu.max=200000 100000;
+memory.max=1999998976;
+memory.peak=141160448;
+memory.events=low 0;high 0;max 0;oom 0;oom_kill 0;oom_group_kill 0;
+cpu.stat=usage_usec 838258;user_usec 488346;system_usec 349911;nice_usec 0;nr_periods 150;nr_throttled 0;throttled_usec 0;nr_bursts 0;burst_usec 0;

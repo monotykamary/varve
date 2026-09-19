@@ -1,0 +1,6 @@
+{
+  "engine_reverse_instrumentation_matches_query_owner_source": true,
+  "tier_only_guard_routing_changed": true,
+  "wal_model_ingest_derived_dependencies_config_unchanged": true,
+  "scope": "Exact text reversal plus protected source hashes; guard/timer correctness requires separate tests/review"
+}

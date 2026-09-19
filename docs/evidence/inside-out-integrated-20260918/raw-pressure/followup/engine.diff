@@ -1,0 +1,15 @@
+--- ../raw-pressure/src/engine.rs	2026-09-18 18:08:58.000000000 +0000
++++ src/engine.rs	2026-09-18 18:25:57.000000000 +0000
+@@ -2211,7 +2211,11 @@
+                     .sum(),
+                 active_queries: self.inner.query_active.load(Ordering::SeqCst),
+                 active_snapshots: self.inner.readers.load(Ordering::SeqCst),
+-                fenced: s.fenced.clone(),
++                fenced: s.fenced.clone().or_else(|| {
++                    self.inner.commit.is_poisoned().then(|| {
++                        "publication gate poisoned; reopen for recovery before further writes".to_owned()
++                    })
++                }),
+                 last_maintenance_error: s.last_maintenance_error.clone(),
+             }
+         };

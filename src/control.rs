@@ -1,7 +1,7 @@
 use crate::engine::*;
 use crate::job_runtime::{self, JobRuntime};
 use crate::model::*;
-use crate::{segment, wal};
+use crate::wal;
 use anyhow::{Context, Result, bail, ensure};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -541,6 +541,7 @@ impl Database {
     pub fn set_policy(&self, table: &str, policy: LifecyclePolicy) -> Result<u64> {
         validate_name(table)?;
         policy.validate()?;
+        let _commit = self.lock_commit()?;
         let mut s = self.lock()?;
         healthy(&s)?;
         let sequence = next_sequence(&s)?;
@@ -614,6 +615,7 @@ impl Database {
         validate_name(source)?;
         ensure!(width_us > 0, "aggregate width_us must be positive");
         let (barrier, cutoff, segments, mut backfill, pin, _backfill_working, backfill_budget) = {
+            let _commit = self.lock_commit()?;
             let mut s = self.lock()?;
             healthy(&s)?;
             ensure!(
@@ -697,8 +699,7 @@ impl Database {
                     descriptor.decoded_bytes <= self.inner.config.hot_max_bytes as u64,
                     "backfill segment exceeds bounded working set"
                 );
-                let path = resolve_segment(&self.inner, descriptor)?;
-                let rows = segment::read(&path)?;
+                let rows = read_raw_segment(&self.inner, descriptor, true)?;
                 ensure!(
                     rows.len() as u64 == descriptor.rows,
                     "backfill segment row-count mismatch"
@@ -707,6 +708,7 @@ impl Database {
             }
         }
         drop(pin);
+        let _commit = self.lock_commit()?;
         let mut s = self.lock()?;
         healthy(&s)?;
         ensure!(
@@ -752,6 +754,7 @@ impl Database {
 
     pub fn drop_continuous_aggregate(&self, name: &str) -> Result<u64> {
         validate_name(name)?;
+        let _commit = self.lock_commit()?;
         let mut s = self.lock()?;
         healthy(&s)?;
         let sequence = next_sequence(&s)?;
@@ -794,6 +797,7 @@ impl Database {
     pub fn create_job(&self, name: &str, kind: JobKind, interval_us: i64) -> Result<u64> {
         validate_name(name)?;
         validate_interval(interval_us)?;
+        let _commit = self.lock_commit()?;
         let mut s = self.lock()?;
         healthy(&s)?;
         ensure!(
@@ -832,6 +836,7 @@ impl Database {
             alter.interval_us.is_some() || alter.paused.is_some(),
             "empty job alteration"
         );
+        let _commit = self.lock_commit()?;
         let mut s = self.lock()?;
         healthy(&s)?;
         let sequence = next_sequence(&s)?;
@@ -889,6 +894,7 @@ impl Database {
             name != BUILTIN_MAINTENANCE_JOB,
             "the built-in maintenance job cannot be dropped"
         );
+        let _commit = self.lock_commit()?;
         let mut s = self.lock()?;
         healthy(&s)?;
         let definition = s.catalog.jobs.get(name).context("job does not exist")?;
@@ -942,6 +948,7 @@ impl Database {
             }
         }
         let started = (|| {
+            let _commit = self.lock_commit()?;
             let mut s = self.lock()?;
             healthy(&s)?;
             let definition = s
@@ -1022,6 +1029,7 @@ impl Database {
                 };
                 let next_run_us = now_us.checked_add(delay).context("job next-run overflow")?;
                 let persisted = (|| {
+                    let _commit = self.lock_commit()?;
                     let mut s = self.lock()?;
                     healthy(&s)?;
                     let definition = s

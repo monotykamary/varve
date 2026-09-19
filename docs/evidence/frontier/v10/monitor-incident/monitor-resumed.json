@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-17T01:55:51.371Z",
+  "deployment_id": "760674f1-f2a5-4df8-8aa5-b7422be8061b",
+  "original_monitor": {
+    "at": "2026-09-17T01:49:22.614Z",
+    "pid": 24423
+  },
+  "source_upload_accepted": true,
+  "source_upload_retried": false,
+  "original_monitor_dead": true,
+  "benchmark_workloads_started": 0,
+  "other_benchmark_compute": 0,
+  "source_or_runtime_changed": false,
+  "incident": "The upload returned promptly and the first controller DID start. The captured Bash override exposes command/timeout only; background:true did not detach. The outer 185-second timeout killed that monitor while Varve was still BUILDING. A subsequent launch was refused by its existing-start guard. Its shell redirect overwrote the initial monitor log with that refusal; the initial log is unavailable. No workload or driver deployment had started. The earlier upload-timeout explanation was an incorrect inference and is superseded here. Preserve the old start/guard records and resume the identical controller using shell-level nohup detachment, not another upload."
+}

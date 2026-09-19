@@ -42,17 +42,8 @@ pub fn plan_with_catalog(
     };
 
     let mut query_counter = QueryCounter::default();
-    if query.visit(&mut query_counter).is_break() {
-        return None;
-    }
-
-    if query.with.is_some()
-        || !query.locks.is_empty()
-        || query.for_clause.is_some()
-        || query.settings.is_some()
-        || query.format_clause.is_some()
-        || !query.pipe_operators.is_empty()
-    {
+    let _ = query.visit(&mut query_counter);
+    if !is_supported_query(&query) {
         return None;
     }
 
@@ -63,33 +54,31 @@ pub fn plan_with_catalog(
         return None;
     }
     if select.from.is_empty() || metadata_only_select(select, catalog) {
-        return Some(storage_free_plan());
+        return (query_counter.count == 1).then(storage_free_plan);
     }
-    if select.from.len() != 1 {
+
+    let source = base_source(&query)?;
+    if source.query_count != query_counter.count {
+        // A derived-table chain is the only accepted location for nested queries.
+        return None;
+    }
+    if source.query_count > 1 && query.visit(&mut NestedChainValidator).is_break() {
         return None;
     }
 
-    let from = &select.from[0];
-    if !from.joins.is_empty() {
-        return None;
-    }
-
-    let (relation, alias) = plain_table(&from.relation)?;
-    let (table, rollup, rollup_width_us) = resolve_table(relation, table_names, catalog)?;
-    let qualifier = alias.unwrap_or(relation);
+    let (table, rollup, rollup_width_us) = resolve_table(source.relation, table_names, catalog)?;
+    let qualifier = source.alias.unwrap_or(source.relation);
     let bounds = if rollup {
         // Raw timestamps and aggregate bucket timestamps have different semantics.
         Bounds::default()
     } else {
-        select
+        source
             .selection
-            .as_ref()
             .map(|selection| extract_bounds(selection, qualifier))
             .unwrap_or_default()
     };
-    let series = select
+    let series = source
         .selection
-        .as_ref()
         .map(|selection| extract_series(selection, qualifier))
         .unwrap_or_default();
 
@@ -106,6 +95,10 @@ pub fn plan_with_catalog(
 }
 
 impl ScanPlan {
+    pub(crate) fn proves_single_storage_source(&self) -> bool {
+        !self.table.is_empty()
+    }
+
     pub fn matches_series(&self, tenant: &str, series: &str) -> bool {
         !self.empty
             && self
@@ -221,12 +214,84 @@ impl Visitor for QueryCounter {
 
     fn pre_visit_query(&mut self, _query: &Query) -> ControlFlow<Self::Break> {
         self.count += 1;
-        if self.count > 1 {
+        ControlFlow::Continue(())
+    }
+}
+
+struct NestedChainValidator;
+
+impl Visitor for NestedChainValidator {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        if matches!(expr, Expr::Collate { .. }) {
             ControlFlow::Break(())
         } else {
             ControlFlow::Continue(())
         }
     }
+}
+
+struct BaseSource<'a> {
+    relation: &'a Ident,
+    alias: Option<&'a Ident>,
+    selection: Option<&'a Expr>,
+    query_count: usize,
+}
+
+fn base_source(query: &Query) -> Option<BaseSource<'_>> {
+    if !is_supported_query(query) {
+        return None;
+    }
+    let SetExpr::Select(select) = query.body.as_ref() else {
+        return None;
+    };
+    if !is_supported_select(select) || select.from.len() != 1 {
+        return None;
+    }
+    let from = &select.from[0];
+    if !from.joins.is_empty() {
+        return None;
+    }
+
+    if let Some((relation, alias)) = plain_table(&from.relation) {
+        return Some(BaseSource {
+            relation,
+            alias,
+            selection: select.selection.as_ref(),
+            query_count: 1,
+        });
+    }
+
+    let TableFactor::Derived {
+        lateral,
+        subquery,
+        alias,
+        sample,
+    } = &from.relation
+    else {
+        return None;
+    };
+    if *lateral
+        || sample.is_some()
+        || alias
+            .as_ref()
+            .is_some_and(|alias| !alias.columns.is_empty())
+    {
+        return None;
+    }
+    let mut source = base_source(subquery)?;
+    source.query_count += 1;
+    Some(source)
+}
+
+fn is_supported_query(query: &Query) -> bool {
+    query.with.is_none()
+        && query.locks.is_empty()
+        && query.for_clause.is_none()
+        && query.settings.is_none()
+        && query.format_clause.is_none()
+        && query.pipe_operators.is_empty()
 }
 
 fn is_supported_select(select: &Select) -> bool {
@@ -771,12 +836,89 @@ mod tests {
     }
 
     #[test]
-    fn visitor_rejects_nested_queries_anywhere() {
+    fn nested_single_source_chains_use_only_base_select_predicates() {
+        let plan = planned(
+            r#"SELECT timestamp_us, value
+                FROM (
+                    SELECT timestamp_us, value,
+                        row_number() OVER (
+                            ORDER BY timestamp_us DESC, value DESC
+                        ) AS rn
+                    FROM metrics m
+                    WHERE m.tenant='tenant_0'
+                        AND m.series='series_0000'
+                        AND m.timestamp_us >= 10
+                ) ranked
+                WHERE rn <= 5"#,
+        );
+        assert_eq!(plan.tenant.as_deref(), Some("tenant_0"));
+        assert_eq!(plan.series.as_deref(), Some("series_0000"));
+        assert_eq!((plan.start_us, plan.end_us), (Some(10), None));
+
+        let plan = planned(
+            r#"SELECT *
+                FROM (
+                    SELECT *
+                    FROM (
+                        SELECT * FROM metrics
+                        WHERE tenant='a' AND timestamp_us < 20
+                        LIMIT 100
+                    ) first
+                    LIMIT 10
+                ) second
+                WHERE timestamp_us >= 15 AND series='outer'"#,
+        );
+        assert_eq!(plan.tenant.as_deref(), Some("a"));
+        assert_eq!(plan.series, None);
+        assert_eq!((plan.start_us, plan.end_us), (None, Some(20)));
+
+        let plan = planned(
+            r#"SELECT *
+                FROM (
+                    SELECT tenant, sum(value) AS total
+                    FROM metrics
+                    WHERE series='cpu'
+                    GROUP BY tenant
+                ) grouped
+                WHERE tenant='a'"#,
+        );
+        assert_eq!(plan.tenant, None);
+        assert_eq!(plan.series.as_deref(), Some("cpu"));
+    }
+
+    #[test]
+    fn outer_predicates_never_cross_a_derived_boundary() {
+        let plan = planned(
+            r#"SELECT *
+                FROM (
+                    SELECT *, row_number() OVER (ORDER BY timestamp_us) AS rn
+                    FROM metrics
+                    LIMIT 10
+                ) ranked
+                WHERE tenant='a'
+                    AND series='cpu'
+                    AND timestamp_us >= 10
+                    AND rn <= 5"#,
+        );
+        assert_eq!(plan.tenant, None);
+        assert_eq!(plan.series, None);
+        assert_eq!((plan.start_us, plan.end_us), (None, None));
+    }
+
+    #[test]
+    fn rejects_side_queries_ambiguous_sources_and_unsupported_nested_syntax() {
         for sql in [
             "SELECT (SELECT max(value) FROM events) FROM metrics",
             "SELECT * FROM metrics WHERE value IN (SELECT value FROM events)",
             "SELECT * FROM metrics ORDER BY (SELECT max(value) FROM events)",
-            "SELECT * FROM (SELECT * FROM metrics) m",
+            "SELECT * FROM (SELECT timestamp_us, (SELECT max(value) FROM events) FROM metrics WHERE tenant='a') nested",
+            "SELECT * FROM (SELECT * FROM metrics WHERE value IN (SELECT value FROM events)) nested",
+            "SELECT * FROM (SELECT * FROM metrics JOIN events ON true) nested",
+            "SELECT * FROM (SELECT * FROM metrics, events) nested",
+            "SELECT * FROM (SELECT * FROM metrics UNION ALL SELECT * FROM events) nested",
+            "SELECT * FROM (WITH source AS (SELECT * FROM metrics) SELECT * FROM source) nested",
+            "SELECT * FROM (SELECT * FROM metrics WHERE tenant COLLATE NOCASE = 'a') nested",
+            "SELECT * FROM LATERAL (SELECT * FROM metrics) nested",
         ] {
             assert!(plan(sql, &tables()).is_none(), "unexpected plan for {sql}");
         }
@@ -829,6 +971,56 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn storage_source_proof_depends_on_shape_and_aliases_not_catalog_rows() {
+        let mut catalog = QueryCatalog {
+            relations: vec![crate::query::CatalogRelation {
+                name: "varve_status".to_string(),
+                columns: vec![("sequence".to_string(), "UBIGINT".to_string())],
+                rows: vec![serde_json::json!([7])],
+            }],
+            aggregates: vec![crate::query::AggregateAlias {
+                name: "cpu_hourly".to_string(),
+                source: "metrics".to_string(),
+                width_us: 3_600_000_000,
+            }],
+        };
+        for sql in [
+            "SELECT * FROM metrics",
+            "SELECT * FROM (SELECT * FROM metrics WHERE tenant='a') nested",
+            "SELECT * FROM cpu_hourly",
+        ] {
+            let full = plan_with_catalog(sql, &tables(), &catalog);
+            catalog.relations[0].rows.clear();
+            let schema_only = plan_with_catalog(sql, &tables(), &catalog);
+            assert_eq!(full, schema_only, "{sql}");
+            assert!(
+                schema_only
+                    .as_ref()
+                    .is_some_and(ScanPlan::proves_single_storage_source),
+                "{sql}"
+            );
+            catalog.relations[0].rows = vec![serde_json::json!([9])];
+        }
+
+        for sql in [
+            "SELECT 1",
+            "SELECT * FROM varve_status()",
+            "SELECT (SELECT sequence FROM varve_status()) FROM metrics",
+            "SELECT * FROM metrics JOIN varve_status() ON true",
+            "WITH source AS (SELECT * FROM metrics) SELECT * FROM source",
+            "SELECT * FROM query_table('metrics')",
+            "SELECT * FROM __varve_input",
+        ] {
+            assert!(
+                !plan_with_catalog(sql, &tables(), &catalog)
+                    .as_ref()
+                    .is_some_and(ScanPlan::proves_single_storage_source),
+                "unexpected storage-only proof for {sql}"
+            );
+        }
     }
 
     #[test]

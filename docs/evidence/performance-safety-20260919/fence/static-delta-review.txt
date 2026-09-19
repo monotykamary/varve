@@ -1,0 +1,4 @@
+src/publication_gate.rs: exact approved additions only; baseline remainder byte-identical
+src/commit_boundary.rs: exact approved additions only; baseline remainder byte-identical
+src/owned_epoch_tests.rs: all existing tests/helpers unchanged; additions have no synthetic fenced assignment, injected error or sleep
+Text-only inspection; no Rust execution, compilation, tests or rustfmt.

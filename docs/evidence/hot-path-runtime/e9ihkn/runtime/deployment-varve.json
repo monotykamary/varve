@@ -1,0 +1,7 @@
+{
+  "role": "varve",
+  "service": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+  "deployment": "11b3ac22-510a-4425-9bd8-4e15fd9ec47c",
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "stage_sha256": "810f7d4885fb9e0c554e61991778b95586de5979e551b34a9dd9e85f9550f825"
+}

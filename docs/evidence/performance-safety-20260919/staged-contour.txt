@@ -1,0 +1,46 @@
+Contour · staged · b3814a74fa02 → 8d7f93c8bf94
+Root: /Users/monotykamary/VCS/working-remote/open-source/varve
+178 changed source files · 66 findings · 0 policy violations · 379 file/extraction gaps
+Δ SLOC +6790; decisions +3030; erosion 0.226 → 0.438; verbosity 0.000 → 0.175
+Δ Verbose lines 0 → 1436; complex mass 259.9 → 2906.4
+
+Δ [complexity; advisory] execute: decision load increased
+  ▪ docs/evidence/frontier/v13/witness/test-monitor.mjs:69
+  0 → 25 decisions (CC = decisions + 1)
+  ↗ Exposure (modeled): t=0.5: 0.0% outside source region; t=2: 0.0% outside source region; t=8: 0.0% outside source region
+  ? Is this additional branching required, or can responsibilities be separated without merely distributing the same decisions?
+
+Δ [complexity; advisory] execute: decision load increased
+  ▪ docs/evidence/frontier/v13/pre-correction/inputs/test-monitor.mjs:69
+  0 → 25 decisions (CC = decisions + 1)
+  ↗ Exposure (modeled): t=0.5: 0.0% outside source region; t=2: 0.0% outside source region; t=8: 0.0% outside source region
+  ? Is this additional branching required, or can responsibilities be separated without merely distributing the same decisions?
+
+Δ [duplication; advisory] Additional exact-token callable copies
+  ▪ docs/evidence/frontier/v10/witness/configure.mjs:11 [same body token sequence] — api
+  ▪ docs/evidence/frontier/v10/witness/redeploy.mjs:11 [same body token sequence] — api
+  ▪ docs/evidence/frontier/v10/witness/restart.mjs:11 [same body token sequence] — api
+  ▪ docs/evidence/frontier/v10/witness/status.mjs:11 [same body token sequence] — api
+  ▪ docs/evidence/frontier/v10/witness/stop-attempt.mjs:11 [same body token sequence] — api
+  ▪ docs/evidence/frontier/v10/witness/verify-stop.mjs:11 [same body token sequence] — api
+  ▪ docs/evidence/frontier/v11/witness/configure.mjs:11 [same body token sequence] — api
+  ▪ docs/evidence/frontier/v11/witness/redeploy.mjs:11 [same body token sequence] — api
+  0 → 35 copies
+  ↗ Exposure (modeled): t=0.5: 0.0% outside source region; t=2: 0.0% outside source region; t=8: 0.0% outside source region
+  ? Do these implementations represent one responsibility, or is their independence intentional? Compare signatures and surrounding contracts before sharing code.
+
+Δ [duplication; advisory] Additional exact-token callable copies
+  ▪ docs/evidence/frontier/v10/witness/configure.mjs:17 [same body token sequence] — snapshot
+  ▪ docs/evidence/frontier/v10/witness/redeploy.mjs:17 [same body token sequence] — snapshot
+  ▪ docs/evidence/frontier/v10/witness/remote.mjs:17 [same body token sequence] — snapshot
+  ▪ docs/evidence/frontier/v10/witness/restart.mjs:17 [same body token sequence] — snapshot
+  ▪ docs/evidence/frontier/v10/witness/status.mjs:17 [same body token sequence] — snapshot
+  ▪ docs/evidence/frontier/v10/witness/stop-attempt.mjs:17 [same body token sequence] — snapshot
+  ▪ docs/evidence/frontier/v10/witness/verify-stop.mjs:17 [same body token sequence] — snapshot
+  ▪ docs/evidence/frontier/v11/witness/configure.mjs:17 [same body token sequence] — snapshot
+  0 → 41 copies
+  ↗ Exposure (modeled): t=0.5: 0.0% outside source region; t=2: 0.0% outside source region; t=8: 0.0% outside source region
+  ? Do these implementations represent one responsibility, or is their independence intentional? Compare signatures and surrounding contracts before sharing code.
+62 findings not displayed (CLI --json for details).
+⚠ Coverage incomplete; absence of findings is not approval.
+No quality score or correctness guarantee. Graph resolution is partial. Heat means exposure, not defect probability.

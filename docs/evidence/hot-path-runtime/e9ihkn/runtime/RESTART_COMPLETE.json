@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "owned": {
+    "varve": "d5a80f14-dee0-4c53-9f92-4c5447db769c",
+    "timescale": "d79c7afb-94cb-4591-b6ab-503fc8fd484b"
+  },
+  "source_sha256": "bce40d9452c153d7e243e031318226096d30e37ec6e172e4e370c4e86eca2747",
+  "rows_per_backend": 550000,
+  "receipts_per_backend": 550,
+  "independent_integer_time_value_fingerprints": true,
+  "raw_and_rollup_checks_without_refresh": true,
+  "changed_processes": true,
+  "instance_ids_reused": true,
+  "power_loss_or_HA_claim": false
+}

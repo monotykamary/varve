@@ -232,13 +232,22 @@ pub struct JobAlter {
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub hot_max_bytes: usize,
+    /// Engine-owned raw allocations, including retired but still shared rows.
+    pub raw_memory_max_bytes: usize,
+    /// Separate non-waiting maintenance/recovery workspace headroom.
+    pub raw_working_max_bytes: usize,
     pub metadata_max_bytes: usize,
     /// Opt in to paged derived-state checkpoints; existing v2 roots stay paged.
     pub derived_pages: bool,
     pub derived_max_bytes: usize,
     pub derived_page_bytes: usize,
     pub hot_max_rows: usize,
+    /// Opt in to append-tolerant frozen-prefix checkpoint preparation.
+    pub checkpoint_frozen_prefix: bool,
     pub wal_max_bytes: u64,
+    /// Explicitly select segmented WAL for a new or fully checkpointed database.
+    /// A persisted segmented root remains authoritative on later opens.
+    pub segmented_journal: bool,
     pub max_disk_bytes: u64,
     pub decoded_cache_bytes: usize,
     pub disk_cache_bytes: u64,
@@ -249,26 +258,45 @@ pub struct Config {
     pub max_tables: usize,
     pub segment_rows: usize,
     pub compact_min_segments: usize,
+    pub flush_policy: FlushPolicy,
     pub flush_interval_us: i64,
     pub ship_interval_us: i64,
     pub maintenance_interval_ms: u64,
     pub query_executable: PathBuf,
+    /// Native DuckDB v2 library; distinct from the legacy CLI executable.
+    pub duckdb_library: Option<PathBuf>,
     pub query_memory_mb: usize,
     pub query_threads: usize,
     pub query_timeout_ms: u64,
     pub query_max_output_bytes: usize,
     pub query_workers: usize,
+    /// Opt in to disposable, snapshot-validated resident SQL input caches.
+    pub query_retained_inputs: bool,
 }
+/// Separates age-driven columnarization from durable append admission.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FlushPolicy {
+    #[default]
+    AgeOrPressure,
+    /// Disable elapsed-age flushing, not pressure, explicit or lifecycle barriers.
+    PressureOnly,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             hot_max_bytes: 16 * 1024 * 1024,
+            raw_memory_max_bytes: 128 * 1024 * 1024,
+            raw_working_max_bytes: 512 * 1024 * 1024,
             metadata_max_bytes: 32 * 1024 * 1024,
             derived_pages: false,
             derived_max_bytes: 64 * 1024 * 1024,
             derived_page_bytes: 256 * 1024,
             hot_max_rows: 100_000,
+            checkpoint_frozen_prefix: false,
             wal_max_bytes: 64 * 1024 * 1024,
+            segmented_journal: false,
             max_disk_bytes: 512 * 1024 * 1024,
             decoded_cache_bytes: 8 * 1024 * 1024,
             disk_cache_bytes: 32 * 1024 * 1024,
@@ -279,20 +307,27 @@ impl Default for Config {
             max_tables: 128,
             segment_rows: 16_384,
             compact_min_segments: 4,
+            flush_policy: FlushPolicy::AgeOrPressure,
             flush_interval_us: 5_000_000,
             ship_interval_us: 1_000_000,
             maintenance_interval_ms: 1000,
             query_executable: PathBuf::from("duckdb"),
+            duckdb_library: None,
             query_memory_mb: 128,
             query_threads: 2,
             query_timeout_ms: 30_000,
             query_max_output_bytes: 8 * 1024 * 1024,
             query_workers: 2,
+            query_retained_inputs: false,
         }
     }
 }
 impl Config {
     pub fn validate(&self) -> Result<()> {
+        crate::raw_memory::RawMemoryBudget::new(
+            self.raw_memory_max_bytes,
+            self.raw_working_max_bytes,
+        )?;
         ensure!(
             self.hot_max_bytes > 0
                 && self.hot_max_rows > 0
@@ -318,6 +353,12 @@ impl Config {
             self.wal_max_bytes > 0 && self.max_disk_bytes > self.wal_max_bytes,
             "invalid WAL/disk budgets"
         );
+        if self.segmented_journal {
+            ensure!(
+                self.max_batch_bytes <= 15 * 1024 * 1024 && self.wal_max_bytes >= 512,
+                "segmented journal requires max_batch_bytes <= 15MiB and wal_max_bytes >= 512"
+            );
+        }
         ensure!(
             self.segment_rows > 0 && self.compact_min_segments >= 2,
             "invalid segment/compaction limits"

@@ -1,0 +1,5 @@
+RELEASED AGAIN AFTER FOLLOW-UPS: /workspace/varve-rebuild/target
+Owner completed: Astra cae8d4cfb9104a169fda7225097647df
+Isolated qualified source: /workspace/varve-rebuild/raw-pressure-followup
+Source manifest: 0658a56988a24534b5b61f268274a71f5ed7327d42e92495d88f969dddb61c7f
+Original raw-pressure source5244039a remains frozen and verified. All final qualification commands hash-gated before/after; no background Cargo job remains. Main may reassign target now.

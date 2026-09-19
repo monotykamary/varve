@@ -1,0 +1,23 @@
+{
+  "baseline_driver_sha256": "f5488311247210b118410c155408a5be5af9ce2d28d6d480585a9c315125f637",
+  "effective_driver_sha256": "23e05928cf287a4f8b59433f2079cf63610a256dabbb75138a2ea5081442df23",
+  "normal_workload_ast_unchanged": true,
+  "changes": [
+    "bounded secret-redacting cause traversal",
+    "retained failure-only read/generation distributions",
+    "original mixed failure exception as explicit cause"
+  ],
+  "files": {
+    "benchmark.py": "23e05928cf287a4f8b59433f2079cf63610a256dabbb75138a2ea5081442df23",
+    "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+    "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c",
+    "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+    "tests/test_core.py": "bf37d134b8785fcdf9b55f7fa345f0793e5fa6c187d52971806a233938074bf4",
+    "tests/test_runner.py": "ad4442fc00d9a46e7f2ecaf8f789e8eb0487760b80d3ba31e07495b4d89ccaf4",
+    "README.md": "279ef2d1ea28de4cf770ea9b44b421c65e064581c2c3092fbc73f942ae1018d9"
+  },
+  "offline_tests": 21,
+  "test_log_sha256": "e8ca1facf8bc013e10c6c4cdd1502b4336995e5f7b575fc4ed9447080684da58",
+  "database_load_run": false,
+  "remote_run": false
+}

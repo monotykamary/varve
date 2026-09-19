@@ -1,0 +1,1 @@
+cargo clippy --locked --offline --workspace --all-targets --features fault-injection -- -D warnings 

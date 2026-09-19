@@ -1,6 +1,5 @@
 use crate::engine::*;
 use crate::model::checked_cutoff;
-use crate::segment;
 use crate::tier::{ship_with_remote_gate, vacuum_with_remote_gate};
 use anyhow::{Context, Result, ensure};
 use std::collections::{BTreeMap, BTreeSet};
@@ -31,6 +30,7 @@ impl Database {
         let result = (|| {
             let mut report = MaintenanceReport::default();
             let (checkpoint_due, checkpoint_had_hot_work) = {
+                let _commit = self.lock_commit()?;
                 let mut s = self.lock()?;
                 healthy(&s)?;
                 advance_idempotency_floors(&mut s, now_us);
@@ -59,6 +59,7 @@ impl Database {
                 }
             }
             {
+                let _commit = self.lock_commit()?;
                 let mut s = self.lock()?;
                 healthy(&s)?;
                 // A write racing after this recheck makes retention defer rather
@@ -68,6 +69,7 @@ impl Database {
             drop(maintenance_pin);
             report.compacted = compact_prepared(self, false)?;
             let (ship_due, resume_gc, vacuum_due) = {
+                let _commit = self.lock_commit()?;
                 let mut s = self.lock()?;
                 healthy(&s)?;
                 let ship_due = self.inner.remote.is_some()
@@ -88,20 +90,24 @@ impl Database {
             if let Some(gate) = remote_gate.as_ref() {
                 if !resume_gc && ship_due {
                     report.shipped_sequence = Some(ship_with_remote_gate(self, gate)?);
+                    let _commit = self.lock_commit()?;
                     let mut s = self.lock()?;
                     s.last_ship_us = Some(now_us);
                     report.evicted_files = archive_locked(&self.inner, &mut s, now_us)?;
                 }
                 if resume_gc || vacuum_due {
                     vacuum_with_remote_gate(self, gate)?;
+                    let _commit = self.lock_commit()?;
                     self.lock()?.remote_vacuum_pending = false;
                 }
             }
+            let _commit = self.lock_commit()?;
             let mut s = self.lock()?;
             report.reclaimed_files = gc_locked(&self.inner, &mut s)?;
             Ok(report)
         })();
         {
+            let _commit = self.lock_commit()?;
             let mut s = self.lock()?;
             match &result {
                 Ok(_) => s.last_maintenance_error = None,
@@ -120,8 +126,14 @@ fn has_retention(s: &State) -> bool {
 
 fn maintenance_checkpoint_due(inner: &Inner, s: &State, now_us: i64) -> bool {
     has_retention(s)
-        || s.first_hot_us
-            .is_none_or(|at| now_us.saturating_sub(at) >= inner.config.flush_interval_us)
+        || match inner.config.flush_policy {
+            crate::model::FlushPolicy::AgeOrPressure => s
+                .first_hot_us
+                .is_none_or(|at| now_us.saturating_sub(at) >= inner.config.flush_interval_us),
+            // Timed receipt floors remain a durable lifecycle obligation even
+            // when elapsed age alone must not move hot data to Parquet.
+            crate::model::FlushPolicy::PressureOnly => idempotency_checkpoint_due(s),
+        }
 }
 
 // Select one deterministic group per preparation. Its decoded rows are bounded by
@@ -226,6 +238,11 @@ fn prefetch_maintenance_segments(db: &Database, now_us: Option<i64>) -> Result<O
             .remote
             .as_ref()
             .context("maintenance requires the configured remote store")?;
+        let _raw_prefetch = db.inner.raw_memory.reserve_working(
+            (segment.bytes as usize)
+                .saturating_mul(2)
+                .saturating_add(256),
+        )?;
         let bytes = remote.get_bounded(&segment.key(), segment.bytes as usize)?;
         ensure!(
             bytes.len() as u64 == segment.bytes
@@ -269,6 +286,12 @@ fn retention_locked(inner: &Inner, s: &mut State, now_us: i64) -> Result<u64> {
                 }
                 if seg.min_timestamp_us < cutoff {
                     let old = read_segment_locked(inner, s, seg)?;
+                    let _raw_copy =
+                        inner
+                            .raw_memory
+                            .reserve_working(crate::raw_memory::row_charge(
+                                seg.decoded_bytes as usize,
+                            ))?;
                     let rows: Vec<_> = old
                         .iter()
                         .filter(|r| r.row.timestamp_us >= cutoff)
@@ -309,7 +332,7 @@ fn retention_locked(inner: &Inner, s: &mut State, now_us: i64) -> Result<u64> {
 
 fn compact_prepared(db: &Database, allow_remote_fetch: bool) -> Result<usize> {
     let _preparation_gate = db.lock_maintenance_preparation()?;
-    let (generation, table_name, table_config, selected, mut pin) = {
+    let (table_name, table_config, selected, mut pin) = {
         let s = db.lock()?;
         healthy(&s)?;
         if s.catalog.checkpoint_sequence != s.sequence {
@@ -330,7 +353,7 @@ fn compact_prepared(db: &Database, allow_remote_fetch: bool) -> Result<usize> {
         let _disk = lock_disk_admission(&db.inner)?;
         let ids = selected.iter().map(|segment| segment.id.clone()).collect();
         let pin = Pin::new(&db.inner, ids)?;
-        (s.generation, table_name, table_config, selected, pin)
+        (table_name, table_config, selected, pin)
     };
 
     #[cfg(feature = "fault-injection")]
@@ -361,11 +384,14 @@ fn compact_prepared(db: &Database, allow_remote_fetch: bool) -> Result<usize> {
             expected_bytes <= db.inner.config.hot_max_bytes as u64,
             "compaction working set exceeds hot memory budget"
         );
+        let _raw_rows = db
+            .inner
+            .raw_memory
+            .reserve_working(crate::raw_memory::row_charge(expected_bytes as usize))?;
         let mut rows = Vec::new();
         let mut bytes = 0usize;
         for descriptor in &selected {
-            let path = resolve_segment(&db.inner, descriptor)?;
-            let batch = segment::read(&path)?;
+            let batch = read_raw_segment(&db.inner, descriptor, true)?;
             ensure!(
                 batch.len() as u64 == descriptor.rows,
                 "segment row-count mismatch"
@@ -385,13 +411,58 @@ fn compact_prepared(db: &Database, allow_remote_fetch: bool) -> Result<usize> {
                 bytes <= db.inner.config.hot_max_bytes,
                 "compaction working set exceeds hot memory budget"
             );
-            rows.extend(batch);
+            rows.extend(batch.iter().cloned());
         }
-        write_partitioned_with_pin(&db.inner, &table_config, &rows, Some(&mut pin))
+        let replacements =
+            write_partitioned_with_pin(&db.inner, &table_config, &rows, Some(&mut pin))?;
+        drop(rows);
+        let retired: BTreeSet<_> = selected.iter().map(|segment| segment.id.as_str()).collect();
+        // Immutable input preparation may overlap an unrelated checkpoint. Freeze
+        // the whole root only after that I/O, validating the selected descriptors
+        // against the latest fully checkpointed state. Later changes still make
+        // this root stale; never rebase already-prepared derived state.
+        let mut candidate = {
+            let s = db.lock()?;
+            healthy(&s)?;
+            if s.catalog.checkpoint_sequence != s.sequence {
+                return Ok(None);
+            }
+            let current = s
+                .catalog
+                .tables
+                .get(&table_name)
+                .context("compaction table disappeared")?;
+            if current.config != table_config
+                || !selected
+                    .iter()
+                    .all(|expected| current.segments.iter().any(|segment| segment == expected))
+            {
+                return Ok(None);
+            }
+            capture_root(&s, &db.inner.config)?
+        };
+        let table = candidate
+            .next
+            .tables
+            .get_mut(&table_name)
+            .context("compaction table disappeared")?;
+        table
+            .segments
+            .retain(|segment| !retired.contains(segment.id.as_str()));
+        table.segments.extend(replacements);
+        // Replacements contain exactly the selected raw rows, only repartitioned.
+        prepare_root(&db.inner, candidate).map(|root| Some(root.preserving_raw_rows()))
     })();
     drop(prepare_timer);
-    let replacements = match preparation {
-        Ok(replacements) => replacements,
+    let prepared = match preparation {
+        Ok(Some(prepared)) => prepared,
+        Ok(None) => {
+            drop(pin);
+            let s = db.lock()?;
+            healthy(&s)?;
+            cleanup_unpublished_segments(&db.inner, &s)?;
+            return Ok(0);
+        }
         Err(error) => {
             drop(pin);
             let s = db.lock()?;
@@ -402,50 +473,32 @@ fn compact_prepared(db: &Database, allow_remote_fetch: bool) -> Result<usize> {
         }
     };
 
+    let _commit = db.lock_commit()?;
     let mut s = db.lock()?;
     healthy(&s)?;
     let publish_timer = db
         .inner
         .metrics
         .timer(crate::metrics::Phase::CompactionPublish);
-    if s.catalog.checkpoint_sequence != s.sequence {
+    if !prepared.is_current(&s) || s.catalog.checkpoint_sequence != s.sequence {
         drop(publish_timer);
+        drop(s);
+        drop(prepared);
         drop(pin);
+        let s = db.lock()?;
+        healthy(&s)?;
         cleanup_unpublished_segments(&db.inner, &s)?;
         return Ok(0);
     }
-    let retired: BTreeSet<_> = selected.iter().map(|segment| segment.id.as_str()).collect();
-    let current = s
-        .catalog
-        .tables
-        .get(&table_name)
-        .context("compaction table disappeared")?;
-    let inputs_match = current.config == table_config
-        && selected
-            .iter()
-            .all(|expected| current.segments.iter().any(|segment| segment == expected));
-    if !inputs_match {
-        drop(publish_timer);
-        drop(pin);
-        cleanup_unpublished_segments(&db.inner, &s)?;
-        return Ok(0);
-    }
-    // A newer checkpoint may append unrelated immutable descriptors. Exact input
-    // revalidation makes rebasing the replacement onto that generation safe.
-    let _generation_changed = s.generation != generation;
-    let _derived_working = reserve_catalog_clone(&s, &db.inner.config)?;
-    let mut next = s.catalog.clone();
-    let table = next
-        .tables
-        .get_mut(&table_name)
-        .context("compaction table disappeared")?;
-    table
-        .segments
-        .retain(|segment| !retired.contains(segment.id.as_str()));
-    table.segments.extend(replacements);
-    persist_manifest(&db.inner, &mut s, next)?;
+    // The whole root, not just its selected inputs, was frozen off-lock. Never
+    // rebase its derived state onto a newer generation.
+    let retired = publish_prepared_root(&db.inner, &mut s, prepared)?;
     drop(publish_timer);
+    drop(s);
+    drop(retired);
     drop(pin);
+    let mut s = db.lock()?;
+    healthy(&s)?;
     gc_locked(&db.inner, &mut s)?;
     Ok(1)
 }

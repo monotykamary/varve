@@ -1,0 +1,4 @@
+rustc 1.98.1 (48a229cea 2026-09-01)
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+1dd0a1596505613a439dced4fb5f5800471badec82b2dc3b2c0efbd46fafbf6d  /workspace/varve-rebuild/baseline/.tools/duckdb
+69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d  /workspace/varve-rebuild/baseline/.tools/duckdb-native-v2.0.0-alpha41533-linux-amd64/libduckdb.so

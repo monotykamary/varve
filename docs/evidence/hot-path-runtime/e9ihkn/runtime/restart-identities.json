@@ -1,0 +1,63 @@
+{
+  "actual": {
+    "varve": {
+      "deployment": "d5a80f14-dee0-4c53-9f92-4c5447db769c",
+      "instance": "4b61b1bb-f322-4f7a-89a1-b084556c7bb3",
+      "same_instance_id": true
+    },
+    "timescale": {
+      "deployment": "d79c7afb-94cb-4591-b6ab-503fc8fd484b",
+      "instance": "80b27d52-af69-4d8e-917a-4a69d2efdda0",
+      "same_instance_id": true
+    }
+  },
+  "varve_process_before": {
+    "pid": 1,
+    "uid": [
+      10001,
+      10001,
+      10001,
+      10001
+    ],
+    "argv": [
+      "varve",
+      "--data",
+      "/data/probes/runtime-e9ihkn-s1",
+      "--config",
+      "/data/probes/benchmark.json",
+      "serve",
+      "--bind",
+      "::",
+      "--port",
+      "8080",
+      "--allow-remote"
+    ],
+    "start_ticks": "568705379",
+    "executable": "/usr/local/bin/varve"
+  },
+  "varve_process_after": {
+    "pid": 1,
+    "uid": [
+      10001,
+      10001,
+      10001,
+      10001
+    ],
+    "argv": [
+      "varve",
+      "--data",
+      "/data/probes/runtime-e9ihkn-s1",
+      "--config",
+      "/data/probes/benchmark.json",
+      "serve",
+      "--bind",
+      "::",
+      "--port",
+      "8080",
+      "--allow-remote"
+    ],
+    "start_ticks": "568764887",
+    "executable": "/usr/local/bin/varve"
+  },
+  "platform_behavior": "deploymentRestart retains instance UUIDs; initial instance-replacement wait was an invalid observation assumption; no second restart issued"
+}

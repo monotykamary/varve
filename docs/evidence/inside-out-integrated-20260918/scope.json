@@ -1,0 +1,27 @@
+{
+  "campaign": "varve-inside-out-20260918",
+  "status": "qualification in progress; no performance or production claim",
+  "project_id": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+  "environment_id": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+  "region": "asia-southeast1-eqsg3a",
+  "services": {
+    "varve": "f0faf99c-c9af-4a31-b0ec-133430f75696",
+    "timescale": "ee0a45c2-7d9e-4952-9de1-edda32064a46",
+    "driver": "cadd532a-e09a-4bfb-b825-089a3a175ce9"
+  },
+  "volumes": {
+    "varve": "7ed958b0-574f-4178-90d1-7d26dc7f2145",
+    "timescale": "61403f48-b59f-497b-86fd-965802afb5e2"
+  },
+  "bucket_id": "7a08d1e4-f2c0-4568-a8e6-b0ed4c99315b",
+  "bucket_name": "varve-rebuild-0918",
+  "s3_prefix": "varve-inside-out-20260918/probe-0b284812-f476-4589-a3e5-ab63790cbdb6",
+  "sandbox_id": "1dea8336-2d0c-4de4-bcf9-f1dfd63ef2f3",
+  "candidate_deployment": "44a8c376-94df-43ae-b068-f4db9f685269",
+  "timescale_deployment": "39f1403f-5bd0-4a37-8784-981d2f86bb6d",
+  "configured_database_limits": {"cpu":2,"memory_bytes":2000000000},
+  "observed_database_cgroups": {"cpu_max":"200000 100000","memory_max":"1999998976"},
+  "configured_driver_limits": {"cpu":2,"memory_bytes":1000000000},
+  "restart_policy": "NEVER",
+  "excluded_existing_services": ["64ddd834-6732-4582-bf4a-d86bbd0317fa","0aff95bb-3f5a-45fe-bda0-195aa742938a","acc76115-5c5f-4be4-901d-fde4adbcbacf","76fdbde0-4296-46a4-a6f2-4026432fd4a3"]
+}

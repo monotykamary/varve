@@ -1,0 +1,79 @@
+{
+  "checks": {
+    "aggregates": {
+      "page_rows_max": 4096,
+      "pages": 1,
+      "rows": 1074
+    },
+    "database_identities": {
+      "timescale": {
+        "database_name": "postgres",
+        "database_oid": 5,
+        "schema_name": "vb_io13_b1_01_1247825d",
+        "schema_oid": 18196
+      },
+      "varve": {
+        "database_id": "1e006339-802c-4ed7-ac03-cced48430e15"
+      }
+    },
+    "expected_iteration_bounds": {
+      "aggregate_group_limit": 100000,
+      "aggregate_groups": 1074,
+      "late_remainder_classes": 50,
+      "max_late_class_values": 1
+    },
+    "raw": {
+      "page_rows_max": 4096,
+      "pages": 1,
+      "rows": 1074
+    }
+  },
+  "claim_boundary": {
+    "automatic_write_retries": 0,
+    "excluded": "first/last/OHLC because independent receipt ordering does not prove equal-timestamp ties",
+    "mutation_or_refresh": false,
+    "supplemental_not_replacement": true,
+    "verified": "every deterministic raw identity, exact quarter value, empty tags, multiplicity, and every named minute count/sum/min/max group"
+  },
+  "execution": {
+    "freshness": "uses the source report existing fresh barrier; performs no refresh",
+    "query_order": "sequential Varve then Timescale pages",
+    "query_workers": 1
+  },
+  "finished_at": "2026-09-18T20:16:18.216657+00:00",
+  "format_version": 1,
+  "kind": "supplemental_exact_verification",
+  "run_id": "io13_b1_01",
+  "source_artifact": {
+    "files": {
+      "Dockerfile": "579d48eb1e14fa6efaae0d1179b0146490aefa8bef9f444f2bd8214e12cea277",
+      "benchmark.py": "082e871f53797759ea8e658ac460788b7308cb9bc13b4143794957a3ab2e8ed9",
+      "core.py": "cc0049651b6e767c401ebdbb065e41c6e178b51fc8209c4c490cdd52f4d8da7e",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    "format_version": 1,
+    "sha256": "7d2ce4fa1d4cebb7121aa99b964a0db36b0d6a73af7299cacc6857f3fe14ef00"
+  },
+  "source_final_fingerprints_sha256": "7078a52d307c3728f0253b8d5ee1be93f6e69eda55e09c4cc86ff622a19c120e",
+  "source_report_sha256": "ce411c0334f34f33aa4e15cd25db329c75fb5b976f9efa260f37f559c9a850f0",
+  "started_at": "2026-09-18T20:16:17.685371+00:00",
+  "state": "passed",
+  "verdict": {
+    "performance_approval": false,
+    "source_benchmark": "passed",
+    "source_benchmark_preserved": true,
+    "statement": "Exact verification is diagnostic only and does not promote or approve benchmark performance."
+  },
+  "verifier_artifact": {
+    "Dockerfile": "579d48eb1e14fa6efaae0d1179b0146490aefa8bef9f444f2bd8214e12cea277",
+    "benchmark.py": "082e871f53797759ea8e658ac460788b7308cb9bc13b4143794957a3ab2e8ed9",
+    "core.py": "cc0049651b6e767c401ebdbb065e41c6e178b51fc8209c4c490cdd52f4d8da7e",
+    "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+    "verify_exact.py": "512c726bd71c74ce493f9ef8dc81da82a196459f50daef6817f12c4556ed624d"
+  },
+  "workload": {
+    "acknowledged_late_rows": 50,
+    "initial_rows": 1024,
+    "total_rows": 1074
+  }
+}

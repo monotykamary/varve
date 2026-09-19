@@ -1,0 +1,312 @@
+{
+  "format_version": 1,
+  "candidate": "v8",
+  "outcomes": {
+    "baseline": "passed",
+    "large": "overloaded"
+  },
+  "retained_common_rows_per_backend": 2062000,
+  "known_credential_values_absent": true,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 7322,
+      "sha256": "3d018b4dd9a0fcaf8560ca4510c01ef3304667431ae6c1339f8e3326ec8b84e5"
+    },
+    {
+      "path": "analysis-baseline.json",
+      "bytes": 2804,
+      "sha256": "b4fbdc80a4650ac7cd9d4bce22484c57339557531fa738501cf9e0ba48a8e3f0"
+    },
+    {
+      "path": "analysis-stress.json",
+      "bytes": 2826,
+      "sha256": "53a770dd1cc3edd214ad22456937bd433a65d8f18486886c16f1f175ef9b1637"
+    },
+    {
+      "path": "campaign-complete.json",
+      "bytes": 66,
+      "sha256": "31929e8dc4c37d70e442e317af87020875f261923360e8041633aa2624b335aa"
+    },
+    {
+      "path": "campaign-error.json",
+      "bytes": 118,
+      "sha256": "08b5c88cef3e5d1eca14a550af166643c760897e49174b40b27c8e0990ead241"
+    },
+    {
+      "path": "campaign-resumed.json",
+      "bytes": 170,
+      "sha256": "fee1e61128f0b581cc76a93a0102dbeaf06ac7e3714942bddb3a7167e050933f"
+    },
+    {
+      "path": "campaign-resumed.log",
+      "bytes": 6066,
+      "sha256": "5ce03081a3834ea28de278c9dd17994b22e727239d20405d73a4f4d2a13b3b20"
+    },
+    {
+      "path": "campaign-started.json",
+      "bytes": 46,
+      "sha256": "af281e216d282a9eb74a0afd90e5752aea8a66de3c0a4546bfcd1e137a7db45f"
+    },
+    {
+      "path": "campaign.log",
+      "bytes": 2299,
+      "sha256": "f87d48e1811f84fd2468065d44e9f77262688aef17d222324e25e965ac800c0d"
+    },
+    {
+      "path": "cleanup-verified.json",
+      "bytes": 1359,
+      "sha256": "5e52d819ec728eba327a90de40658cc0e54fac2ea4eaac16f3408aab7e5fcfad"
+    },
+    {
+      "path": "config-docs-check.log",
+      "bytes": 712,
+      "sha256": "bc0672e83cb7e222aec1420dadf3120c2974a92bebfb6c81e1c7a3be212218bb"
+    },
+    {
+      "path": "driver/Dockerfile",
+      "bytes": 378,
+      "sha256": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+    },
+    {
+      "path": "driver/benchmark.py",
+      "bytes": 61260,
+      "sha256": "f5488311247210b118410c155408a5be5af9ce2d28d6d480585a9c315125f637"
+    },
+    {
+      "path": "driver/core.py",
+      "bytes": 8139,
+      "sha256": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a"
+    },
+    {
+      "path": "driver/requirements.txt",
+      "bytes": 219,
+      "sha256": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    {
+      "path": "local-qualification.json",
+      "bytes": 13649,
+      "sha256": "2cef986a9275c978003ffbb706e0dd35a0f896dbbb268b20c0ba047d18aa3b34"
+    },
+    {
+      "path": "local-qualification.log",
+      "bytes": 33629,
+      "sha256": "693296d546465ed30d581180419a95e07cfd8677dcbec021775681634ceba4c4"
+    },
+    {
+      "path": "local-qualified-source.tar.gz",
+      "bytes": 307748,
+      "sha256": "f4ec02f634675aa3c8fed04b1e74c110d3e74e39420ff96ecc791b52502f478d"
+    },
+    {
+      "path": "metrics-after-baseline.json",
+      "bytes": 22206,
+      "sha256": "95a67f01e76efd98a0655f5908f220b32f854e95fb941d64e55729761b2282c8"
+    },
+    {
+      "path": "metrics-after-restart.json",
+      "bytes": 21864,
+      "sha256": "6b1499d51e16ce2fcf1ac2786319fef4c64ce5b16b6ebb20906b0928ed20ec36"
+    },
+    {
+      "path": "metrics-after-stress.json",
+      "bytes": 22294,
+      "sha256": "3b8c6ec07e52b78ed54e66af5dc92dc8a533b58daa4c815bac911192f7f0430f"
+    },
+    {
+      "path": "metrics-before.json",
+      "bytes": 21844,
+      "sha256": "7fcde2f5bb4e2d2253021c74e2194af56e7f90e80afc3c210bdbad867cdb8187"
+    },
+    {
+      "path": "metrics-during-baseline-controller-halt.json",
+      "bytes": 22080,
+      "sha256": "6f9a75cc6b51d70703445f165c1c6f4e71a77f5cdc44c514be9854e25d5d2784"
+    },
+    {
+      "path": "previous-profile.json",
+      "bytes": 710,
+      "sha256": "20c310dea827fc4b98199acdd4eab4c660660909a223c9155a3688be16b4aeed"
+    },
+    {
+      "path": "recovery-after.json",
+      "bytes": 1184,
+      "sha256": "28e487756cecff4ce95d83cdded16acc0ea95a6cd54446b6be50e6be9bb58ba4"
+    },
+    {
+      "path": "recovery-before.json",
+      "bytes": 1157,
+      "sha256": "e134b018e8f6d4ccaa6fe32813f04d629d2bfdb9d1b07ed8705329c9d2811fde"
+    },
+    {
+      "path": "resident001.json",
+      "bytes": 134255,
+      "sha256": "d4a65be563e5b7d9a3c6b364f859be46d4c355e0882e86cd9551d1b4e070548e"
+    },
+    {
+      "path": "resident001.launch.json",
+      "bytes": 419,
+      "sha256": "e2d36d9c485306b905e0244f057deb4954ab5503602be60fe987f5ef1604b138"
+    },
+    {
+      "path": "resident001.log",
+      "bytes": 877,
+      "sha256": "e511d039e9d42c01157a6c6c0614f8ca6962fb5cdc260af16c0e6e0b9883e578"
+    },
+    {
+      "path": "resident002.json",
+      "bytes": 235550,
+      "sha256": "c0a7f784a239d37afe108821792235a4e6e4e4492cc3013403997dc9761b7292"
+    },
+    {
+      "path": "resident002.launch.json",
+      "bytes": 417,
+      "sha256": "35a111dc6c57638a79470b8dbe430fcd9b28d801d34c8dc7a9792b8f4fff4a41"
+    },
+    {
+      "path": "resident002.log",
+      "bytes": 881,
+      "sha256": "b58d2a90ba62433ef12aac8fade271497e81eca20788a630f3becf22e7906dc1"
+    },
+    {
+      "path": "resources-driver-after-workload.txt",
+      "bytes": 417,
+      "sha256": "e5c3bb2e6c1d3e6afab07ea9181140adedcd32ff6fb2d1a11e16c5eb197e66ea"
+    },
+    {
+      "path": "resources-driver-before.txt",
+      "bytes": 404,
+      "sha256": "307d9b7bc2dfba61ee11c13d7f2983326404bed41906e225a339a241501be0f0"
+    },
+    {
+      "path": "resources-timescale-after-restart.txt",
+      "bytes": 436,
+      "sha256": "1f4f63646ba47f0d6b946bd91480e5713cce816452bb443db59c15e03e5cac59"
+    },
+    {
+      "path": "resources-timescale-before.txt",
+      "bytes": 441,
+      "sha256": "5873c166c106854c780bafb754ff281293dde28ab624d57c98db9497ddab8e8c"
+    },
+    {
+      "path": "resources-timescale-pre-restart.txt",
+      "bytes": 454,
+      "sha256": "3be5f7890a938e83a3501b2a9b6cedf9ac7321f22da11e23516119bc1ab6f743"
+    },
+    {
+      "path": "resources-varve-after-restart.txt",
+      "bytes": 423,
+      "sha256": "f4b2b86a993345fd0387f1f28d40c974504e8e12fa19052b394c2ab991b882b5"
+    },
+    {
+      "path": "resources-varve-before.txt",
+      "bytes": 422,
+      "sha256": "0f310538eee5bae163cc1d5f9e6e43ac759fb7bebd2e2878754d2c6a462f5843"
+    },
+    {
+      "path": "resources-varve-pre-restart.txt",
+      "bytes": 430,
+      "sha256": "e5693a90dc78f1d513ab5ab406cf07ace77a134d1c3c819dd77322aa0a403cd3"
+    },
+    {
+      "path": "restart-request.json",
+      "bytes": 263,
+      "sha256": "050223578011c07f2733d2af54ad5eec4437ce36d31b17b696e0dcebe3a28ecc"
+    },
+    {
+      "path": "restart-response.json",
+      "bytes": 75,
+      "sha256": "e12bbf93bce438dfbddd558a0a5027a982f4df703c00e64dbb969c1d9346dda7"
+    },
+    {
+      "path": "runtime-driver.json",
+      "bytes": 716,
+      "sha256": "e30ca57207bc671191920fc381218fd7c4a3862f359339c0eb8012db3f24f1f6"
+    },
+    {
+      "path": "runtime-varve.json",
+      "bytes": 2188,
+      "sha256": "bc1c30df3b9d491b06ecda55a44598915bb78454360f5a054b68a12e5b6cc747"
+    },
+    {
+      "path": "source-manifest.json",
+      "bytes": 8577,
+      "sha256": "4620502e533e0f35a9bef433e5a518f59543f9d7953ccdbfa8efb7f903bf9987"
+    },
+    {
+      "path": "source.tar.gz",
+      "bytes": 237072,
+      "sha256": "6970f9f73baa31184bfab6f5ca2c19488d46cb9c478ddf4654b63ff803f2f08d"
+    },
+    {
+      "path": "typescript-unit.log",
+      "bytes": 1813,
+      "sha256": "e2d3e64c712e42e159b175640828e090346b088cea424cc955ed15736ae7158d"
+    },
+    {
+      "path": "varve-config.json",
+      "bytes": 743,
+      "sha256": "a1ba9bc95589a40c490b2bcad26359b0c62ff103ae3bdc121d969d8e02775e34"
+    },
+    {
+      "path": "witness/analyze-phases.py",
+      "bytes": 1671,
+      "sha256": "a0c93688382aeaee0446e192999ee3babe3fc65c1fae2d47cfee6287cc50d5fd"
+    },
+    {
+      "path": "witness/check-driver.mjs",
+      "bytes": 1274,
+      "sha256": "d111470c1c659bafd94daf967a898c91b21db2adb50ba467e8c5c6c993544365"
+    },
+    {
+      "path": "witness/check-recovery.mjs",
+      "bytes": 1723,
+      "sha256": "6509ad6a9e570d671fb3a50d6952c5f86f0ffcec13805c18237ca7c08ba8951e"
+    },
+    {
+      "path": "witness/collect.py",
+      "bytes": 397,
+      "sha256": "a8f851747e20c471a7b5985ff5ef3611540b1cf8a4fc78bfb955396222c554b5"
+    },
+    {
+      "path": "witness/launch.py",
+      "bytes": 1501,
+      "sha256": "735f3f9394361a061196ce5c4c4352c35dadeb67b8a6fa1697fb70d5139cdd37"
+    },
+    {
+      "path": "witness/metrics.py",
+      "bytes": 1212,
+      "sha256": "91c4f7f6fde255d2c05403adae7cafddb0f0c2d9da054f1fb0d00c845584663b"
+    },
+    {
+      "path": "witness/probe-driver.py",
+      "bytes": 1685,
+      "sha256": "0aabc4cc165d06a7737a809db58eaf97d5e910f0c3959678b22114ba96fe810e"
+    },
+    {
+      "path": "witness/probe-varve.py",
+      "bytes": 4141,
+      "sha256": "a12163d630fd613c8269beb927c63383c41dd8e757a1f092ded024a86ad55148"
+    },
+    {
+      "path": "witness/recovery.py",
+      "bytes": 4293,
+      "sha256": "efa5431584d6e0649879782b18d6ee2663929457350377c7940a91d962a8408c"
+    },
+    {
+      "path": "witness/resources.sh",
+      "bytes": 429,
+      "sha256": "b47ae01d506056a82a218733e9e309771de3871baedc842e603ee2f41bd71e22"
+    },
+    {
+      "path": "witness/run-campaign.mjs",
+      "bytes": 6204,
+      "sha256": "d3ac9b14bc7bd7f4346cf6bdd9f6a422b867d90fe0151d27804c40e16ad383f0"
+    },
+    {
+      "path": "witness/verify.mjs",
+      "bytes": 8001,
+      "sha256": "b98426276fa3e30c49909dcea8443aff84ba5207b83e60c6abaf877f1bd98d0e"
+    }
+  ]
+}

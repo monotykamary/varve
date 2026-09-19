@@ -1,0 +1,3 @@
+RELEASED: /workspace/varve-rebuild/target
+Owner completed: Astra cae8d4cfb9104a169fda7225097647df
+Final matrix passed and manifests verified. No background Cargo/build job remains. Sol native169beab0ab31444b8e032cfaa0e66eed and read-only auditor03c61a47d4cc46bcaa5f80974e6ca873 completed; neither holds target rights. Main may reassign target now.

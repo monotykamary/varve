@@ -21,6 +21,8 @@ jobs:
           cache-dependency-path: clients/typescript/package-lock.json
       - name: Install checksum-pinned DuckDB v2 CLI (no C++ build)
         run: scripts/install-duckdb.sh
+      - name: Install checksum-pinned DuckDB v2 native library (no C++ build)
+        run: scripts/install-duckdb-native.sh
       - name: Verify storage, persistent transports and both client packages
         run: scripts/verify.sh
   audit:

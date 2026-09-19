@@ -1,0 +1,10 @@
+--- /workspace/varve-rebuild/raw-budget/src/derived.rs	2026-09-18 13:19:13.000000000 +0000
++++ src/derived.rs	2026-09-18 16:28:31.000000000 +0000
+@@ -104,6 +104,7 @@
+         Ok(())
+     }
+ 
++    #[cfg(test)]
+     pub(crate) fn remove(&mut self, key: &str, row: &RollupRow) {
+         let Some(tenants) = self.widths.get_mut(&row.width_us) else {
+             return;

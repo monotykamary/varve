@@ -63,7 +63,7 @@ failure, receipt loss, result-too-large and deadlines return `-32000`: a mutatio
 | `VARVE_HTTP_MAX_BODY_BYTES` | 4 MiB | HTTP body, WS frame/message/response, PG query packet; clamped to database batch bytes and 4 MiB |
 | `VARVE_HTTP_BODY_TIMEOUT_MS` | 10000 | HTTP body, WS sends, PG packet completion after its first byte |
 | `VARVE_HTTP_REQUEST_TIMEOUT_MS` | 60000 | Per-operation accepted deadline |
-| `VARVE_HTTP_CONNECTION_TIMEOUT_MS` | 65000 | Retire HTTP keepalive; drain an active request for at most request timeout + header timeout; WS uses heartbeat, authenticated PG may remain idle |
+| `VARVE_HTTP_CONNECTION_TIMEOUT_MS` | 65000 | Absolute HTTP lifetime; proactively mark ordinary responses close in its final bounded window; at expiry drain an active request for at most request timeout + header timeout; WS uses heartbeat, authenticated PG may remain idle |
 | `VARVE_HTTP_SHUTDOWN_TIMEOUT_MS` | 10000 | Network-task drain budget |
 | `VARVE_WS_AUTH_TIMEOUT_MS` | 5000 | WS first frame and PG startup/SCRAM deadline |
 | `VARVE_WS_MAX_PENDING` | 32 | Per-WS outstanding requests (hard maximum 1024) |
@@ -76,7 +76,11 @@ failure, receipt loss, result-too-large and deadlines return `-32000`: a mutatio
 | `VARVE_INGEST_MAX_GROUP_BYTES` | 4 MiB | Group byte cap; engine caps still apply |
 | `VARVE_INGEST_MAX_DELAY_MS` | 2 | Maximum grouping delay (0 disables intentional waiting) |
 
-Lifetime expiry disables HTTP keepalive rather than cancelling an active response immediately. A stalled drain is forcibly closed after the additional bounded grace period. `varve_http_connection_timeouts_total` counts retirement triggers, not necessarily failed requests. WebSocket upgrade and shutdown handling keep their separate bounds.
+Ordinary HTTP responses completed in the final `min(header_timeout, connection_timeout / 2)` of the absolute lifetime are marked `Connection: close`. A monotonic age check runs after the handler completes, including when a request was admitted before the window. With the unchanged defaults (lifetime 65000 ms, request 60000 ms, header 5000 ms), the window starts at age 60000 ms. Short legal lifetimes retain an initial reusable interval. The terminal response retains its complete body/framing and write receipt; Hyper then closes without admitting a subsequent request on that connection. No triggering write is rejected or automatically replayed. Valid 101 WebSocket responses keep `Connection: upgrade`, the shared connection permit and their separate authentication/framing/session bounds; ordinary upgrade errors may be marked close.
+
+The original hard lifetime is unchanged: unused/idle connections still expire, and an active request/response drains for at most the additional request timeout + header timeout before forced closure. There is no new post-expiry admission window or extension of the drain/shutdown budgets. `varve_http_connection_timeouts_total` still counts hard lifetime expiry triggers, not proactive response marks, delivered close handshakes or necessarily failed requests. No new counter is added.
+
+An idle connection has no response on which to signal close. Idle reuse can still race EOF, and a stalled drain or network failure can lose a receipt after commit. Explicitly reconnect and retry the identical rows with the same stable `request_id` to deduplicate an unknown outcome; disconnect is not proof of rollback. Deterministic source/protocol tests establish these bounded behaviors, not the cause of a historical socket failure or production/performance guarantees.
 
 The existing HTTP CLI options override their corresponding environment values.
 Global in-flight slots also cap outstanding encoded requests across connections;

@@ -1,0 +1,18 @@
+[package]
+name = "varve-flow-memory-model"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dev-dependencies]
+loom = "=0.7.2"
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false

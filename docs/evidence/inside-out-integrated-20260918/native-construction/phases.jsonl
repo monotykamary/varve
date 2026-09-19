@@ -1,0 +1,8 @@
+{"trial":0,"preopen_options":false,"environment_ms":0.011390,"options_ms":0.000230,"open_ms":31.554426,"connect_ms":0.005660,"teardown_ms":15.282767,"total_ms":46.854473,"self_cpu_ms":54.180000}
+{"trial":1,"preopen_options":true,"environment_ms":0.000770,"options_ms":0.004130,"open_ms":25.394739,"connect_ms":0.003500,"teardown_ms":7.131769,"total_ms":32.534908,"self_cpu_ms":39.382000}
+{"trial":2,"preopen_options":false,"environment_ms":0.000950,"options_ms":0.000110,"open_ms":25.277180,"connect_ms":0.019310,"teardown_ms":9.203090,"total_ms":34.500640,"self_cpu_ms":47.412000}
+{"trial":3,"preopen_options":true,"environment_ms":0.000820,"options_ms":0.000820,"open_ms":24.918618,"connect_ms":0.003740,"teardown_ms":4.837426,"total_ms":29.761424,"self_cpu_ms":31.945000}
+{"trial":4,"preopen_options":false,"environment_ms":0.000790,"options_ms":0.000100,"open_ms":28.510983,"connect_ms":0.013460,"teardown_ms":6.794928,"total_ms":35.320261,"self_cpu_ms":39.660000}
+{"trial":5,"preopen_options":true,"environment_ms":0.000900,"options_ms":0.001200,"open_ms":23.007997,"connect_ms":0.003450,"teardown_ms":10.248161,"total_ms":33.261708,"self_cpu_ms":38.674000}
+{"trial":6,"preopen_options":false,"environment_ms":0.000820,"options_ms":0.000150,"open_ms":25.966031,"connect_ms":0.020950,"teardown_ms":9.993521,"total_ms":35.981472,"self_cpu_ms":52.181000}
+{"trial":7,"preopen_options":true,"environment_ms":0.000910,"options_ms":0.001260,"open_ms":24.527788,"connect_ms":0.004470,"teardown_ms":11.684684,"total_ms":36.219112,"self_cpu_ms":43.388000}

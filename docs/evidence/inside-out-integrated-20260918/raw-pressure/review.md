@@ -1,0 +1,7 @@
+# Focused review
+
+Astra03c61a47d4cc46bcaa5f80974e6ca873 independently read current raw/transfer/scan/flow changes against frozen owned-epoch. Exact root/AGENTS/required docs verified; no edits/builds/remote operations. Report: no blocking non-native correctness regression found. It witnessed latest3F envelope, oversized retained capacities, explicit output vector, production prohibition on second reservation, registered raw/flow notifications and unlocked release, compact duplicate clocks, unchanged checkpoint-floor reproductions, and unchanged raw13 assertions (typed-error composition only).
+
+Minor findings: CONFIGURATION overflow wording claimed typedTooLarge for generic checked arithmetic errors; fixed. commit_boundary comment said original inputs retained; fixed. INGESTION stale comment is outside assigned doc scope and was referred to Main. Added separate hot/cold partial-output raw-credit exhaustion regression in addition to existing logical output cap failure test.
+
+Audit snapshot write_input SHA256 b3b7cc801919dc2b35d59c80ec059129d0cba32a8e3a8b14a062fce11acf4564 at2026-09-18T17:59:39Z. Subsequent changes include documentation and added focused tests; final manifests/tests bind final source. Native code excluded from this audit and reviewed separately during integration. Contour action unavailable in current tool registry; documented version does not parse Rust, so no semantic approval is inferred.

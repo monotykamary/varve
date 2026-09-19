@@ -1,0 +1,36 @@
+{
+  "cases": 25,
+  "case_names": [
+    "valid",
+    "intent",
+    "receipt",
+    "missing_configuration",
+    "wrong_directory",
+    "wrong_profile_bytes",
+    "wrong_pgdata",
+    "active_varve",
+    "active_reference",
+    "caps",
+    "original",
+    "old_id",
+    "old_status",
+    "old_service",
+    "old_environment",
+    "old_project",
+    "missing_old",
+    "new_service",
+    "new_environment",
+    "new_project",
+    "new_missing_id",
+    "new_same_id",
+    "new_terminal",
+    "missing_response",
+    "ambiguous_mutation"
+  ],
+  "actual_source_exercised": true,
+  "external_commands": 0,
+  "infra_mutations": 0,
+  "helpers": {
+    "reuse-varve.mjs": "0222148f78e9d11d25ce300e148151b89283a1a769fe2d278491ae87c958c7b9"
+  }
+}

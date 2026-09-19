@@ -1,0 +1,22 @@
+import {readFileSync,writeFileSync,existsSync,renameSync,copyFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+const root='/tmp/varve-scoped.0bj4bw';
+const read=name=>JSON.parse(readFileSync(root+'/'+name,'utf8'));
+assert(!existsSync(root+'/monitor-resumed.json'));
+const state=read('status-latest.json'),started=read('campaign-started.json');
+assert(Date.now()-Date.parse(state.at)<180000);
+assert.equal(state.deployments.varve.id,read('upload-varve.jsonl').deploymentId);
+assert(['BUILDING','DEPLOYING','SUCCESS'].includes(state.deployments.varve.status));
+for(const role of ['timescale','driver'])assert.equal(state.state[role].instance.activeDeployments.length,0);
+for(const name of ['redeploy-intent.json','redeployed.json','scoped001.launch.json','scoped002.launch.json','campaign-error.json','cleanup-request.json'])assert(!existsSync(root+'/'+name),'Transition already occurred: '+name);
+let running=false;try{execFileSync('kill',['-0',String(started.pid)],{stdio:'ignore'});running=true;}catch{}
+assert(!running,'Original monitor still alive');
+execFileSync('node',[root+'/verify-ready.mjs'],{stdio:'pipe'});
+copyFileSync(root+'/upload-timeout-reconciled.json',root+'/upload-timeout-first-inference-superseded.json');
+copyFileSync(root+'/campaign.log',root+'/duplicate-monitor-guard.log');
+renameSync(root+'/campaign-started.json',root+'/first-monitor-started.json');
+const receipt={at:new Date().toISOString(),deployment_id:state.deployments.varve.id,original_monitor:started,source_upload_accepted:true,source_upload_retried:false,original_monitor_dead:true,benchmark_workloads_started:0,other_benchmark_compute:0,source_or_runtime_changed:false,incident:'The upload returned promptly and the first controller DID start. The captured Bash override exposes command/timeout only; background:true did not detach. The outer 185-second timeout killed that monitor while Varve was still BUILDING. A subsequent launch was refused by its existing-start guard. Its shell redirect overwrote the initial monitor log with that refusal; the initial log is unavailable. No workload or driver deployment had started. The earlier upload-timeout explanation was an incorrect inference and is superseded here. Preserve the old start/guard records and resume the identical controller using shell-level nohup detachment, not another upload.'};
+writeFileSync(root+'/upload-timeout-reconciled.json',JSON.stringify(receipt,null,2)+'\n',{mode:0o600});
+writeFileSync(root+'/monitor-resumed.json',JSON.stringify(receipt,null,2)+'\n',{mode:0o600});
+console.log(JSON.stringify({resuming_pre_workload_monitor:true,source_upload_retried:false,source_and_helpers_unchanged:true}));

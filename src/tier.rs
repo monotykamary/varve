@@ -12,6 +12,10 @@ use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+#[path = "tier_journal.rs"]
+mod journal_transport;
+use journal_transport::JournalRef;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ObjectRef {
@@ -74,6 +78,8 @@ pub(crate) struct RemoteHead {
     pub sequence: u64,
     pub checkpoint: ObjectRef,
     pub wal: Vec<ObjectRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub journal: Vec<JournalRef>,
     pub lock: Option<RemoteLock>,
 }
 impl RemoteHead {
@@ -99,6 +105,7 @@ impl RemoteHead {
             record.validate("wal/", ".wal")?;
             ensure!(keys.insert(&record.key), "duplicate remote WAL reference");
         }
+        journal_transport::validate_refs(&head)?;
         if let Some(lock) = &head.lock {
             ensure!(
                 ["restore", "gc"].contains(&lock.kind.as_str()),
@@ -483,6 +490,7 @@ struct ShipSnapshot {
     derived_pages: Vec<PageRef>,
     checkpoint_bytes: Vec<u8>,
     wal: Vec<WalUpload>,
+    journal: Vec<crate::journal::SealedSegment>,
     _pin: Pin,
 }
 
@@ -560,10 +568,7 @@ fn prepare_publication_intent(
     let additional = (intent_bytes.len() as u64)
         .checked_add(intent.binding_reservation_bytes)
         .context("publication reservation size overflow")?;
-    let _disk = inner
-        .disk_admission
-        .lock()
-        .map_err(|_| anyhow::anyhow!("disk admission lock poisoned"))?;
+    let _disk = lock_disk_admission(inner)?;
     ensure_budget(inner, additional)?;
     let reservation = wal::reserve_file(
         &reservation_path(&inner.root),
@@ -653,7 +658,11 @@ fn try_compare_and_swap_with_intent(
     }
 }
 
-fn capture_ship(inner: &Inner, s: &State) -> Result<ShipSnapshot> {
+fn capture_ship(
+    inner: &Inner,
+    s: &State,
+    journal: Vec<crate::journal::SealedSegment>,
+) -> Result<ShipSnapshot> {
     inner
         .remote
         .as_ref()
@@ -679,10 +688,23 @@ fn capture_ship(inner: &Inner, s: &State) -> Result<ShipSnapshot> {
         .flat_map(|table| table.segments.iter().map(|segment| segment.id.clone()))
         .collect();
     segment_ids.extend(derived_pages.iter().map(PageRef::key));
+    ensure!(
+        checkpoint.segmented_journal == s.catalog.segmented_journal,
+        "checkpoint journal marker changed unexpectedly"
+    );
+    for segment in &journal {
+        segment_ids.insert(format!(
+            "journal/{}",
+            segment
+                .relative_path
+                .to_str()
+                .context("invalid journal pin name")?
+        ));
+    }
     let pin = Pin::new(inner, segment_ids)?;
     let mut wal = Vec::new();
     let mut wal_bytes = 0u64;
-    if checkpoint.checkpoint_sequence < s.sequence {
+    if !checkpoint.segmented_journal && checkpoint.checkpoint_sequence < s.sequence {
         let first_wal_sequence = checkpoint
             .checkpoint_sequence
             .checked_add(1)
@@ -711,6 +733,7 @@ fn capture_ship(inner: &Inner, s: &State) -> Result<ShipSnapshot> {
         derived_pages,
         checkpoint_bytes,
         wal,
+        journal,
         _pin: pin,
     })
 }
@@ -788,11 +811,7 @@ fn prove_owned_remote_prefix(
             && checkpoint.checkpoint_sequence <= head.sequence,
         "remote checkpoint does not match the owned head"
     );
-    let tail_len = u64::try_from(head.wal.len()).context("remote WAL tail length overflow")?;
-    ensure!(
-        head.sequence.checked_sub(checkpoint.checkpoint_sequence) == Some(tail_len),
-        "remote WAL tail is not contiguous with its checkpoint"
-    );
+    journal_transport::validate_transport(head, &checkpoint)?;
     if let Some(remote_stamp) = checkpoint.control_history.last() {
         ensure!(
             local
@@ -876,31 +895,9 @@ fn prove_owned_remote_prefix(
             );
         }
     }
-    let mut wal_bytes = 0u64;
-    for (index, object) in head.wal.iter().enumerate() {
-        let offset = u64::try_from(index)
-            .context("remote WAL index overflow")?
-            .checked_add(1)
-            .context("remote WAL index overflow")?;
-        let sequence = checkpoint
-            .checkpoint_sequence
-            .checked_add(offset)
-            .context("remote WAL sequence overflow")?;
-        let bytes = remote.get_bounded(&object.key, object.bytes as usize)?;
-        object.verify(&bytes)?;
-        wal_bytes = wal_bytes
-            .checked_add(bytes.len() as u64)
-            .context("remote WAL proof size overflow")?;
-        ensure!(
-            wal_bytes <= inner.config.wal_max_bytes,
-            "remote WAL proof exceeds configured WAL budget"
-        );
-        let record = wal::decode(&bytes)?;
-        ensure!(
-            record.sequence == sequence
-                && object.key == format!("wal/{sequence:020}-{}.wal", object.digest),
-            "remote WAL sequence/key mismatch"
-        );
+    journal_transport::visit_tail(inner, head, &checkpoint, |sequence, bytes| {
+        let record = wal::decode(bytes)?;
+        ensure!(record.sequence == sequence, "remote WAL sequence mismatch");
         let group_fingerprint = wal::group_fingerprint(&record)?;
         match record.operation {
             wal::Operation::CreateTable { name, config } => {
@@ -1040,7 +1037,8 @@ fn prove_owned_remote_prefix(
                 );
             }
         }
-    }
+        Ok(())
+    })?;
     for (name, local_table) in &local.catalog.tables {
         if local_table.created_sequence <= head.sequence {
             ensure!(
@@ -1130,6 +1128,7 @@ fn reconcile_owned_head(db: &Database) -> Result<()> {
 }
 
 fn fence_remote(db: &Database, state: &RemoteState, reason: &str) -> Result<()> {
+    let _commit = db.lock_commit()?;
     let mut s = db.lock()?;
     if state.still_current(&s) {
         s.fenced = Some(format!(
@@ -1144,6 +1143,7 @@ fn apply_binding(
     expected: &RemoteState,
     published: PublishedHead,
 ) -> Result<RemoteState> {
+    let _commit = db.lock_commit()?;
     let mut s = db.lock()?;
     if !expected.still_current(&s)
         || published.head.database_id != s.catalog.database_id
@@ -1214,6 +1214,7 @@ fn upload_ship(inner: &Inner, snapshot: &ShipSnapshot) -> Result<PublishedHead> 
         remote.put_immutable(&object.key, &record.bytes)?;
         tail.push(object);
     }
+    let journal = journal_transport::upload(inner, &snapshot.journal)?;
     wal::failpoint("remote_objects_uploaded");
     let head = RemoteHead {
         format_version: FORMAT_VERSION,
@@ -1222,8 +1223,10 @@ fn upload_ship(inner: &Inner, snapshot: &ShipSnapshot) -> Result<PublishedHead> 
         sequence: snapshot.sequence,
         checkpoint: checkpoint_ref,
         wal: tail,
+        journal,
         lock: None,
     };
+    journal_transport::validate_transport(&head, &snapshot.checkpoint)?;
     let token = compare_and_swap_with_intent(inner, &snapshot.remote_state, &head)?;
     wal::failpoint("remote_head_published");
     Ok(PublishedHead {
@@ -1239,9 +1242,11 @@ pub(crate) fn ship_with_remote_gate(
 ) -> Result<u64> {
     reconcile_owned_head(db)?;
     let snapshot = {
+        let _commit = db.lock_commit()?;
+        let journal = journal_transport::capture(db)?;
         let s = db.lock()?;
         healthy(&s)?;
-        capture_ship(&db.inner, &s)?
+        capture_ship(&db.inner, &s, journal)?
     };
     let published = match upload_ship(&db.inner, &snapshot) {
         Ok(published) => published,
@@ -1265,6 +1270,7 @@ impl Database {
     pub fn vacuum_remote(&self) -> Result<usize> {
         let gate = self.lock_remote_operation()?;
         let resume = {
+            let _commit = self.lock_commit()?;
             let mut s = self.lock()?;
             healthy(&s)?;
             let resume = s.remote_head.as_ref().is_some_and(|head| {
@@ -1281,6 +1287,7 @@ impl Database {
             ship_with_remote_gate(self, &gate)?;
         }
         let removed = vacuum_with_remote_gate(self, &gate)?;
+        let _commit = self.lock_commit()?;
         self.lock()?.remote_vacuum_pending = false;
         Ok(removed)
     }
@@ -1366,12 +1373,7 @@ impl Database {
                 catalog.checkpoint_sequence <= head.sequence,
                 "remote checkpoint is ahead of head"
             );
-            ensure!(
-                u64::try_from(head.wal.len()).ok().is_some_and(|tail_len| {
-                    head.sequence.checked_sub(catalog.checkpoint_sequence) == Some(tail_len)
-                }),
-                "incomplete remote WAL tail"
-            );
+            journal_transport::validate_transport(&head, &catalog)?;
             ensure!(
                 used <= config.max_disk_bytes,
                 "restore checkpoint exceeds disk budget"
@@ -1403,9 +1405,20 @@ impl Database {
                 );
                 wal::atomic_write(&wal::path(target, sequence), &bytes)?;
             }
+            if catalog.segmented_journal {
+                let directory = target.join("journal");
+                journal_transport::install(&directory, &config, remote.as_ref(), &head, &mut used)?;
+                journal_transport::scan_installed(&directory, &config, &head, &catalog, |_, _| {
+                    Ok(())
+                })?;
+            }
+            // Transport authority comes from the verified root, not the caller's
+            // migration opt-in. A legacy head remains a valid owned predecessor.
+            let mut restore_config = config.clone();
+            restore_config.segmented_journal = catalog.segmented_journal;
             drop(catalog);
             // Segments remain remote and are fetched/verified on demand. Replay is validated before releasing the remote lease.
-            let db = Self::open_locked(target, config.clone(), Some(remote.clone()), Some(lock))?;
+            let db = Self::open_locked(target, restore_config, Some(remote.clone()), Some(lock))?;
             Ok(db)
         })();
         let mut released = head.clone();
@@ -1418,6 +1431,7 @@ impl Database {
         match (result, release) {
             (Ok(db), Ok(token)) => {
                 {
+                    let _commit = db.lock_commit()?;
                     let mut s = db.lock()?;
                     s.remote_owner = released.owner.clone();
                     s.remote_segment_ids = s
@@ -1485,7 +1499,7 @@ fn protected_segment_keys(db: &Database) -> Result<BTreeSet<String>> {
         .lock()
         .map_err(|_| anyhow::anyhow!("segment pins poisoned during remote vacuum"))?;
     protected.extend(pins.keys().map(|id| {
-        if id.starts_with("derived/") {
+        if id.starts_with("derived/") || id.starts_with("journal/") {
             id.clone()
         } else {
             format!("segments/{id}.parquet")
@@ -1555,6 +1569,7 @@ pub(crate) fn vacuum_with_remote_gate(
         let root = derived_root::decode(&bytes, &db.inner.config)?;
         let derived_keys: BTreeSet<_> = root.page_refs().map(PageRef::key).collect();
         let checkpoint = root.catalog;
+        journal_transport::validate_transport(&head, &checkpoint)?;
         ensure!(
             checkpoint.database_id == head.database_id
                 && checkpoint.checkpoint_sequence <= head.sequence,
@@ -1573,8 +1588,13 @@ pub(crate) fn vacuum_with_remote_gate(
         live.extend(derived_keys);
         live.insert(head.checkpoint.key.clone());
         live.extend(head.wal.iter().map(|record| record.key.clone()));
+        live.extend(
+            head.journal
+                .iter()
+                .map(|segment| segment.object.key.clone()),
+        );
         let mut removed = 0usize;
-        for prefix in ["segments", "manifests", "wal", "derived"] {
+        for prefix in ["segments", "manifests", "wal", "derived", "journal"] {
             let mut after = None;
             let mut cursors = BTreeSet::new();
             let mut pages = 0usize;

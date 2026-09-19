@@ -13,19 +13,32 @@ use std::time::{Duration, Instant};
 
 use crate::model::{RollupRow, StoredRow, validate_name};
 
+mod native;
+mod resident_types;
 mod workers;
+pub(crate) use native::NativeRuntime;
+#[cfg(test)]
+mod native_race_tests;
+#[cfg(test)]
+mod native_tests;
+pub(crate) use resident_types::{
+    ResidentBatch, ResidentFile, ResidentLineage, ResidentSnapshot, ResidentTable,
+};
 pub use workers::{QueryRuntime, QueryWorkerStats};
 
 const STDERR_LIMIT: usize = 256 * 1024;
 const MAX_QUERY_SCRIPT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_QUERY_INPUT_BYTES: usize = 128 * 1024 * 1024;
 const MAX_CATALOG_SQL_BYTES: usize = 32 * 1024;
+const MAX_TYPED_INPUT_ROWS: usize = 128;
+const MAX_TYPED_SQL_BYTES: usize = 32 * 1024;
 const POLL_INTERVAL: Duration = Duration::from_millis(2);
 
 // One schema drives both ingestion paths, including unsigned tie-breakers.
 const INPUT_COLUMNS: &[(&str, &str)] = &[
     ("kind", "VARCHAR"),
     ("table_name", "VARCHAR"),
+    ("batch_id", "VARCHAR"),
     ("timestamp_us", "BIGINT"),
     ("tenant", "VARCHAR"),
     ("series", "VARCHAR"),
@@ -253,7 +266,7 @@ fn build_query_mode(
     options: &QueryOptions,
     catalog: &QueryCatalog,
     worker: &Path,
-    inline_catalog: bool,
+    inline_relations: bool,
 ) -> Result<(String, Vec<u8>)> {
     let mut table_names = HashSet::new();
     let mut exposed_relations = HashSet::new();
@@ -270,16 +283,12 @@ fn build_query_mode(
     validate_catalog(catalog, tables, &mut exposed_relations)?;
 
     let mut allowed_paths = Vec::new();
-    let literal_catalog = if inline_catalog
-        && tables
-            .iter()
-            .all(|table| table.hot.is_empty() && table.rollups.is_empty())
-    {
-        catalog_literals(catalog)?
+    let literals = if inline_relations {
+        typed_relations(tables, catalog)?
     } else {
         None
     };
-    let has_input = literal_catalog.is_none()
+    let has_input = literals.is_none()
         && (tables
             .iter()
             .any(|table| !table.hot.is_empty() || !table.rollups.is_empty())
@@ -341,9 +350,11 @@ fn build_query_mode(
     let mut input = Vec::new();
     for table in tables {
         append_table_views(&mut setup, table)?;
-        append_table_input(&mut input, table)?;
+        if literals.is_none() {
+            append_table_input(&mut input, table)?;
+        }
     }
-    if let Some(literals) = &literal_catalog {
+    if let Some(literals) = &literals {
         setup.push_str(literals);
     } else {
         for relation in &catalog.relations {
@@ -356,7 +367,7 @@ fn build_query_mode(
     }
     setup.push_str(sql);
     // Literals must not consume headroom available to the original scanner script.
-    if literal_catalog.is_some() && setup.len() > MAX_QUERY_SCRIPT_BYTES {
+    if literals.is_some() && setup.len() > MAX_QUERY_SCRIPT_BYTES {
         return build_query_mode(tables, sql, options, catalog, worker, false);
     }
     Ok((setup, input))
@@ -437,7 +448,7 @@ fn catalog_type(column_type: &str) -> Result<&'static str> {
     }
 }
 
-fn catalog_row_values(relation: &CatalogRelation, row: &Value) -> Result<Vec<Value>> {
+fn catalog_row_values<'a>(relation: &CatalogRelation, row: &'a Value) -> Result<Vec<&'a Value>> {
     let values = match row {
         Value::Array(values) => {
             ensure!(
@@ -447,7 +458,7 @@ fn catalog_row_values(relation: &CatalogRelation, row: &Value) -> Result<Vec<Val
                 values.len(),
                 relation.columns.len()
             );
-            values.clone()
+            values.iter().collect()
         }
         Value::Object(values) => {
             ensure!(
@@ -461,7 +472,7 @@ fn catalog_row_values(relation: &CatalogRelation, row: &Value) -> Result<Vec<Val
                 .columns
                 .iter()
                 .map(|(name, _)| {
-                    values.get(name).cloned().with_context(|| {
+                    values.get(name).with_context(|| {
                         format!("catalog relation {} row is missing {name}", relation.name)
                     })
                 })
@@ -520,6 +531,8 @@ impl Write for BoundedInput<'_> {
 struct HotInput<'a> {
     kind: &'a str,
     table_name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    batch_id: Option<&'a str>,
     timestamp_us: i64,
     tenant: &'a str,
     series: &'a str,
@@ -533,6 +546,8 @@ struct HotInput<'a> {
 struct RollupInput<'a> {
     kind: &'a str,
     table_name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    batch_id: Option<&'a str>,
     width_us: i64,
     bucket_us: i64,
     tenant: &'a str,
@@ -560,6 +575,7 @@ fn append_table_input(input: &mut Vec<u8>, table: &QueryTable) -> Result<()> {
             &HotInput {
                 kind: "hot",
                 table_name: &table.name,
+                batch_id: None,
                 timestamp_us: row.row.timestamp_us,
                 tenant: &row.row.tenant,
                 series: &row.row.series,
@@ -584,6 +600,7 @@ fn append_table_input(input: &mut Vec<u8>, table: &QueryTable) -> Result<()> {
             &RollupInput {
                 kind: "rollup",
                 table_name: &table.name,
+                batch_id: None,
                 width_us: rollup.width_us,
                 bucket_us: rollup.bucket_us,
                 tenant: &rollup.tenant,
@@ -628,8 +645,9 @@ fn append_table_views(sql: &mut String, table: &QueryTable) -> Result<()> {
     sql.push_str("CREATE TEMP VIEW ");
     sql.push_str(&identifier);
     sql.push_str(" AS SELECT timestamp_us, tenant, series, value, tags, sequence, ordinal FROM (");
-    sql.push_str("SELECT timestamp_us, tenant, series, value, tags, sequence, ordinal FROM __varve_input WHERE kind = 'hot' AND table_name = ");
+    sql.push_str("SELECT timestamp_us, tenant, series, value, tags, sequence, ordinal FROM __varve_input AS raw WHERE kind = 'hot' AND table_name = ");
     sql.push_str(&table_literal);
+    sql.push_str(" AND (batch_id IS NULL OR EXISTS (SELECT 1 FROM __varve_input AS selected WHERE selected.kind = 'selected' AND selected.table_name = raw.table_name AND selected.batch_id = raw.batch_id))");
     if let Some(cutoff) = table.cutoff_us {
         sql.push_str(&format!(" AND timestamp_us >= {cutoff}"));
     }
@@ -656,6 +674,192 @@ fn append_table_views(sql: &mut String, table: &QueryTable) -> Result<()> {
     Ok(())
 }
 
+// This is copied, bounded SQL construction, not native or zero-copy ingestion.
+// Selection depends only on the supplied snapshot, never on the user's SQL.
+fn typed_relations(tables: &[QueryTable], catalog: &QueryCatalog) -> Result<Option<String>> {
+    let rows = tables
+        .iter()
+        .flat_map(|table| [table.hot.len(), table.rollups.len()])
+        .chain(catalog.relations.iter().map(|relation| relation.rows.len()))
+        .try_fold(0usize, |total, count| total.checked_add(count));
+    if rows.is_none_or(|rows| rows > MAX_TYPED_INPUT_ROWS) {
+        return Ok(None);
+    }
+    let mut sql = TypedSql(String::new());
+    let mut first = true;
+    for table in tables {
+        for stored in &table.hot {
+            let row = &stored.row;
+            row.validate().context("validate hot query row")?;
+            let Some(tags) = typed_tags(&row.tags) else {
+                return Ok(None);
+            };
+            use TypedValue::*;
+            if sql
+                .row(
+                    &mut first,
+                    &[
+                        Text("hot"),
+                        Text(&table.name),
+                        Null,
+                        Signed(row.timestamp_us),
+                        Text(&row.tenant),
+                        Text(&row.series),
+                        Double(row.value),
+                        Text(&tags),
+                        Unsigned(stored.sequence),
+                        Unsigned(stored.ordinal.into()),
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                        Null,
+                    ],
+                )
+                .is_err()
+            {
+                return Ok(None);
+            }
+        }
+        for row in &table.rollups {
+            ensure!(
+                [row.sum, row.min, row.max, row.first, row.last]
+                    .iter()
+                    .all(|v| v.is_finite()),
+                "rollup values must be finite"
+            );
+            let Some(tags) = typed_tags(&row.tags) else {
+                return Ok(None);
+            };
+            use TypedValue::*;
+            if sql
+                .row(
+                    &mut first,
+                    &[
+                        Text("rollup"),
+                        Text(&table.name),
+                        Null,
+                        Null,
+                        Text(&row.tenant),
+                        Text(&row.series),
+                        Null,
+                        Text(&tags),
+                        Null,
+                        Null,
+                        Signed(row.width_us),
+                        Signed(row.bucket_us),
+                        Unsigned(row.count),
+                        Double(row.sum),
+                        Double(row.min),
+                        Double(row.max),
+                        Double(row.first),
+                        Double(row.last),
+                        Signed(row.first_timestamp_us),
+                        Signed(row.last_timestamp_us),
+                        Unsigned(row.first_sequence),
+                        Unsigned(row.first_ordinal.into()),
+                        Unsigned(row.last_sequence),
+                        Unsigned(row.last_ordinal.into()),
+                    ],
+                )
+                .is_err()
+            {
+                return Ok(None);
+            }
+        }
+    }
+    if !first && sql.push("; ").is_err() {
+        return Ok(None);
+    }
+    let Some(catalog) = catalog_literals(catalog)? else {
+        return Ok(None);
+    };
+    if sql.push(&catalog).is_err() {
+        return Ok(None);
+    }
+    Ok(Some(sql.0))
+}
+
+fn typed_tags(tags: &std::collections::BTreeMap<String, String>) -> Option<String> {
+    let mut bytes = Vec::new();
+    serde_json::to_writer(&mut BoundedInput(&mut bytes, MAX_TYPED_SQL_BYTES), tags).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+enum TypedValue<'a> {
+    Null,
+    Text(&'a str),
+    Signed(i64),
+    Unsigned(u64),
+    Double(f64),
+}
+
+struct TypedSql(String);
+
+impl TypedSql {
+    fn push(&mut self, text: &str) -> std::fmt::Result {
+        if text.len() > MAX_TYPED_SQL_BYTES.saturating_sub(self.0.len()) {
+            return Err(std::fmt::Error);
+        }
+        self.0.push_str(text);
+        Ok(())
+    }
+
+    fn literal(&mut self, text: &str, kind: &str) -> std::fmt::Result {
+        // NUL cannot occur in a CLI SQL script. Keep scanner semantics for it.
+        if text.len() > MAX_TYPED_SQL_BYTES || text.contains('\0') {
+            return Err(std::fmt::Error);
+        }
+        self.push("CAST('")?;
+        for (index, part) in text.split('\'').enumerate() {
+            if index > 0 {
+                self.push("''")?;
+            }
+            self.push(part)?;
+        }
+        self.push("' AS ")?;
+        self.push(kind)?;
+        self.push(")")
+    }
+
+    fn row(
+        &mut self,
+        first: &mut bool,
+        values: &[TypedValue<'_>; INPUT_COLUMNS.len()],
+    ) -> std::fmt::Result {
+        self.push(if *first {
+            "INSERT INTO __varve_input VALUES ("
+        } else {
+            ",("
+        })?;
+        *first = false;
+        for (index, (value, (_, kind))) in values.iter().zip(INPUT_COLUMNS).enumerate() {
+            if index > 0 {
+                self.push(",")?;
+            }
+            match value {
+                TypedValue::Null => self.push("NULL")?,
+                TypedValue::Text(text) => self.literal(text, kind)?,
+                TypedValue::Signed(value) => self.literal(&value.to_string(), kind)?,
+                TypedValue::Unsigned(value) => self.literal(&value.to_string(), kind)?,
+                // Cast the round-trip decimal string directly to DOUBLE, without
+                // SQL decimal inference (which would also erase negative zero).
+                TypedValue::Double(value) => self.literal(&value.to_string(), kind)?,
+            }
+        }
+        self.push(")")
+    }
+}
+
 // Bound the complete encoded macros, not just the source payload. Any miss uses
 // the existing JSON scanner; no relation is pruned based on the user's SQL.
 fn catalog_literals(catalog: &QueryCatalog) -> Result<Option<String>> {
@@ -670,6 +874,10 @@ fn catalog_literals(catalog: &QueryCatalog) -> Result<Option<String>> {
         }};
     }
     for relation in &catalog.relations {
+        // Even empty relations must not allocate an unbounded NULL-value vector.
+        if relation.columns.len() > MAX_CATALOG_SQL_BYTES {
+            return Ok(None);
+        }
         push!(format!(
             "CREATE TEMP MACRO {}() AS TABLE SELECT * FROM (VALUES ",
             quote_identifier(&relation.name)
@@ -681,7 +889,7 @@ fn catalog_literals(catalog: &QueryCatalog) -> Result<Option<String>> {
             }
             push!("(");
             let values = if relation.rows.is_empty() {
-                vec![Value::Null; relation.columns.len()]
+                vec![&Value::Null; relation.columns.len()]
             } else {
                 catalog_row_values(relation, &relation.rows[index])?
             };
@@ -1490,12 +1698,13 @@ mod tests {
             cutoff_us: None,
         };
         let worker = tempfile::tempdir().unwrap();
-        let (sql, input) = build_query(
+        let (sql, input) = build_query_mode(
             std::slice::from_ref(&table),
             "SELECT 1",
             &QueryOptions::default(),
             &QueryCatalog::default(),
             worker.path(),
+            false,
         )
         .unwrap();
         assert!(sql.contains("read_json('/dev/stdin'"));
@@ -1520,6 +1729,128 @@ mod tests {
         table.hot.clear();
         table.rollups[0].sum = f64::INFINITY;
         assert!(append_table_input(&mut vec![], &table).is_err());
+    }
+
+    #[test]
+    fn small_named_aggregate_setup_is_typed_and_bounds_are_snapshot_wide() {
+        let worker = tempfile::tempdir().unwrap();
+        let stored = StoredRow {
+            row: crate::model::Row {
+                timestamp_us: 0,
+                tenant: "t".into(),
+                series: "s".into(),
+                value: -0.0,
+                tags: Default::default(),
+            },
+            sequence: u64::MAX,
+            ordinal: u32::MAX,
+        };
+        let mut tables = vec![QueryTable {
+            name: "metrics".into(),
+            hot: vec![stored.clone()],
+            files: vec![],
+            rollups: vec![RollupRow::from_row(1, &stored).unwrap()],
+            cutoff_us: Some(0),
+        }];
+        let mut catalog = QueryCatalog {
+            relations: vec![CatalogRelation {
+                name: "metadata".into(),
+                columns: vec![("text".into(), "VARCHAR".into())],
+                rows: vec![json!(["雪'"])],
+            }],
+            aggregates: vec![AggregateAlias {
+                name: "minute".into(),
+                source: "metrics".into(),
+                width_us: 1,
+            }],
+        };
+        let options = QueryOptions::default();
+        for query in [
+            "SELECT * FROM minute",
+            "SELECT count(*) FROM metrics",
+            "WITH a AS (SELECT * FROM minute) SELECT * FROM a",
+        ] {
+            let (script, input) =
+                build_query(&tables, query, &options, &catalog, worker.path()).unwrap();
+            assert!(input.is_empty());
+            assert!(!script.contains("read_json("));
+            assert!(!script.contains("/dev/stdin"));
+            assert!(script.contains("INSERT INTO __varve_input VALUES"));
+            assert!(script.contains("CREATE TEMP VIEW \"minute\""));
+            assert!(script.contains("CAST('18446744073709551615' AS UBIGINT)"));
+            assert!(script.contains("CAST('-0' AS DOUBLE)"));
+            assert!(script.contains("SET allowed_paths = [];"));
+            assert!(script.contains("SET lock_configuration = true"));
+        }
+        // Selected aggregate-only snapshots also need no raw rows or scanner.
+        tables[0].hot.clear();
+        let (script, input) = build_query(
+            &tables,
+            "SELECT * FROM minute",
+            &options,
+            &catalog,
+            worker.path(),
+        )
+        .unwrap();
+        assert!(input.is_empty());
+        assert!(!script.contains("read_json("));
+        tables[0].rollups.clear();
+        catalog.relations[0].rows = vec![json!([""]); MAX_TYPED_INPUT_ROWS];
+        assert!(typed_relations(&tables, &catalog).unwrap().is_some());
+        tables[0].hot.push(stored);
+        assert!(typed_relations(&tables, &catalog).unwrap().is_none());
+        let (script, input) =
+            build_query(&tables, "SELECT 1", &options, &catalog, worker.path()).unwrap();
+        assert!(script.contains("read_json('/dev/stdin'"));
+        assert_eq!(
+            input.iter().filter(|&&b| b == b'\n').count(),
+            MAX_TYPED_INPUT_ROWS + 1
+        );
+        for text in ["'".repeat(17 * 1024), "nul\0value".into()] {
+            catalog.relations[0].rows = vec![json!([text])];
+            assert!(typed_relations(&tables, &catalog).unwrap().is_none());
+        }
+        catalog.relations[0].rows = vec![json!(["x".repeat(16 * 1024)])];
+        tables[0].hot[0].row.tags = (0..16)
+            .map(|i| (format!("tag{i}"), "x".repeat(1024)))
+            .collect();
+        assert!(catalog_literals(&catalog).unwrap().is_some());
+        assert!(
+            typed_relations(&tables, &QueryCatalog::default())
+                .unwrap()
+                .is_some()
+        );
+        assert!(typed_relations(&tables, &catalog).unwrap().is_none());
+        catalog.relations.clear();
+        tables[0].hot[0].row.tags = (0..32)
+            .map(|i| (format!("tag{i}"), "'".repeat(1024)))
+            .collect();
+        assert!(typed_relations(&tables, &catalog).unwrap().is_none());
+        let (script, input) =
+            build_query(&tables, "SELECT 1", &options, &catalog, worker.path()).unwrap();
+        assert!(script.contains("read_json("));
+        assert!(!input.is_empty());
+    }
+
+    #[test]
+    fn typed_sql_checks_encoded_bound_before_each_append() {
+        let mut sql = TypedSql(String::new());
+        sql.push(&"x".repeat(MAX_TYPED_SQL_BYTES)).unwrap();
+        assert!(sql.push("雪").is_err());
+        assert_eq!(sql.0.len(), MAX_TYPED_SQL_BYTES);
+        let mut sql = TypedSql(String::new());
+        assert!(
+            sql.literal(&"'".repeat(MAX_TYPED_SQL_BYTES / 2), "VARCHAR")
+                .is_err()
+        );
+        assert!(sql.0.len() <= MAX_TYPED_SQL_BYTES);
+        assert!(
+            typed_tags(&std::collections::BTreeMap::from([(
+                "key".into(),
+                "x".repeat(MAX_TYPED_SQL_BYTES)
+            )]))
+            .is_none()
+        );
     }
 
     #[test]

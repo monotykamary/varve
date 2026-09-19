@@ -32,7 +32,7 @@ Historical WAL replay does not apply the newer live-writer headroom rule, but it
 
 ## Publication, restore and GC
 
-Raw Parquet preparation uses a bounded off-lock candidate with protected outputs. Publication validates its generation. Scheduled stale work defers; explicit/admission checkpoint paths retain the documented synchronous fallback. Derived set packing/root publication still performs bounded work under serialization—it is not an entirely lock-free maintenance design.
+Prepared maintenance handles raw output, whole-set derived encoding, dependency verification/writes, index construction and accounting outside state with budgeted reservations and active raw/page pins. Root publication requires exact generation, sequence and timed-floor identity; scheduled stale work defers. Compaction freezes its whole root only after selected immutable input I/O and exact descriptor revalidation, and never rebases already-frozen derived state. Initial capture still clones under state; root fsync, disk admission and GC remain serialized. Explicit/control/admission fallbacks remain synchronous. This is not page-local update cost, a lock-free maintenance design, or a frozen-prefix checkpoint that can publish through later appends.
 
 Dependencies are written and synced before the atomic root rename. Derived publication is protected by state/disk-admission serialization; pending raw outputs remain pinned across the off-lock interval. Only successful root publication permits retirement of covered hot rows/WAL. Failed candidates leave unreachable immutable objects, never a partial authoritative replacement.
 

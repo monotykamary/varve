@@ -1,0 +1,1 @@
+cargo clean --locked --offline -p varve-storage -p varve-client 

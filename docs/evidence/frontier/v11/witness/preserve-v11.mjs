@@ -1,0 +1,34 @@
+import {readFileSync,writeFileSync,mkdirSync,existsSync,readdirSync,statSync,renameSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import {join,dirname} from 'node:path';
+import assert from 'node:assert/strict';
+const root='/tmp/varve-diagnostic.KOUrtH/retry-config',parent='/tmp/varve-diagnostic.KOUrtH',repo='/Users/monotykamary/VCS/working-remote/open-source/varve',base=repo+'/docs/evidence/frontier/v10',destination=repo+'/docs/evidence/frontier/v11',stage=root+'/evidence-stage-v11';
+assert(!existsSync(destination)&&!existsSync(stage),'Never overwrite evidence or a partial staging attempt');
+execFileSync('node',[root+'/verify-ready.mjs'],{stdio:'pipe'});
+const secrets=JSON.parse(readFileSync('/tmp/varve-timescale.DU0Znc/secrets.json','utf8'));assert(secrets.token&&secrets.password);
+const sha=data=>createHash('sha256').update(data).digest('hex');
+const checked=path=>{const data=readFileSync(path);for(const value of [secrets.token,secrets.password])assert(!data.includes(Buffer.from(value)),'Known credential found in '+path);return data;};
+const json=path=>JSON.parse(checked(path));
+assert.equal(json(root+'/campaign-complete.json').performance_win_claimed,false);
+const clean=json(root+'/cleanup-verified.json');assert(clean.original_unchanged&&clean.benchmark_volumes_retained&&clean.active_benchmark_deployments===0);
+const reports=['diag101','diag102'].map(id=>json(root+'/'+id+'.json'));assert.equal(reports[0].state,'passed');assert.equal(reports[1].state,'overloaded');assert.equal(reports[1].mixed_workload.dropped_rows,103000);
+assert.deepEqual(json(root+'/recovery-before.json').fingerprints,json(root+'/recovery-after.json').fingerprints);
+assert.equal(reports.reduce((n,r)=>n+r.manifest.total_committed_watermark_rows,0),2047000);
+const mappings=[];
+for(const id of ['diag101','diag102'])for(const suffix of ['.json','.log','.launch.json'])mappings.push([id+suffix,root+'/'+id+suffix]);
+for(const name of ['before.json','configured.json','prepared.json','runtime-varve.json','runtime-driver.json','runtime-driver-effective.json','redeploy-intent.json','redeployed.json','upload-varve.jsonl','campaign-started.json','campaign-complete.json','campaign.log','metrics-before.json','metrics-after-baseline.json','metrics-after-stress.json','analysis-baseline.json','analysis-stress.json','metrics-after-restart.json','recovery-before.json','recovery-after.json','restart-request.json','restart-response.json','cleanup-request.json','cleanup-verified.json','control-tests.json','summary-tests.json','installer-tests.json','attestation-tests.json','configuration-tests.json','driver-scope.json','driver-diagnostic-tests.log','DIAGNOSTIC_REVIEW.md','REVIEW_RESOLUTION.md'])mappings.push([name,root+'/'+name]);
+for(const role of ['varve','timescale','driver'])for(const phase of role==='driver'?['before','after-workload']:['before','pre-restart','after-restart'])mappings.push(['resources-'+role+'-'+phase+'.txt',root+'/resources-'+role+'-'+phase+'.txt']);
+for(const name of ['prepare.mjs','configure.mjs','remote.mjs','redeploy.mjs','status.mjs','ssh.mjs','launch.py','unpack.mjs','stop-attempt.mjs','probe-varve.py','check-driver.mjs','probe-driver.py','collect.py','recovery.py','check-recovery.mjs','metrics.py','resources.sh','restart.mjs','verify-stop.mjs','run-campaign.mjs','install-driver.py','install-driver.py.template','test-summary.mjs','test-installer.py','test-attestation.mjs','test-controls.mjs','test-cleanup.mjs','test-configuration.mjs','verify-ready.mjs','analyze-phases.mjs','preserve-v11.mjs'])mappings.push(['witness/'+name,root+'/'+name]);
+for(const name of ['before.json','configured.json','prepared.json','runtime-driver.json','redeploy-intent.json','redeployed.json','upload-varve.jsonl','campaign-started.json','campaign-error.json','campaign.log','cleanup-request.json','cleanup-verified.json'])mappings.push(['config-preflight/'+name,parent+'/'+name]);
+for(const name of ['prepare.mjs','verify-ready.mjs','probe-varve.py','run-campaign.mjs'])mappings.push(['config-preflight/witness/'+name,parent+'/'+name]);
+const scope=json(root+'/driver-scope.json');for(const [name,expected]of Object.entries(scope.files)){const path=repo+'/benchmarks/timescale/'+name;assert.equal(sha(checked(path)),expected);mappings.push(['driver/'+name,path]);}
+for(const name of ['benchmark.py','core.py','Dockerfile','requirements.txt'])mappings.push(['base-driver/'+name,base+'/driver/'+name]);
+for(const name of ['source-manifest.json','source.tar.gz','local-qualified-source.tar.gz','local-qualification.json','local-qualification.log','typescript-unit.log'])mappings.push([name,base+'/'+name]);
+mappings.push(['base-runtime-varve.json',base+'/runtime-varve.json'],['varve-config.json',root+'/runtime-config.json'],['previous-profile.json',base+'/varve-config.json'],['README.md',root+'/evidence.md'],['witness/verify.mjs',root+'/verify-v11.mjs'],['witness/verify-driver-delta.py',root+'/verify-driver-delta.py']);
+const prepared=mappings.map(([name,path])=>({name,data:checked(path)}));assert.equal(new Set(prepared.map(f=>f.name)).size,prepared.length);
+mkdirSync(stage,{recursive:true});for(const {name,data}of prepared){mkdirSync(dirname(join(stage,name)),{recursive:true});writeFileSync(join(stage,name),data);}
+const files=[];function walk(path,prefix=''){for(const name of readdirSync(path).sort()){const full=join(path,name),relative=prefix+name;if(statSync(full).isDirectory())walk(full,relative+'/');else{const data=checked(full);files.push({path:relative,bytes:data.length,sha256:sha(data)});}}}walk(stage);
+writeFileSync(stage+'/MANIFEST.json',JSON.stringify({format_version:1,candidate:'v11',outcomes:{baseline:'passed',stress:'overloaded'},fresh_uninterrupted_workloads:true,prior_preflight_attempt_failed:true,driver_reporting_only:true,performance_win_claimed:false,retained_common_rows_per_backend:2047000,known_credential_values_absent:true,files},null,2)+'\n');
+const verified=JSON.parse(execFileSync('node',[stage+'/witness/verify.mjs'],{encoding:'utf8',timeout:60000}));renameSync(stage,destination);
+console.log(JSON.stringify({destination,...verified,known_credentials_absent:true,overall_win:false}));

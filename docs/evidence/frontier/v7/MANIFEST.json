@@ -1,0 +1,262 @@
+{
+  "format_version": 1,
+  "candidate": "v7",
+  "outcomes": {
+    "baseline": "passed",
+    "large": "overloaded"
+  },
+  "retained_common_rows_per_backend": 2092000,
+  "known_credential_values_absent": true,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5410,
+      "sha256": "2a9a63fb8e6dc776edbe57170a171eb9edd80fe0dd17ba08f249a389bc2c568f"
+    },
+    {
+      "path": "analysis-baseline.json",
+      "bytes": 2420,
+      "sha256": "c79281e414a28bd7e908cd070eb7a63e245a73a54945ce603478054310c6f71e"
+    },
+    {
+      "path": "analysis-stress.json",
+      "bytes": 2434,
+      "sha256": "9a704cf892db80b310f91c1b675a760e9e2cf2a88f04fddc367045118b300c84"
+    },
+    {
+      "path": "cleanup-verified.json",
+      "bytes": 1359,
+      "sha256": "47cd3a35513a4344e944b72ca6a36f7ad882635082534ae8a6cf12358ed51913"
+    },
+    {
+      "path": "driver/Dockerfile",
+      "bytes": 378,
+      "sha256": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+    },
+    {
+      "path": "driver/benchmark.py",
+      "bytes": 61260,
+      "sha256": "f5488311247210b118410c155408a5be5af9ce2d28d6d480585a9c315125f637"
+    },
+    {
+      "path": "driver/core.py",
+      "bytes": 8139,
+      "sha256": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a"
+    },
+    {
+      "path": "driver/requirements.txt",
+      "bytes": 219,
+      "sha256": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    {
+      "path": "local-qualification.json",
+      "bytes": 12524,
+      "sha256": "6db56ac29de00544befa1c4967a65dccb1c8ababa82204060ec1a2813abaf1d6"
+    },
+    {
+      "path": "local-qualification.log",
+      "bytes": 31648,
+      "sha256": "1565517f98233659b518563185dbbd9bdca0bd19d2c852bab0143939833b7271"
+    },
+    {
+      "path": "local-qualified-source.tar.gz",
+      "bytes": 291334,
+      "sha256": "8bc1d0eefa68144ce7bd688c5b521df69d38a37cae6705c42279c9efb466e17e"
+    },
+    {
+      "path": "metrics-after-baseline.json",
+      "bytes": 21441,
+      "sha256": "9b7a5903eec182d935c0919814a0af3977a997eea9d2133ff1b74670d7813e75"
+    },
+    {
+      "path": "metrics-after-restart.json",
+      "bytes": 21015,
+      "sha256": "277d7259a710e396f8c3ef8c925f943e220824cca9716cfa37636f59c99d4130"
+    },
+    {
+      "path": "metrics-after-stress.json",
+      "bytes": 21517,
+      "sha256": "71f7e6a70fe18c29f38027af013ba31c0615190a23379e98f18a4a4c35ee5275"
+    },
+    {
+      "path": "metrics-before.json",
+      "bytes": 21092,
+      "sha256": "aab77f4a1b6a5d22a07d96e9aee9a959443447cb68b1c0bf8336e34db4af69bb"
+    },
+    {
+      "path": "recovery-after.json",
+      "bytes": 1184,
+      "sha256": "13ce431c588b31daffb72b6e9138968f0affebfbcb59b875f986671cae6eca70"
+    },
+    {
+      "path": "recovery-before.json",
+      "bytes": 1157,
+      "sha256": "f835fd265af551e1643c04efb1b05eb63f8d3c852f1e9db05c158d2a62a9dbc3"
+    },
+    {
+      "path": "resources-driver-after-workload.txt",
+      "bytes": 428,
+      "sha256": "fb0a8525dfc743141cd3958bb469bfa9bca24ce82e8c60fc5b37f1d092b91de7"
+    },
+    {
+      "path": "resources-driver-before.txt",
+      "bytes": 412,
+      "sha256": "ee4f93662cde151438cbc33b4394b08ca16512e2b52558337593129682a95d1c"
+    },
+    {
+      "path": "resources-timescale-after-restart.txt",
+      "bytes": 437,
+      "sha256": "7992f7a6d18b5805dc68a375614f6dcf73b83a783fb462b4d50fe702353b37a3"
+    },
+    {
+      "path": "resources-timescale-before.txt",
+      "bytes": 442,
+      "sha256": "1e4fd4dd99e4bfcf71bfafce79e58b7399be2d19453950f4b99bdbd703994991"
+    },
+    {
+      "path": "resources-timescale-pre-restart.txt",
+      "bytes": 454,
+      "sha256": "1f8deea107e46ed7fb10387415d127bfc1785e99d1799c7393c3fb457214bf18"
+    },
+    {
+      "path": "resources-varve-after-restart.txt",
+      "bytes": 424,
+      "sha256": "7bc5fb6eaa910d59cb3fd12a71d97d878798088a25fc592cc5e011e81adc0782"
+    },
+    {
+      "path": "resources-varve-before.txt",
+      "bytes": 423,
+      "sha256": "b8d7152772e6aa750231b4ffd3d9424a7858757ab3305086a278d5f4a88d8c0e"
+    },
+    {
+      "path": "resources-varve-pre-restart.txt",
+      "bytes": 436,
+      "sha256": "6626bd6ae87d1800e11b336c6bd9cbe0805647cc6e68f4cc0920b022387141f3"
+    },
+    {
+      "path": "restart-request.json",
+      "bytes": 263,
+      "sha256": "96dfcb646338a168f867dabc4f947c636588528d7a82de9da048bc24991af9e9"
+    },
+    {
+      "path": "restart-response.json",
+      "bytes": 75,
+      "sha256": "b039ec66bb8149864879719d5f10041ae5a583186bb81b5cc8da5a5bcbb8d173"
+    },
+    {
+      "path": "runtime-driver.json",
+      "bytes": 716,
+      "sha256": "72f5c0ecd4e4c2eff0e957b6efa636aefe57b758a851382d3ca9753ac0a2647d"
+    },
+    {
+      "path": "runtime-varve.json",
+      "bytes": 2185,
+      "sha256": "98b87d3f0d706087de4ddacebba168e54a774b8ac0c02839ab928c87cd18e56c"
+    },
+    {
+      "path": "sediment001.json",
+      "bytes": 135170,
+      "sha256": "b88d12816a758040223a180f693186ba2c0de1b23f08ccdf14902cbd4731f89c"
+    },
+    {
+      "path": "sediment001.launch.json",
+      "bytes": 419,
+      "sha256": "bfea24701ba8ec51cc8ffff710d4d2f86836e2f414f380c942c27764b75478ad"
+    },
+    {
+      "path": "sediment001.log",
+      "bytes": 877,
+      "sha256": "d6f3a2607951ccc74c7c882fb3dd14d999bb49fbf5dcabb1f5035a9eeaa6f4f4"
+    },
+    {
+      "path": "sediment002.json",
+      "bytes": 241770,
+      "sha256": "dc20a163696915056e3d206a41ad4b24a416524efe0bf234e4f4d0aa9a6e2117"
+    },
+    {
+      "path": "sediment002.launch.json",
+      "bytes": 417,
+      "sha256": "a31dfefc5c88796f03b17a8f855a2827cea593c9801723c7185b97d661bdce0c"
+    },
+    {
+      "path": "sediment002.log",
+      "bytes": 881,
+      "sha256": "693f79d50adf58dafbf0df4af0b051e4e6f8a54a29b5e0e57cf77489a9b1cf63"
+    },
+    {
+      "path": "source-manifest.json",
+      "bytes": 7926,
+      "sha256": "4dc0443b5c60a199d3ac62203832635e46983c14ea2dd5e633d7b49240a2bde7"
+    },
+    {
+      "path": "source.tar.gz",
+      "bytes": 225911,
+      "sha256": "f69a4b7c42be38aac76caea30a659b38667f82cae21eeb9c75b37a8456840986"
+    },
+    {
+      "path": "typescript-unit.log",
+      "bytes": 1813,
+      "sha256": "e2d3e64c712e42e159b175640828e090346b088cea424cc955ed15736ae7158d"
+    },
+    {
+      "path": "varve-config.json",
+      "bytes": 710,
+      "sha256": "20c310dea827fc4b98199acdd4eab4c660660909a223c9155a3688be16b4aeed"
+    },
+    {
+      "path": "witness/analyze-phases.py",
+      "bytes": 1644,
+      "sha256": "a45c181232097a6b2c5fd55e9ff9b30beaf6fd0f2f9b7a66781a3213a2347c1a"
+    },
+    {
+      "path": "witness/check-driver.mjs",
+      "bytes": 1274,
+      "sha256": "677abe1de4cd31e9a8910d621071bb1c7c79928b8ad1abae3ad1f25e53042e31"
+    },
+    {
+      "path": "witness/check-recovery.mjs",
+      "bytes": 1723,
+      "sha256": "8fe63d8216adef88a94246dd4513cfe17749c51019f9e0e3e9ccc3ec3437103f"
+    },
+    {
+      "path": "witness/collect.py",
+      "bytes": 397,
+      "sha256": "f03a71af7c0340bb842664adcb8ef50f448e68ded12da0a36cd7b718e9092dfa"
+    },
+    {
+      "path": "witness/launch.py",
+      "bytes": 1501,
+      "sha256": "ab4673d0a5b4a330aea8523926d3a2b3e2f07b60356770739125bbc193343ee9"
+    },
+    {
+      "path": "witness/metrics.py",
+      "bytes": 1212,
+      "sha256": "91c4f7f6fde255d2c05403adae7cafddb0f0c2d9da054f1fb0d00c845584663b"
+    },
+    {
+      "path": "witness/probe-driver.py",
+      "bytes": 1685,
+      "sha256": "51a3dc3de328ef9d76305d549b40a1e86947117f50c26c77f0c7b3f9c1970156"
+    },
+    {
+      "path": "witness/probe-varve.py",
+      "bytes": 4094,
+      "sha256": "43a3ad888cfa81ab35a503d8a84d23a83ebca5abbe8146b9d604d8169f1a07a3"
+    },
+    {
+      "path": "witness/recovery.py",
+      "bytes": 4293,
+      "sha256": "92b55a905a7c1fd31b499961e60d227a98b40e4cfd1ccc3323eb7d43bbc98892"
+    },
+    {
+      "path": "witness/resources.sh",
+      "bytes": 429,
+      "sha256": "b47ae01d506056a82a218733e9e309771de3871baedc842e603ee2f41bd71e22"
+    },
+    {
+      "path": "witness/verify.mjs",
+      "bytes": 7724,
+      "sha256": "b479bfba45d5f664aed3fbb7132d2bc1060944c2db4f9d8244c8ea2eea334e64"
+    }
+  ]
+}

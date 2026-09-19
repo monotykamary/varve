@@ -1,0 +1,21 @@
+{
+  "at": "2026-09-17T01:58:24.325Z",
+  "newVarve": "760674f1-f2a5-4df8-8aa5-b7422be8061b",
+  "oldState": {
+    "driver": {
+      "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+      "id": "b6849f53-4623-4a1d-b21f-6940fab9e235",
+      "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "serviceId": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+      "status": "REMOVED"
+    },
+    "timescale": {
+      "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+      "id": "3bb14b95-0468-455c-9e3d-7f55d483ec45",
+      "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "serviceId": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+      "status": "REMOVED"
+    }
+  },
+  "usePreviousImageTag": true
+}

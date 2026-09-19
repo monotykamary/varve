@@ -67,6 +67,40 @@ fn every_public_configuration_entry_is_documented() {
 }
 
 #[test]
+fn frozen_prefix_checkpoints_are_explicitly_opted_in() {
+    assert!(!Config::default().checkpoint_frozen_prefix);
+    let legacy: Config = serde_json::from_str("{}").unwrap();
+    assert!(!legacy.checkpoint_frozen_prefix);
+    let opted_in: Config = serde_json::from_value(serde_json::json!({
+        "checkpoint_frozen_prefix": true
+    }))
+    .unwrap();
+    opted_in.validate().unwrap();
+    assert!(opted_in.checkpoint_frozen_prefix);
+    assert_eq!(
+        serde_json::to_value(opted_in).unwrap()["checkpoint_frozen_prefix"],
+        serde_json::json!(true)
+    );
+}
+
+#[test]
+fn retained_query_inputs_are_explicitly_opted_in() {
+    assert!(!Config::default().query_retained_inputs);
+    let legacy: Config = serde_json::from_str("{}").unwrap();
+    assert!(!legacy.query_retained_inputs);
+    let opted_in: Config = serde_json::from_value(serde_json::json!({
+        "query_retained_inputs": true
+    }))
+    .unwrap();
+    opted_in.validate().unwrap();
+    assert!(opted_in.query_retained_inputs);
+    assert_eq!(
+        serde_json::to_value(opted_in).unwrap()["query_retained_inputs"],
+        serde_json::json!(true)
+    );
+}
+
+#[test]
 fn derived_layout_migration_is_explicit_and_writer_pages_are_bounded() {
     let legacy: Config = serde_json::from_str("{}").unwrap();
     assert!(!legacy.derived_pages);

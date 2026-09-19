@@ -1,0 +1,21 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+const root='/tmp/varve-scoped.0bj4bw',repo='/Users/monotykamary/VCS/working-remote/open-source/varve';
+const before=readFileSync(root+'/engine-before-integration.rs','utf8');
+let after=readFileSync(repo+'/src/engine.rs','utf8');
+after=after.replace('use crate::metrics::{MeasuredDiskGuard, Metrics, PerformanceSnapshot, Phase, PhaseTimer};','use crate::metrics::{Metrics, PerformanceSnapshot, Phase, PhaseTimer};');
+after=after.replace(/pub\(crate\) fn lock_disk_admission\(inner: &Inner\) -> Result<MeasuredDiskGuard<'_>> \{\n    inner\n        \.metrics\n        \.lock_disk\(&inner.disk_admission\)\n        \.map_err\(\|_\| anyhow::anyhow!\("disk admission lock poisoned"\)\)\n\}/,"pub(crate) fn lock_disk_admission(inner: &Inner) -> Result<MutexGuard<'_, ()>> {\n    inner\n        .disk_admission\n        .lock()\n        .map_err(|_| anyhow::anyhow!(\"disk admission lock poisoned\"))\n}");
+after=after.replace(/                if group_prepare\.is_none\(\) \{\n                    group_prepare = Some\(self.inner.metrics.timer\(Phase::GroupPrepare\)\);\n                \}\n/,'');
+after=after.replace(/^\s*(?:let mut group_prepare = Some\(self.inner.metrics.timer\(Phase::GroupPrepare\)\);|group_prepare = Some\(self.inner.metrics.timer\(Phase::GroupPrepare\)\);|drop\(group_prepare.take\(\)\);|let wal_disk_wait = inner.metrics.timer\(Phase::WalDiskLockWait\);|drop\(wal_disk_wait\);|let _verify = inner.metrics.timer\(Phase::(?:DerivedVerify|RawVerify)\);|let _publish = inner.metrics.timer\(Phase::RawPublish\);)\n/gm,'');
+after=after.replace(/                    \{\n                        let _publish = inner.metrics.timer\(Phase::DerivedPublish\);\n                        wal::atomic_write\(&path, bytes\)\?;\n                    \}\n/g,'                    wal::atomic_write(&path, bytes)?;\n');
+after=after.replace('#[cfg(test)]\n#[path = "engine_metrics_tests.rs"]\nmod engine_metrics_tests;\n\n','');
+assert.equal(after,before,'Unexpected non-instrumentation engine difference');
+const tierBefore=readFileSync(root+'/tier-before-integration.rs','utf8');
+const tierAfter=readFileSync(repo+'/src/tier.rs','utf8');
+const original='    let _disk = inner\n        .disk_admission\n        .lock()\n        .map_err(|_| anyhow::anyhow!("disk admission lock poisoned"))?;';
+assert.equal(tierBefore.replace(original,'    let _disk = lock_disk_admission(inner)?;'),tierAfter,'Unexpected tier behavior change');
+const manifest=JSON.parse(readFileSync(repo+'/docs/evidence/frontier/v9/local-qualification.json'));
+for(const path of ['src/wal.rs','src/model.rs','src/ingest.rs','src/derived.rs','src/derived_root.rs','Cargo.toml','Cargo.lock','docs/CONFIGURATION.md']){const file=manifest.files.find(file=>file.path===path);assert(file);assert.equal(createHash('sha256').update(readFileSync(repo+'/'+path)).digest('hex'),file.sha256,path+' changed');}
+const evidence={engine_reverse_instrumentation_matches_query_owner_source:true,tier_only_guard_routing_changed:true,wal_model_ingest_derived_dependencies_config_unchanged:true,scope:'Exact text reversal plus protected source hashes; guard/timer correctness requires separate tests/review'};
+writeFileSync(root+'/integration-check.json',JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify(evidence));

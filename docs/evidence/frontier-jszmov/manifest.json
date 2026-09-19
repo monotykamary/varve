@@ -1,0 +1,260 @@
+{
+  "kind": "local-frontier-evidence",
+  "claims": {
+    "timescale_win": false,
+    "cloud_qualification": false,
+    "p99_qualified": false,
+    "independent_read_arrivals": false,
+    "independent_review": false
+  },
+  "notes": [
+    "baseline-http-01 timing rejected: oracle setup was initially inside the workload interval",
+    "debug timings are not compared against release",
+    "cache-disabled diagnostic changes cache mode; not a speed comparison",
+    "overloaded and failed runs remain failures; no automatic write retry",
+    "final source archive is 133 current candidate inputs, not historical baseline source",
+    "source archive contains project sources, not compiled binaries or database data"
+  ],
+  "files": [
+    {
+      "path": "baseline-binaries.sha256",
+      "bytes": 229,
+      "sha256": "7b4755478741998e08d685a14fd44e0931a3946c4aeb871d91b235118da12848"
+    },
+    {
+      "path": "checks/lifetime-clippy-default.log",
+      "bytes": 154,
+      "sha256": "265cb0dc6fa4582ae0c1cfcad5e3189a3527449f0fda109f096fbe1a7fa73ad7"
+    },
+    {
+      "path": "checks/lifetime-clippy-fault.log",
+      "bytes": 154,
+      "sha256": "f85c4efabe415262065a0b32117403fa98bec43feb889bceb7f89b57b26a1a7b"
+    },
+    {
+      "path": "checks/lifetime-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "checks/lifetime-metric-service.log",
+      "bytes": 413,
+      "sha256": "bc87d2f6538b883357e60ccb90a59c0f8185985c4caf70e28cc99c85e07f8be0"
+    },
+    {
+      "path": "checks/lifetime-qualification.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "checks/lifetime-real-sdk.log",
+      "bytes": 338,
+      "sha256": "d5ed1954d93cf9bb39a596441e03f8ae04b84edd575be81560b5635a713d6abe"
+    },
+    {
+      "path": "checks/lifetime-release-build.log",
+      "bytes": 156,
+      "sha256": "ef4512de0462fb9884e9c7316df1e0ba1ba624923e8181b4f0d97e8d41ea9a1e"
+    },
+    {
+      "path": "checks/lifetime-release-ready.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "checks/lifetime-workspace.log",
+      "bytes": 49350,
+      "sha256": "bddc08205fed290aa2fdd6da1c4a9eff2ab040062036ecd2d62bff9f09e13eac"
+    },
+    {
+      "path": "checks/measure-lifetime-release.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "checks/python-errors.log",
+      "bytes": 4310,
+      "sha256": "1ba38d8aebc9d65fb683fa1f5e0ced20a6824e6eb3fb9e03136223008857b095"
+    },
+    {
+      "path": "checks/qualify-lifetime.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "checks/resident-lifetime-query-02.log",
+      "bytes": 5749,
+      "sha256": "1ee149fb77da63d0e2d9e66b52b92f927c9bd4e748c8d6a80a1baaee95a0934e"
+    },
+    {
+      "path": "checks/resident-lifetime-red.log",
+      "bytes": 1544,
+      "sha256": "d0bdd1e1d12d074611e0c8c18505fecb7f68d34ebbd755e46cf00e917304056e"
+    },
+    {
+      "path": "lifetime-binary.sha256",
+      "bytes": 113,
+      "sha256": "ef599397ad64d73f11a15afdfc972cde1f001dd0ba2148a65351e2ab8e9eecd4"
+    },
+    {
+      "path": "lifetime-release-summary.json",
+      "bytes": 4095,
+      "sha256": "fe6b747da14c59f22c1f6a02b571cb0f6ac60d2c0e84d113f7ae5901c41ed7c6"
+    },
+    {
+      "path": "lifetime-source.json",
+      "bytes": 21665,
+      "sha256": "84db9e135661f76584d0bc911cb0d707afd26fa7b02a06572ba2171d50b5bd1c"
+    },
+    {
+      "path": "lifetime-source.tar.gz",
+      "bytes": 473006,
+      "sha256": "b9555e1e9ca06e640329cee9004fd0cef993b0b713b368e72cb9237b56e2b248"
+    },
+    {
+      "path": "native-diagnostic-profile.json",
+      "bytes": 729,
+      "sha256": "59afdd263a71e58e3f640bef94ae42287a44237c6eefb121d7c324b680f42a95"
+    },
+    {
+      "path": "profile.json",
+      "bytes": 728,
+      "sha256": "23ae83270630d881127817f0a39547cd327144635a99597c476374a6401b675c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5165,
+      "sha256": "72af4258dde6410ba432d54dd8c1a375f366cc1eb1f40527f0db62230bee38e3"
+    },
+    {
+      "path": "runs/baseline-http-01/report.json",
+      "bytes": 23646,
+      "sha256": "102fad082b687c63066b731f8097e40b278a3956b7f0ba3b948bb2eee8159fc0"
+    },
+    {
+      "path": "runs/baseline-http-02/report.json",
+      "bytes": 23730,
+      "sha256": "624939db2567f543696805d2af1760e8a2d74282b8f0fa980ab7162a72da863c"
+    },
+    {
+      "path": "runs/budget-debug-fresh-01/report.json",
+      "bytes": 50247,
+      "sha256": "4e1f5dede0ff84bfe5c8323c0abac8d5bbacaa4574ad9af8f2d8bb70df7f9eb8"
+    },
+    {
+      "path": "runs/fresh-abba-a1/report.json",
+      "bytes": 15522,
+      "sha256": "641b2174d2f3ae2ed6db514a783a1312a7db6f5de6142366bccde102e044345c"
+    },
+    {
+      "path": "runs/fresh-native-diagnostic-01/report.json",
+      "bytes": 24524,
+      "sha256": "c9e4beea2d03860d6354b3e773c510e0bee10b9f64e29394eb74b03b69046389"
+    },
+    {
+      "path": "runs/fresh-repro-baseline-01/report.json",
+      "bytes": 16414,
+      "sha256": "836ecaaf228cd0ce356b4d489fafd3e50fcc2871b2a0ae62533e72ade911e108"
+    },
+    {
+      "path": "runs/fresh-repro-reclaim-01/report.json",
+      "bytes": 16412,
+      "sha256": "bc5d8466c771d754e563024f494a31f5828e2694db32f09a2a4d27c74dbe62c2"
+    },
+    {
+      "path": "runs/lifetime-debug-fresh-01/report.json",
+      "bytes": 50718,
+      "sha256": "1587d1400913f3d825e74e4d51b9662a6227009519be253d2d8e5e888ba5370c"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-large-01/events.jsonl",
+      "bytes": 45985,
+      "sha256": "1af0f17018f50c81a8de735d554bbf79c648a62f7b3b98e141d967ce61bea526"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-large-01/metrics-after.txt",
+      "bytes": 39349,
+      "sha256": "ee69eab5ccc0d2070a2e9f686aff34e32f59427a8932b5ca84ccc0560a1a0b86"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-large-01/metrics-before.txt",
+      "bytes": 39184,
+      "sha256": "d979f485318884e462d75df2c6a69ae6457976daee32df553eb0fb016384d199"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-large-01/report.json",
+      "bytes": 50729,
+      "sha256": "3c699f7bb0812c8e9bf6760b468f721458b76a26f523623d1aa04b626d3ebaf6"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-large-01/traces.json",
+      "bytes": 767523,
+      "sha256": "94eca647b7f0ffbf88068a851a6eb6944ee728469a44e0dfd8570208ccf78b5b"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-load-01/events.jsonl",
+      "bytes": 130201,
+      "sha256": "4bdcc3d0117c22ccaa2ce05f6843cc37e9180bb234e1086e928078cfb7d2029f"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-load-01/metrics-after.txt",
+      "bytes": 39324,
+      "sha256": "6a3bce882e194765e63b4ef156dc04231e508a0995ec3b12d34a2e623845b925"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-load-01/metrics-before.txt",
+      "bytes": 39077,
+      "sha256": "369dc5c3b50274b523ec2aed4cc7b2e1e2b96d89b5f12cb43c16bb9a1773d818"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-load-01/report.json",
+      "bytes": 24543,
+      "sha256": "8b4503dfe74d472add8d717a552cdb64f573ca61e5ba77836f21734fe0423da7"
+    },
+    {
+      "path": "runs/lifetime-release-fresh-load-01/traces.json",
+      "bytes": 52,
+      "sha256": "c2f9f89cd1e18cb5e1208c24bff2fc28577cb7fcce5cd5e75f3d07d48c3c2a26"
+    },
+    {
+      "path": "runs/reclaim-fresh-traced-01/report.json",
+      "bytes": 24465,
+      "sha256": "d48de0c7d5030308fbad1b26d2958346d03a9139818b4d55ee2218ee7ef76696"
+    },
+    {
+      "path": "runs/reclaim-prefix-traced-01/report.json",
+      "bytes": 24469,
+      "sha256": "c5095b3484a61fe5da974232401247ece95d88a2d2bb86066d3cbad12f7f74c6"
+    },
+    {
+      "path": "runs/traced-http-02/report.json",
+      "bytes": 23908,
+      "sha256": "a1e3135905da15003d048e7b4e42bc5fb2482c69af13d51c8e7ddf295aff823d"
+    },
+    {
+      "path": "verify.mjs",
+      "bytes": 945,
+      "sha256": "49611f1679d36030775cf3f9313dadcd9e1bc3627ddb8bca279e934f9d1dfa41"
+    },
+    {
+      "path": "witness/freeze-lifetime-source.mjs",
+      "bytes": 3011,
+      "sha256": "b65fa40d21aa6f9a2d6cdf46a73602edfbfa32056689b86983519b047f33ff8d"
+    },
+    {
+      "path": "witness/measure-lifetime-release.sh",
+      "bytes": 1406,
+      "sha256": "0a6acbe0537482727384bfd850144585f0c235efd5cee0e3195d0280ff6f4b2b"
+    },
+    {
+      "path": "witness/qualify-lifetime.sh",
+      "bytes": 2396,
+      "sha256": "0ff10ea3c83745e7cb8d2e2dcad5ff7fce893bb7a50941595c15b322770e741e"
+    },
+    {
+      "path": "witness/summarize-lifetime.mjs",
+      "bytes": 1985,
+      "sha256": "7f18cc0c24c5cc2ee8f6d15114941452f9739a9dd6172d986def834843cda11d"
+    }
+  ]
+}

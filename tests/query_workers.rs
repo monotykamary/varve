@@ -579,7 +579,14 @@ fn rollups_cutoffs_and_catalog_types_match_standalone_across_reuse() {
 
 #[test]
 fn concurrent_snapshots_are_isolated_and_last_arc_drop_reaps_both_children() {
-    let fixture = Fixture::new(true);
+    let fixture = Fixture::new(false);
+    let duckdb = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tools/duckdb");
+    // Concurrent shell read builtins may consume each other's bytes from a shared
+    // FIFO. Each child publishes its own ready gate before it enters the CLI.
+    fs::write(&fixture.options.executable, format!(
+        "#!/bin/sh\ngate='{}/gate.'$$\nmkfifo \"$gate\" || exit 1\nprintf '%s %s\\n' \"$$\" \"$PWD\" >> '{}'\nread -r release < \"$gate\"\nexec '{}' \"$@\"\n",
+        fixture.directory.path().display(), fixture.log.display(), duckdb.display()
+    )).unwrap();
     let runtime = Arc::new(QueryRuntime::new(2));
     let mut jobs = Vec::new();
     for value in [11.0, 22.0] {
@@ -599,13 +606,14 @@ fn concurrent_snapshots_are_isolated_and_last_arc_drop_reaps_both_children() {
     }
     fixture.wait_for_children(2);
     assert_eq!(runtime.stats().active, 2);
-    // One release line for each blocked wrapper. They then exec the actual CLI.
-    fs::OpenOptions::new()
-        .write(true)
-        .open(fixture.directory.path().join("gate"))
-        .unwrap()
-        .write_all(b"go\ngo\n")
-        .unwrap();
+    for (pid, _) in fixture.children() {
+        fs::OpenOptions::new()
+            .write(true)
+            .open(fixture.directory.path().join(format!("gate.{pid}")))
+            .unwrap()
+            .write_all(b"go\n")
+            .unwrap();
+    }
     drop(runtime);
     for job in jobs {
         job.join().unwrap();
@@ -898,7 +906,10 @@ fn reused_worker_security_denies_host_network_mutation_and_old_staging_paths() {
             "unexpected success: {sql}"
         );
     }
-    let tables = [table("measurements", 1.0)];
+    // Exercise scanner cleanup deliberately; small inputs now use typed literals.
+    let mut scanner_table = table("measurements", 1.0);
+    scanner_table.hot = vec![scanner_table.hot[0].clone(); 129];
+    let tables = [scanner_table];
     let input = runtime
         .execute_with_catalog(
             &tables,

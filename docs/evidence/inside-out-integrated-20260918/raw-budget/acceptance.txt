@@ -1,0 +1,27 @@
+Raw ownership acceptance checkpoint
+Sandbox: 1dea8336-2d0c-4de4-bcf9-f1dfd63ef2f3
+Workdir: /workspace/varve-rebuild/raw-budget
+Source manifest SHA256: 8f32e4a71f60011463a1dafaa2c83783891e3fface96a20c619d17293f355dd7
+Changed-file manifest SHA256: ceac5046c94c12dcc7f2a6e2126851acddea3889cdc699c7eefcfd654306ed9d
+All 24 changed local files match tested remote hashes.
+PASS pre-allocation admission / exactly-once final-owner release / bounded concurrent admission: lib-raw_budget-03.log (13 tests)
+PASS held query/checkpoint/cache owners, retired designations, independent mandatory workspaces, optional-copy skipping, stale preparation, decode/WAL failure, native cancellation, scan caller handoff: lib-raw_budget-03.log
+PASS queued input ownership and waiting cancellation/credit release: lib-ingest__tests-03.log (6 tests)
+PASS CLI weak identities and retained adapter behavior: lib-query__workers__resident-02.log (39 tests)
+PASS native private-session and scanner regressions: lib-query__native-01.log (12 tests)
+PASS immutable batch bounds: lib-query__resident-01.log (3 tests)
+PASS raw lineage: lib-engine__raw_lineage-01.log (11 tests)
+PASS append/replay/undo baseline: lib-engine__hot_path-01.log (5 tests)
+PASS segment exactness: lib-segment__-01.log (2 tests)
+PASS integration-01.log: journal_engine 9; prepared_publication 5; prefix_checkpoint 13; ingest_flush 3; model 7
+PASS residency-03.log: query_residency 6; residency 6
+PASS strict all-target storage Clippy default and fault-injection: clippy-default-03.log; clippy-fault-injection-03.log
+PASS changed Rust formatting: format-final.log
+PASS mechanical Config documentation, raw public symbols and metric registrations: raw_budget_configuration_and_metrics_are_documented
+Preserved missing-manifest guard and NativeRuntime threads/memory_limit pre-open options.
+Initial compile failures retained in clippy-01.log; a zero-match exploratory ingestion filter is retained in lib-ingest__flow_tests-02.log and is NOT evidence; corrected filter passed in lib-ingest__tests-03.log.
+Earlier regression logs precede final scanner scratch/scan pre-copy guard refinements; final raw, ingestion and residency tests plus Clippy validate the final manifest.
+No local Cargo/tests/fixture execution; no deployments, service mutations, credentials, S3, containers, bundled DuckDB or resource creation/deletion.
+No benchmark, Dockerfile, SDK, overview/ledger, journal framing or append mutate/undo semantic edits. Unattributed benchmark evidence changes were left alone.
+Exclusions: caller allocations before input transfer and outputs after return; DuckDB allocation/RSS; non-raw metadata/derived/control and transport/journal framing use their separate boundaries. Estimates are conservative, not total RSS or independent partition ownership.
+Review: manually traced ownership/allocation/destruction paths; fovea/contour extension actions unavailable in this Fabric kernel.

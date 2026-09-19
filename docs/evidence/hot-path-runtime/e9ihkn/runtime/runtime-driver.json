@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "deployment": "87b79e52-90f2-4458-8686-1946298e4257",
+  "instance": "7d5be4ca-68b1-4a2d-afc5-2ea33fc5c7f8",
+  "uid": 10001,
+  "identity": {
+    "RAILWAY_PROJECT_ID": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+    "RAILWAY_ENVIRONMENT_ID": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+    "RAILWAY_SERVICE_ID": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+    "RAILWAY_DEPLOYMENT_ID": "87b79e52-90f2-4458-8686-1946298e4257"
+  },
+  "cgroups": {
+    "cpu.max": "200000 100000",
+    "memory.max": "999997440",
+    "memory.current": "23764992",
+    "cpu.stat": "usage_usec 233222\nuser_usec 160843\nsystem_usec 72379\nnice_usec 0\nnr_periods 6\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0"
+  },
+  "driver": {
+    "format_version": 1,
+    "sha256": "c0fd1f694726d44c1737a4e0a47dbc59e761f7dac7f6d8c164af6986d7d5afc5",
+    "files": {
+      "benchmark.py": "23e05928cf287a4f8b59433f2079cf63610a256dabbb75138a2ea5081442df23",
+      "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+      "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+    }
+  },
+  "results_writable": true
+}

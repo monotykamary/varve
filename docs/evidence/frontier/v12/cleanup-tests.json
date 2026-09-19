@@ -1,0 +1,1 @@
+{"cleanup_guard_cases":8,"passed":true,"external_commands":0,"infra_mutations":0,"scope":"VM fixtures execute the actual cleanup source with mocked I/O; not live Railway evidence"}

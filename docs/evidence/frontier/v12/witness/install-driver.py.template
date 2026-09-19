@@ -1,0 +1,56 @@
+import base64, gzip, hashlib, json, os
+from datetime import datetime, timezone
+from pathlib import Path
+
+BASE_FILES = __BASE_FILES__
+EFFECTIVE_FILES = __EFFECTIVE_FILES__
+PAYLOAD = '__PAYLOAD__'
+SCOPE_SHA256 = '__SCOPE_SHA256__'
+DESTINATION = Path('/results/driver-accounting-s13')
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+def checked_file(path, expected):
+    assert path.is_file() and not path.is_symlink(), 'Unexpected driver file type: ' + path.name
+    data = path.read_bytes()
+    assert digest(data) == expected, 'Driver byte mismatch: ' + path.name
+    return data
+
+def install(base, destination):
+    originals = {name: checked_file(base / name, expected) for name, expected in BASE_FILES.items()}
+    candidate = gzip.decompress(base64.b64decode(PAYLOAD))
+    assert digest(candidate) == EFFECTIVE_FILES['benchmark.py'], 'Diagnostic payload mismatch'
+    compile(candidate, str(destination / 'benchmark.py'), 'exec')
+    assert not destination.is_symlink(), 'Diagnostic directory is a symlink'
+    preexisting = destination.exists()
+    if preexisting:
+        assert destination.is_dir(), 'Diagnostic destination is not a directory'
+        receipt_path = destination / 'INSTALL_MANIFEST.json'
+        assert receipt_path.is_file() and not receipt_path.is_symlink(), 'Incomplete diagnostic installation'
+        receipt = json.loads(receipt_path.read_text())
+        assert receipt['base_files'] == BASE_FILES and receipt['effective_files'] == EFFECTIVE_FILES
+        assert receipt['driver_scope_sha256'] == SCOPE_SHA256
+        for name, expected in EFFECTIVE_FILES.items():
+            checked_file(destination / name, expected)
+    else:
+        destination.mkdir(mode=0o700)
+        for name in BASE_FILES:
+            data = candidate if name == 'benchmark.py' else originals[name]
+            assert digest(data) == EFFECTIVE_FILES[name]
+            with (destination / name).open('xb') as output:
+                output.write(data)
+            (destination / name).chmod(0o444)
+        receipt = {'at': datetime.now(timezone.utc).isoformat(), 'directory': str(destination), 'uid': os.getuid(), 'base_files': BASE_FILES, 'effective_files': EFFECTIVE_FILES, 'driver_scope_sha256': SCOPE_SHA256, 'normal_workload_ast_unchanged': True}
+        with (destination / 'INSTALL_MANIFEST.json').open('x') as output:
+            json.dump(receipt, output, sort_keys=True)
+            output.write('\n')
+    return {**receipt, 'preexisting_valid_install': preexisting}
+
+if __name__ == '__main__':
+    if os.getuid() == 0:
+        os.setgroups([])
+        os.setgid(10001)
+        os.setuid(10001)
+    assert os.getuid() == os.getgid() == 10001
+    print(json.dumps(install(Path('/app'), DESTINATION)), flush=True)

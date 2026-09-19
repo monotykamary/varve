@@ -1,0 +1,870 @@
+{
+  "status": "overloaded",
+  "workload": {
+    "rows": 102400,
+    "batch": 1000,
+    "writers": 4,
+    "rate": 15000.0,
+    "seconds": 30.0,
+    "read_interval": 0.1,
+    "read_mode": "fresh",
+    "trace_capacity": 512
+  },
+  "claims": {
+    "timescale_win": false,
+    "cloud_qualification": false,
+    "power_loss": false
+  },
+  "identity": {
+    "binary": "/private/tmp/varve-frontier-gate.JsZmOV/reclaim-varve",
+    "binary_sha256": "1192d311724831a12b8162d1afb67a5f4c094043ff3180d4853786a98a4fb051",
+    "profile_sha256": "59afdd263a71e58e3f640bef94ae42287a44237c6eefb121d7c324b680f42a95",
+    "profile": {
+      "hot_max_bytes": 134217728,
+      "metadata_max_bytes": 67108864,
+      "hot_max_rows": 100000,
+      "wal_max_bytes": 268435456,
+      "max_disk_bytes": 4294967296,
+      "decoded_cache_bytes": 33554432,
+      "disk_cache_bytes": 268435456,
+      "max_batch_rows": 10000,
+      "max_batch_bytes": 4194304,
+      "max_idempotency_keys": 100000,
+      "max_rollup_groups": 200000,
+      "segment_rows": 65536,
+      "flush_interval_us": 5000000,
+      "ship_interval_us": 2000000,
+      "maintenance_interval_ms": 1000,
+      "query_executable": "/Users/monotykamary/VCS/working-remote/open-source/varve/.tools/duckdb",
+      "query_memory_mb": 256,
+      "query_threads": 2,
+      "query_workers": 2,
+      "query_timeout_ms": 30000,
+      "query_max_output_bytes": 16777216,
+      "derived_pages": true,
+      "derived_max_bytes": 536870912,
+      "query_retained_inputs": false,
+      "checkpoint_frozen_prefix": true
+    },
+    "duckdb_sha256": "f2eaf202ecec36546039076a19373e7b4b37bc3d535f11731794f53a77686205",
+    "probe_sha256": "1e0eadd5481eee113170ef277dc6bf010b085fc4dc658e1ab1406e239ab252df",
+    "core_sha256": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+    "benchmark_sha256": "23e05928cf287a4f8b59433f2079cf63610a256dabbb75138a2ea5081442df23",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.14",
+    "resource_scope": "local host; no cgroup or dedicated-CPU parity claim"
+  },
+  "server_pid": 47841,
+  "database_id": "643cdfc1-aaf8-4d93-9804-781113d4b54c",
+  "base_us": 1789617300000000,
+  "preload": {
+    "rows": 102400,
+    "seconds": 3.8930882919812575,
+    "rows_per_s": 26303.02534132534,
+    "receipts": [
+      {
+        "sequence": 3,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 4,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 5,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 6,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 6,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 6,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 6,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 7,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 7,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 8,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 8,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 9,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 9,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 9,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 9,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 10,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 11,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 11,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 12,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 13,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 13,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 14,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 15,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 16,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 16,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 17,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 18,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 19,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 19,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 19,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 19,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 20,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 20,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 20,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 20,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 21,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 22,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 22,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 22,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 22,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 23,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 24,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 25,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 25,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 26,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 26,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 27,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 28,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 29,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 29,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 30,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 31,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 32,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 32,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 33,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 34,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 35,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 36,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 36,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 37,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 38,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 38,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 38,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 39,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 40,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 40,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 41,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 41,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 41,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 41,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 42,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 43,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 43,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 43,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 44,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 45,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 46,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 47,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 48,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 49,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 50,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 51,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 52,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 53,
+        "rows": 1000,
+        "duplicate": false,
+        "durability": "local_fsync"
+      },
+      {
+        "sequence": 53,
+        "rows": 400,
+        "duplicate": false,
+        "durability": "local_fsync"
+      }
+    ]
+  },
+  "partial_load": {
+    "offered": 450000,
+    "acknowledged": 439000,
+    "dropped": 11000,
+    "failed": 0,
+    "pending": 0
+  },
+  "load": {
+    "offered": 450000,
+    "acknowledged": 439000,
+    "dropped": 11000,
+    "failed": 0,
+    "pending": 0,
+    "clean": false,
+    "elapsed_with_drain_s": 30.345149083063006,
+    "acknowledged_rows_per_s": 14466.892180965611,
+    "ack_latency": {
+      "samples": 439,
+      "p50_ms": 84.7480419324711,
+      "p95_ms": 308.38445806875825,
+      "p99_ms": 813.6586669133976,
+      "max_ms": 1356.9761670660228,
+      "p99_minimum_sample_gate": false
+    },
+    "arrival_latency": {
+      "samples": 439,
+      "p50_ms": 115.38395774550736,
+      "p95_ms": 646.1985827190802,
+      "p99_ms": 1341.4179993560538,
+      "max_ms": 1424.0075417328626,
+      "p99_minimum_sample_gate": false
+    },
+    "queue_latency": {
+      "samples": 439,
+      "p50_ms": 9.055999806150794,
+      "p95_ms": 371.2735418230295,
+      "p99_ms": 1074.8077076859772,
+      "max_ms": 1157.4047500034794,
+      "p99_minimum_sample_gate": false
+    },
+    "read_latency": {
+      "samples": 22,
+      "p50_ms": 1083.164041978307,
+      "p95_ms": 2080.8905829908326,
+      "p99_ms": 2090.785334003158,
+      "max_ms": 2090.785334003158,
+      "p99_minimum_sample_gate": false
+    }
+  },
+  "load_phase_deltas": {
+    "varve_http_requests_total": 463.0,
+    "varve_http_errors_total": 0.0,
+    "varve_http_auth_failures_total": 0.0,
+    "varve_http_request_timeouts_total": 0.0,
+    "varve_http_connection_timeouts_total": 0.0,
+    "varve_http_rejected_connections_total": 0.0,
+    "varve_http_body_bytes_total": 49227936.0,
+    "varve_query_workers_spawned_total": 5.0,
+    "varve_query_workers_reused_total": 17.0,
+    "varve_query_workers_resets_total": 22.0,
+    "varve_query_workers_discarded_total": 5.0,
+    "varve_query_resident_full_loads_total": 0.0,
+    "varve_query_resident_delta_loads_total": 0.0,
+    "varve_query_resident_hits_total": 0.0,
+    "varve_query_resident_invalidations_total": 0.0,
+    "varve_query_resident_raw_staged_rows_total": 0.0,
+    "varve_query_resident_raw_staged_bytes_total": 0.0,
+    "varve_query_resident_dynamic_loads_total": 0.0,
+    "varve_query_resident_dynamic_staged_bytes_total": 0.0,
+    "varve_ingest_submitted_total": 439.0,
+    "varve_ingest_rejected_total": 0.0,
+    "varve_ingest_completed_total": 439.0,
+    "varve_ingest_groups_total": 334.0,
+    "varve_ingest_dropped_receivers_total": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"state_lock_wait\"}": 996.0,
+    "varve_phase_duration_seconds_sum{phase=\"state_lock_wait\"}": 1.3522871890000001,
+    "varve_phase_duration_seconds_count{phase=\"state_lock_hold\"}": 996.0,
+    "varve_phase_duration_seconds_sum{phase=\"state_lock_hold\"}": 9.728556679999999,
+    "varve_phase_duration_seconds_count{phase=\"write_prepare\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"write_prepare\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"wal_encode\"}": 334.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_encode\"}": 0.661099863,
+    "varve_phase_duration_seconds_count{phase=\"wal_write\"}": 334.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_write\"}": 3.74226286,
+    "varve_phase_duration_seconds_count{phase=\"wal_sync\"}": 668.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_sync\"}": 2.941308281,
+    "varve_phase_duration_seconds_count{phase=\"snapshot\"}": 22.0,
+    "varve_phase_duration_seconds_sum{phase=\"snapshot\"}": 1.942293083,
+    "varve_phase_duration_seconds_count{phase=\"query_build\"}": 22.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_build\"}": 5.398232375,
+    "varve_phase_duration_seconds_count{phase=\"query_wait\"}": 22.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_wait\"}": 0.052291251999999996,
+    "varve_phase_duration_seconds_count{phase=\"query_run\"}": 22.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_run\"}": 18.92822704,
+    "varve_phase_duration_seconds_count{phase=\"query_spawn\"}": 5.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_spawn\"}": 0.053913168,
+    "varve_phase_duration_seconds_count{phase=\"query_reset\"}": 22.0,
+    "varve_phase_duration_seconds_sum{phase=\"query_reset\"}": 0.23936824799999998,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_prepare\"}": 7.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_prepare\"}": 5.914558415,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_publish\"}": 7.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_publish\"}": 0.16368129299999998,
+    "varve_phase_duration_seconds_count{phase=\"compaction_prepare\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"compaction_prepare\"}": 0.638602625,
+    "varve_phase_duration_seconds_count{phase=\"compaction_publish\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"compaction_publish\"}": 0.021154375,
+    "varve_phase_duration_seconds_count{phase=\"disk_account\"}": 559.0,
+    "varve_phase_duration_seconds_sum{phase=\"disk_account\"}": 1.173679451,
+    "varve_phase_duration_seconds_count{phase=\"remote_io\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"remote_io\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_capture\"}": 8.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_capture\"}": 0.110733292,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_locked\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_locked\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"root_prepare\"}": 8.0,
+    "varve_phase_duration_seconds_sum{phase=\"root_prepare\"}": 3.931312459,
+    "varve_phase_duration_seconds_count{phase=\"manifest_commit\"}": 8.0,
+    "varve_phase_duration_seconds_sum{phase=\"manifest_commit\"}": 0.100368292,
+    "varve_phase_duration_seconds_count{phase=\"disk_lock_wait\"}": 1184.0,
+    "varve_phase_duration_seconds_sum{phase=\"disk_lock_wait\"}": 0.360940347,
+    "varve_phase_duration_seconds_count{phase=\"disk_lock_hold\"}": 1184.0,
+    "varve_phase_duration_seconds_sum{phase=\"disk_lock_hold\"}": 4.521914316,
+    "varve_phase_duration_seconds_count{phase=\"wal_disk_lock_wait\"}": 668.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_disk_lock_wait\"}": 0.324743705,
+    "varve_phase_duration_seconds_count{phase=\"group_prepare\"}": 335.0,
+    "varve_phase_duration_seconds_sum{phase=\"group_prepare\"}": 5.078372215,
+    "varve_phase_duration_seconds_count{phase=\"derived_verify\"}": 256.0,
+    "varve_phase_duration_seconds_sum{phase=\"derived_verify\"}": 0.19469092,
+    "varve_phase_duration_seconds_count{phase=\"derived_publish\"}": 100.0,
+    "varve_phase_duration_seconds_sum{phase=\"derived_publish\"}": 0.779188291,
+    "varve_phase_duration_seconds_count{phase=\"raw_verify\"}": 0.0,
+    "varve_phase_duration_seconds_sum{phase=\"raw_verify\"}": 0.0,
+    "varve_phase_duration_seconds_count{phase=\"raw_publish\"}": 65.0,
+    "varve_phase_duration_seconds_sum{phase=\"raw_publish\"}": 0.738148416,
+    "varve_phase_duration_seconds_count{phase=\"append_accounting\"}": 439.0,
+    "varve_phase_duration_seconds_sum{phase=\"append_accounting\"}": 1.339949051,
+    "varve_phase_duration_seconds_count{phase=\"commit_lock_wait\"}": 525.0,
+    "varve_phase_duration_seconds_sum{phase=\"commit_lock_wait\"}": 0.815432743,
+    "varve_phase_duration_seconds_count{phase=\"commit_detach\"}": 334.0,
+    "varve_phase_duration_seconds_sum{phase=\"commit_detach\"}": 0.799668009,
+    "varve_phase_duration_seconds_count{phase=\"commit_install\"}": 334.0,
+    "varve_phase_duration_seconds_sum{phase=\"commit_install\"}": 0.580488704,
+    "varve_phase_duration_seconds_count{phase=\"admission_checkpoint\"}": 1.0,
+    "varve_phase_duration_seconds_sum{phase=\"admission_checkpoint\"}": 1.279390542,
+    "varve_phase_duration_seconds_count{phase=\"checkpoint_reclaim\"}": 7.0,
+    "varve_phase_duration_seconds_sum{phase=\"checkpoint_reclaim\"}": 0.06113291600000001,
+    "varve_phase_duration_seconds_count{phase=\"wal_file_sync\"}": 334.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_file_sync\"}": 1.4855881819999999,
+    "varve_phase_duration_seconds_count{phase=\"wal_directory_sync\"}": 334.0,
+    "varve_phase_duration_seconds_sum{phase=\"wal_directory_sync\"}": 1.454737101
+  },
+  "oracles": {
+    "n": 541400,
+    "total": 676584525.0,
+    "min": 0.0,
+    "max": 2499.75
+  },
+  "final_status": {
+    "database_id": "643cdfc1-aaf8-4d93-9804-781113d4b54c",
+    "sequence": 387,
+    "checkpoint_sequence": 387,
+    "remote_sequence": 0,
+    "unshipped_batches": 387,
+    "hot_rows": 0,
+    "hot_bytes": 0,
+    "wal_bytes": 0,
+    "disk_bytes": 19588757,
+    "metadata_bytes": 14914106,
+    "control_root_bytes": 22746,
+    "derived_encoded_bytes": 14977535,
+    "derived_resident_bytes": 62432247,
+    "derived_working_bytes": 0,
+    "decoded_cache_bytes": 0,
+    "disk_cache_bytes": 0,
+    "tables": 1,
+    "segments": 65,
+    "rollup_groups": 36864,
+    "idempotency_keys": 542,
+    "active_queries": 0,
+    "active_snapshots": 0,
+    "fenced": null,
+    "last_maintenance_error": null
+  },
+  "owned_server_reaped": true,
+  "server_returncode": -9
+}

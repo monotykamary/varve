@@ -1,0 +1,27 @@
+{
+  "at": "2026-09-17T04:11:26.143Z",
+  "varve_source_digest": "58f405adf7d472fdccf0011bc0bcc3f041201f9792ec1a7ab372002b1803944a",
+  "varve_source_manifest_sha256": "f57157e947995785f0d226b2dd80791b100d32527418898e579d07962edb8a9d",
+  "runtime_config_sha256": "215f100b13ba1ba3d012d39117fa1895ed7978657434057a93390c6f359aa089",
+  "base_driver_files": {
+    "benchmark.py": "f5488311247210b118410c155408a5be5af9ce2d28d6d480585a9c315125f637",
+    "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+    "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+    "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+  },
+  "effective_driver_files": {
+    "benchmark.py": "23e05928cf287a4f8b59433f2079cf63610a256dabbb75138a2ea5081442df23",
+    "core.py": "610d6003e3e7604f0b6c5ed4cfe39b42f3216dbf0cc9be1da091c7610d68b97a",
+    "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948",
+    "Dockerfile": "dc9cb37678e5aec0c953bc4d3e8b9520c50076956fd17ef13450b0c9032c547c"
+  },
+  "driver_scope_sha256": "f10292c9602a9c2220a8a5792172708ece3d46b8fedabf33ef55526151271d97",
+  "installer_sha256": "956b530c6022fde691e96bdb2a9ea76c554af0a349199fc4a3acd413ca09862b",
+  "installer_bytes": 22784,
+  "database_source_changed": true,
+  "effective_driver_unchanged_vs_v11": true,
+  "source_qualification_inputs": 86,
+  "driver_reporting_only": true,
+  "normal_workload_ast_unchanged": true,
+  "compute_started": false
+}

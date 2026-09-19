@@ -1,0 +1,223 @@
+{
+  "scope": "Whole workload interval including boundary delay and idle maintenance. Timers overlap; do not add them as exclusive CPU/wall time. Gauges are end values, not peaks. Counter deltas do not isolate individual query patterns.",
+  "phase": "stress",
+  "before_at": "2026-09-17T02:55:21.447674+00:00",
+  "after_at": "2026-09-17T02:57:03.477527+00:00",
+  "observed_window_seconds": 102.03,
+  "phases": [
+    {
+      "phase": "disk_lock_hold",
+      "observations": 6316,
+      "cumulative_seconds": 32.874627952,
+      "mean_ms": 5.204975926535782
+    },
+    {
+      "phase": "state_lock_hold",
+      "observations": 2427,
+      "cumulative_seconds": 28.799286654999996,
+      "mean_ms": 11.866207933662956
+    },
+    {
+      "phase": "root_prepare",
+      "observations": 38,
+      "cumulative_seconds": 18.959822754999998,
+      "mean_ms": 498.9427040789473
+    },
+    {
+      "phase": "checkpoint_prepare",
+      "observations": 21,
+      "cumulative_seconds": 18.135905250999997,
+      "mean_ms": 863.6145357619046
+    },
+    {
+      "phase": "wal_write",
+      "observations": 986,
+      "cumulative_seconds": 14.058902368,
+      "mean_ms": 14.258521671399595
+    },
+    {
+      "phase": "wal_sync",
+      "observations": 1972,
+      "cumulative_seconds": 13.881367798,
+      "mean_ms": 7.039233163286004
+    },
+    {
+      "phase": "derived_publish",
+      "observations": 752,
+      "cumulative_seconds": 10.168964934,
+      "mean_ms": 13.522559752659573
+    },
+    {
+      "phase": "group_prepare",
+      "observations": 994,
+      "cumulative_seconds": 7.259040191999999,
+      "mean_ms": 7.302857336016095
+    },
+    {
+      "phase": "compaction_prepare",
+      "observations": 17,
+      "cumulative_seconds": 6.084262366,
+      "mean_ms": 357.8977862352941
+    },
+    {
+      "phase": "query_run",
+      "observations": 356,
+      "cumulative_seconds": 4.087421405,
+      "mean_ms": 11.481520800561796
+    },
+    {
+      "phase": "query_build",
+      "observations": 356,
+      "cumulative_seconds": 3.133445352,
+      "mean_ms": 8.801812786516853
+    },
+    {
+      "phase": "raw_publish",
+      "observations": 188,
+      "cumulative_seconds": 2.548920772,
+      "mean_ms": 13.558089212765957
+    },
+    {
+      "phase": "state_lock_wait",
+      "observations": 2427,
+      "cumulative_seconds": 2.028936858,
+      "mean_ms": 0.83598552039555
+    },
+    {
+      "phase": "disk_account",
+      "observations": 2134,
+      "cumulative_seconds": 1.9004994279999998,
+      "mean_ms": 0.8905808003748827
+    },
+    {
+      "phase": "disk_lock_wait",
+      "observations": 6316,
+      "cumulative_seconds": 1.558553994,
+      "mean_ms": 0.2467628236225459
+    },
+    {
+      "phase": "checkpoint_publish",
+      "observations": 21,
+      "cumulative_seconds": 0.980639619,
+      "mean_ms": 46.697124714285714
+    },
+    {
+      "phase": "wal_disk_lock_wait",
+      "observations": 986,
+      "cumulative_seconds": 0.543382539,
+      "mean_ms": 0.5510979097363082
+    },
+    {
+      "phase": "manifest_commit",
+      "observations": 37,
+      "cumulative_seconds": 0.530178919,
+      "mean_ms": 14.329159972972974
+    },
+    {
+      "phase": "derived_verify",
+      "observations": 4046,
+      "cumulative_seconds": 0.39392695099999997,
+      "mean_ms": 0.09736207390014828
+    },
+    {
+      "phase": "checkpoint_capture",
+      "observations": 98,
+      "cumulative_seconds": 0.357506752,
+      "mean_ms": 3.648028081632653
+    },
+    {
+      "phase": "snapshot",
+      "observations": 356,
+      "cumulative_seconds": 0.355273409,
+      "mean_ms": 0.9979590140449437
+    },
+    {
+      "phase": "wal_encode",
+      "observations": 986,
+      "cumulative_seconds": 0.30386223700000004,
+      "mean_ms": 0.3081767109533469
+    },
+    {
+      "phase": "compaction_publish",
+      "observations": 17,
+      "cumulative_seconds": 0.25542274200000004,
+      "mean_ms": 15.02486717647059
+    },
+    {
+      "phase": "query_wait",
+      "observations": 356,
+      "cumulative_seconds": 0.19161514600000001,
+      "mean_ms": 0.5382447921348315
+    },
+    {
+      "phase": "query_reset",
+      "observations": 356,
+      "cumulative_seconds": 0.12217979000000001,
+      "mean_ms": 0.3432016573033708
+    },
+    {
+      "phase": "checkpoint_locked",
+      "observations": 1,
+      "cumulative_seconds": 0.111533938,
+      "mean_ms": 111.533938
+    },
+    {
+      "phase": "query_spawn",
+      "observations": 23,
+      "cumulative_seconds": 0.016339924,
+      "mean_ms": 0.7104314782608696
+    },
+    {
+      "phase": "write_prepare",
+      "observations": 0,
+      "cumulative_seconds": 0,
+      "mean_ms": null
+    },
+    {
+      "phase": "remote_io",
+      "observations": 0,
+      "cumulative_seconds": 0,
+      "mean_ms": null
+    },
+    {
+      "phase": "raw_verify",
+      "observations": 0,
+      "cumulative_seconds": 0,
+      "mean_ms": null
+    }
+  ],
+  "workers": {
+    "varve_query_workers_active": 0,
+    "varve_query_workers_idle": 2,
+    "varve_query_workers_spawned_total": 23,
+    "varve_query_workers_reused_total": 333,
+    "varve_query_workers_resets_total": 356,
+    "varve_query_workers_discarded_total": 23,
+    "varve_query_resident_full_loads_total": 23,
+    "varve_query_resident_delta_loads_total": 1,
+    "varve_query_resident_hits_total": 332,
+    "varve_query_resident_invalidations_total": 23,
+    "varve_query_resident_raw_staged_rows_total": 1169882,
+    "varve_query_resident_raw_staged_bytes_total": 212379272,
+    "varve_query_resident_dynamic_loads_total": 8,
+    "varve_query_resident_dynamic_staged_bytes_total": 35367,
+    "varve_query_resident_idle_rows": 1493,
+    "varve_query_resident_idle_bytes": 289269,
+    "varve_ingest_submitted_total": 1497,
+    "varve_ingest_rejected_total": 0,
+    "varve_ingest_completed_total": 1497,
+    "varve_ingest_pending_requests": 0,
+    "varve_ingest_pending_bytes": 0,
+    "varve_ingest_groups_total": 980,
+    "varve_ingest_dropped_receivers_total": 0
+  },
+  "sizes": {
+    "metadata_bytes": 37511817,
+    "control_root_bytes": 42549,
+    "derived_encoded_bytes": 37687979,
+    "derived_resident_bytes": 156555054,
+    "derived_working_bytes": 0
+  },
+  "memory_peak": 860098560,
+  "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+}

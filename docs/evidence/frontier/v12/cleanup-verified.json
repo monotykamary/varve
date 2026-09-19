@@ -1,0 +1,44 @@
+{
+  "at": "2026-09-17T04:40:10.063Z",
+  "deployments": {
+    "driver": {
+      "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+      "id": "f0bcb2d9-3faf-46c0-97bf-5b27807dc6ef",
+      "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "serviceId": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+      "status": "REMOVED"
+    },
+    "timescale": {
+      "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+      "id": "83232bed-bae0-4503-8195-23a6a527ca9e",
+      "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "serviceId": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+      "status": "REMOVED"
+    },
+    "varve": {
+      "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+      "id": "a88e2c35-596f-41d4-b383-06857bf43108",
+      "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "serviceId": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+      "status": "REMOVED"
+    }
+  },
+  "original": {
+    "activeDeployments": [
+      {
+        "id": "dbd59af2-5c4c-4e8e-a452-72914ca69528",
+        "status": "SUCCESS"
+      }
+    ],
+    "latestDeployment": {
+      "id": "dbd59af2-5c4c-4e8e-a452-72914ca69528",
+      "status": "SUCCESS"
+    },
+    "region": null,
+    "startCommand": null
+  },
+  "original_unchanged": true,
+  "active_benchmark_deployments": 0,
+  "benchmark_volumes_retained": true,
+  "resource_caps_unchanged": true
+}

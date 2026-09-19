@@ -1,0 +1,8 @@
+{
+  "cases": 13,
+  "complete_and_failed_fixtures": true,
+  "raw_reports_unchanged": true,
+  "missing_read_metrics_are_null_not_zero": true,
+  "external_calls": 0,
+  "unpacker_sha256": "5c35d28ad3ac594bcaffd242fd25b2c0be63e7ac543aa56a36bbbb38c259737d"
+}

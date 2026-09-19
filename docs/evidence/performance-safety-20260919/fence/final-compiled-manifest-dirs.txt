@@ -1,0 +1,1 @@
+# env-dep:CARGO_MANIFEST_DIR=/workspace/varve-rebuild/performance-safety-20260919/fence

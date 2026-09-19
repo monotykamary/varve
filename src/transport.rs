@@ -341,7 +341,7 @@ pub(super) async fn serve(
 
 pub(super) fn ingest_metrics(stats: &varve::IngestStats) -> String {
     format!(
-        "varve_ingest_submitted_total {}\nvarve_ingest_rejected_total {}\nvarve_ingest_completed_total {}\nvarve_ingest_pending_requests {}\nvarve_ingest_pending_bytes {}\nvarve_ingest_groups_total {}\nvarve_ingest_dropped_receivers_total {}\n",
+        "varve_ingest_submitted_total {}\nvarve_ingest_rejected_total {}\nvarve_ingest_completed_total {}\nvarve_ingest_pending_requests {}\nvarve_ingest_pending_bytes {}\nvarve_ingest_groups_total {}\nvarve_ingest_dropped_receivers_total {}\nvarve_ingest_admission_waits_total {}\nvarve_ingest_waiting_requests {}\nvarve_ingest_peak_waiting_requests {}\nvarve_ingest_admission_wait_seconds_total {}\nvarve_ingest_waits_without_admission_total {}\n",
         stats.submitted,
         stats.rejected,
         stats.completed,
@@ -349,6 +349,11 @@ pub(super) fn ingest_metrics(stats: &varve::IngestStats) -> String {
         stats.pending_bytes,
         stats.groups,
         stats.dropped_receivers,
+        stats.admission_waits,
+        stats.waiting_requests,
+        stats.peak_waiting_requests,
+        stats.admission_wait_ns as f64 / 1_000_000_000.0,
+        stats.waits_without_admission,
     )
 }
 
@@ -363,15 +368,16 @@ async fn dispatch(state: &Arc<State>, rpc: Rpc) -> RpcResult {
     if rpc.method == "write" {
         let input: WriteInput = params(rpc.params)?;
         let now_us = system_now_us().map_err(|_| (-32000, "clock unavailable"))?;
-        // submit() errors guarantee no admission; receipt errors never make that guarantee.
+        // Admission waits for capacity; errors here guarantee the write was not enqueued.
         let receipt = state
             .ingestor
-            .submit(WriteRequest {
+            .submit_wait(WriteRequest {
                 table: input.table,
                 request_id: input.request_id,
                 rows: input.rows,
                 now_us,
             })
+            .await
             .map_err(|_| (-32003, "write rejected before admission"))?;
         let value = receipt
             .await

@@ -1,0 +1,19 @@
+{
+  "at": "2026-09-17T05:31:59.330Z",
+  "deploymentId": "4aa57f43-7e00-4f15-a512-d1575a399632",
+  "submitted": {
+    "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+    "id": "4aa57f43-7e00-4f15-a512-d1575a399632",
+    "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+    "serviceId": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+    "status": "INITIALIZING"
+  },
+  "previous": {
+    "environmentId": "5ec35c82-c1ea-4aa4-b7a5-b89e4c4b9ed1",
+    "id": "a88e2c35-596f-41d4-b383-06857bf43108",
+    "projectId": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+    "serviceId": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+    "status": "REMOVED"
+  },
+  "usePreviousImageTag": true
+}

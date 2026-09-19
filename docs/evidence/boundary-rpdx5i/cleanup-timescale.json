@@ -1,0 +1,16 @@
+{
+  "role": "timescale",
+  "id": "4ca6b220-fb58-45e1-9c14-fcbb62002842",
+  "exact_success": false,
+  "no_foreign_active": true,
+  "exact_removed": true,
+  "baseline_unchanged": true,
+  "ownership_not_inferred": true,
+  "readiness_passed": false,
+  "blockers": [
+    "Runtime image/binary/DuckDB/source binding and exported Linux qualification are not implemented.",
+    "Actual UID, argv, cgroups, profile, mounted volumes and nonroot postmaster checks are not implemented.",
+    "SELECT/SHOW retained cluster, durability/settings and no competing clients checks are not implemented.",
+    "Release HTTP/ack/abrupt-kill/reopen and independent pre-start fresh-root witness are not implemented."
+  ]
+}

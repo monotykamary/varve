@@ -1,0 +1,451 @@
+{
+  "at": "2026-09-17T01:38:58.612Z",
+  "source_digest": "572bc1423656e266d81c8fe7ce1388e0ed8954e40277d5537b2cf6cb9090731c",
+  "files": [
+    {
+      "path": ".cargo/config.toml",
+      "bytes": 17,
+      "sha256": "7af9ec6837490d1ca073d1db582eab96aff336a76a7fff3236d3dbad3bdd3756"
+    },
+    {
+      "path": "Cargo.lock",
+      "bytes": 83924,
+      "sha256": "9b086626033d66459e9db1c118c41909d8e5964136bbaf891f1a367f404303aa"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 1810,
+      "sha256": "4c526d3143cdb90ad25ccbb9d6a34843e806b1a79feafd2af384fe63a9aeb355"
+    },
+    {
+      "path": "clients/rust/Cargo.toml",
+      "bytes": 1142,
+      "sha256": "496dc17ff1a27e9bf733aa5e394b47dd8e0aceaf10d53c45a8ff3f15cbb0c147"
+    },
+    {
+      "path": "clients/rust/README.md",
+      "bytes": 3729,
+      "sha256": "607ac5013336c347a4b6120a2f3d2b9bf5f0c772cad4e3baf96b2b4c3db966fb"
+    },
+    {
+      "path": "clients/rust/examples/basic.rs",
+      "bytes": 1568,
+      "sha256": "ef8bbd70e2811db34c4bbb75a5118304983ffe1163f91c5f6f1509a30530b67d"
+    },
+    {
+      "path": "clients/rust/src/client.rs",
+      "bytes": 26089,
+      "sha256": "0d1ca83bf679ccf89436c598a5b8917ee1a8a2b9caca1db909ccfb27edb45c3b"
+    },
+    {
+      "path": "clients/rust/src/client/tests.rs",
+      "bytes": 14392,
+      "sha256": "0163513fb25aa42268f725cade2f74996c7202dc56cfccd6cab62392f2e16720"
+    },
+    {
+      "path": "clients/rust/src/error.rs",
+      "bytes": 2947,
+      "sha256": "be542b66a405d94d228dc43e860355deb0f1eb8f8b984e2137bec89eb9d0c3fa"
+    },
+    {
+      "path": "clients/rust/src/lib.rs",
+      "bytes": 278,
+      "sha256": "b1fea29d816636ce3cb759e80403ab28e6cc4e107f16315a7215181f64c24c69"
+    },
+    {
+      "path": "clients/rust/src/types.rs",
+      "bytes": 4887,
+      "sha256": "6700393118f9dcb25a976da6d3b5a348a382ba493e1358a70d97b167d927e60a"
+    },
+    {
+      "path": "clients/rust/tests/protocol.rs",
+      "bytes": 12642,
+      "sha256": "6fb11ea09640245eda00e496216b3e864f575d33898952451f99c274e9fa1c5b"
+    },
+    {
+      "path": "clients/rust/tests/real_service.rs",
+      "bytes": 6567,
+      "sha256": "9be26a9e7bba5c3809baa35e4d16e519ddf377dd41f9a4d4e3e9f66c35c04565"
+    },
+    {
+      "path": "clients/rust/tests/status.rs",
+      "bytes": 1444,
+      "sha256": "b957d3bee8c3cc9df1073f8f1105775520e9e3088fffa87e79d94dc9ae5b9679"
+    },
+    {
+      "path": "clients/rust/tests/types.rs",
+      "bytes": 1588,
+      "sha256": "4963d859d9a0ad348c62b1a274b7d1932f942e9a0ab4e1e86a742df122a7c8c9"
+    },
+    {
+      "path": "clients/typescript/package-lock.json",
+      "bytes": 1892,
+      "sha256": "9e252a24d775cea8ef5eb8ff82e9575229284d7474dbb5cfe7093b5f3772510d"
+    },
+    {
+      "path": "clients/typescript/package.json",
+      "bytes": 1372,
+      "sha256": "8db3fc3cf9c64478701ef9e587d67ba3fae80bb02638314ed4e46cc37f624b5d"
+    },
+    {
+      "path": "clients/typescript/src/client.ts",
+      "bytes": 19881,
+      "sha256": "5252a02df04e9811e20bcefffc9ebe247e29a0db47f18bbb3c74bf74597221ed"
+    },
+    {
+      "path": "clients/typescript/src/errors.ts",
+      "bytes": 2192,
+      "sha256": "90bdff67f8f3ae6e60e38f7a5624ac889e76e6d60ec8245547a9b8e20430375d"
+    },
+    {
+      "path": "clients/typescript/src/index.ts",
+      "bytes": 617,
+      "sha256": "65ee8d9c995f6cea77ff0abb139d705f7ca7d33cfa5bda6189d0ea85aec44574"
+    },
+    {
+      "path": "clients/typescript/src/types.ts",
+      "bytes": 3463,
+      "sha256": "330e9e41152965e52a2130f5bf95bcea5e2be19621f5619cb670ae30a5d0ebd1"
+    },
+    {
+      "path": "clients/typescript/src/validation.ts",
+      "bytes": 6627,
+      "sha256": "37b04530e6d36a591f3ab9f47e51d212a0495f89cab90230aa554f36f4d420ce"
+    },
+    {
+      "path": "clients/typescript/test/client.test.ts",
+      "bytes": 19973,
+      "sha256": "7a83504f1dcdbabfcdcf6636de9470ef89cac26ffaeb0922506c691aeaa328cb"
+    },
+    {
+      "path": "clients/typescript/test/integration.test.ts",
+      "bytes": 4246,
+      "sha256": "51fea3d716007f0290de58eb10e1c352e5fd95f09d84dd8b51aea8a8c17c3623"
+    },
+    {
+      "path": "clients/typescript/tsconfig.json",
+      "bytes": 572,
+      "sha256": "37100e489fad6a0d010fe37c7d5d2634ab4efeadef728625be19e1854f2b0adb"
+    },
+    {
+      "path": "docs/CONFIGURATION.md",
+      "bytes": 6229,
+      "sha256": "5b5965eb940255a4de313f92fa025115ff5cfac8c70b7e558d28957a836858ae"
+    },
+    {
+      "path": "src/control.rs",
+      "bytes": 47936,
+      "sha256": "afe76f4aaf0055ef7ac52b58664eb5545313667d5f7cde85fb25e06db0891630"
+    },
+    {
+      "path": "src/derived.rs",
+      "bytes": 21920,
+      "sha256": "ba3d7546e5060a24e49a66483a87c57f24583d682acc7a6963bca53e093d8631"
+    },
+    {
+      "path": "src/derived/tests.rs",
+      "bytes": 12025,
+      "sha256": "4edd32301682dbaae28fcba42847b7e2052ad80df177cb821b008f0439471814"
+    },
+    {
+      "path": "src/derived_root.rs",
+      "bytes": 19242,
+      "sha256": "69ce80132801b0bb783bd3f5d6b3ef6ce33f07ad3b9f8479836c6c124e55d1af"
+    },
+    {
+      "path": "src/engine.rs",
+      "bytes": 256647,
+      "sha256": "794cd89a0ab0fef36cc48d098cf4315d7ada5642bd92e1c46d59f81ec698593d"
+    },
+    {
+      "path": "src/engine_metrics_tests.rs",
+      "bytes": 15166,
+      "sha256": "9451f203fab16bc3743bd0957bab703440519c6fff3e20b594b247d0ba628dd5"
+    },
+    {
+      "path": "src/ingest.rs",
+      "bytes": 13208,
+      "sha256": "2215dddeb28216d1b60484e46d984a7bf94398b0e3778463d234cfa846670ff9"
+    },
+    {
+      "path": "src/job_runtime.rs",
+      "bytes": 3594,
+      "sha256": "ba664da04c668b065f0dec6baaa7da1e06730799486a7e6d60db4a2a63166117"
+    },
+    {
+      "path": "src/lib.rs",
+      "bytes": 674,
+      "sha256": "b7a33f189fafcac1b3185eef3e905f43fa22cf5890c48e7b9097448fe287e6ca"
+    },
+    {
+      "path": "src/main.rs",
+      "bytes": 10630,
+      "sha256": "e7df5454fd60b1ba990d78656b445fc4f65caa4ad30f732b02d3efc3ff99053d"
+    },
+    {
+      "path": "src/metrics.rs",
+      "bytes": 20488,
+      "sha256": "88e4b3180fe490c755b1d891d200f7b4c2e6dce4ed0adcb4a4f2ea5d0d98db2d"
+    },
+    {
+      "path": "src/model.rs",
+      "bytes": 15262,
+      "sha256": "4f30d915ba3b68bf3cd28515810a239786a38d61a00fb6eae8a57a5b2865086f"
+    },
+    {
+      "path": "src/pg_transport.rs",
+      "bytes": 13238,
+      "sha256": "d11d028a4c0f2f75e5d442b4f5a5409240eb5330cfbf9aa81e81a75f79d55751"
+    },
+    {
+      "path": "src/plan.rs",
+      "bytes": 35058,
+      "sha256": "e692905a371e75ce057a9a38fe7c54f14faefe94562847ab9f84a82eb7293eb5"
+    },
+    {
+      "path": "src/policy.rs",
+      "bytes": 19531,
+      "sha256": "c7e0d900b20c24ef8be3e58086d1dc6d17b9be84df459e2b29df9c679e7c0c19"
+    },
+    {
+      "path": "src/query.rs",
+      "bytes": 65460,
+      "sha256": "46a4885722eec69f2840b76165d782c5f953890aefa2de4a935555b94c754d4a"
+    },
+    {
+      "path": "src/query/resident.rs",
+      "bytes": 13492,
+      "sha256": "7531897b404682f722c645c3a965de5767ba9bcdb7d0c8cb6899427585e6bd44"
+    },
+    {
+      "path": "src/query/resident_process_tests.rs",
+      "bytes": 9233,
+      "sha256": "483617c0f72b1544c4dad0552f3199869990f4df34fadc3ebab09946dfc923d9"
+    },
+    {
+      "path": "src/query/resident_tests.rs",
+      "bytes": 16987,
+      "sha256": "06778af5866b101ba13c89daf1ff06525ab1c2303f5443d562c1bd2c19a95ae1"
+    },
+    {
+      "path": "src/query/resident_types.rs",
+      "bytes": 6568,
+      "sha256": "c7a891fe6da6ea022ab0f08a950416635968c3a0dd69e147c4de25c9275a71e9"
+    },
+    {
+      "path": "src/query/workers.rs",
+      "bytes": 30461,
+      "sha256": "c6318a8caf2db765bcad8380fc3c76774f2025257d3df8af3417bfa717e7e542"
+    },
+    {
+      "path": "src/remote.rs",
+      "bytes": 54311,
+      "sha256": "52a70eff591dc787f573b5f9b628b65b96afa72131560c35aee6eb9e4c152350"
+    },
+    {
+      "path": "src/segment.rs",
+      "bytes": 10495,
+      "sha256": "974fe340d85ab45568e5ab04ac19c8e06bbdc1f6d57ef1405b32b424b76e8067"
+    },
+    {
+      "path": "src/service.rs",
+      "bytes": 42960,
+      "sha256": "1558f835bf60b966551178122f43353b4d6e1858c8d0d572fa2f53f1d990fb13"
+    },
+    {
+      "path": "src/tier.rs",
+      "bytes": 60817,
+      "sha256": "10ce07836c5d012e3a8393fe7b25ffc331a9e7955df23dbc87a614023311a0bc"
+    },
+    {
+      "path": "src/transport.rs",
+      "bytes": 16817,
+      "sha256": "24d2823b775885e9dc263e9ab296b9a6200f9d14766f7e845e57363f6b213290"
+    },
+    {
+      "path": "src/wal.rs",
+      "bytes": 20469,
+      "sha256": "d0123bd8ef7fe5afc85eebcf5be7520b9f055957e53895ef9d68822ef965d7b2"
+    },
+    {
+      "path": "tests/admission.rs",
+      "bytes": 5779,
+      "sha256": "6fb80698a0bae8cf2a9ea43e0747ec307d6b526978b25c923303cc943eda9db9"
+    },
+    {
+      "path": "tests/audit_regressions.rs",
+      "bytes": 28945,
+      "sha256": "278db84a30d661e4f0a4fea25c179fae24eb0d55806b5dcc029992186a56d08f"
+    },
+    {
+      "path": "tests/background_io.rs",
+      "bytes": 24021,
+      "sha256": "59850fc904caa5a9bbb36e4bff2b71b95461342cca84a65965ca76f4a03c3705"
+    },
+    {
+      "path": "tests/control.rs",
+      "bytes": 13320,
+      "sha256": "6ffea0bb514d51fa4edab312df0ee946e5b09c3c26e96c40600e9c3b40a4c0b1"
+    },
+    {
+      "path": "tests/derived_state.rs",
+      "bytes": 31945,
+      "sha256": "18f256a1de5a19f4740cfa6b17973162aa4f42875d0e52e62c02449141d83a56"
+    },
+    {
+      "path": "tests/engine.rs",
+      "bytes": 22148,
+      "sha256": "4ed36d15b8ad17d7f0200566f2a2f4bad38ec5dc77bd69c3216a9642bbfc3ced"
+    },
+    {
+      "path": "tests/group_commit.rs",
+      "bytes": 24374,
+      "sha256": "45139ebd48d906462e704e318e5c62800415dc1939aa00ea04697a54ff1ef867"
+    },
+    {
+      "path": "tests/headroom_recovery.rs",
+      "bytes": 7903,
+      "sha256": "d7bb4496fc3500ba04ed9e77229f1b8edc4476f9c90f2076287e7c19fd6042cb"
+    },
+    {
+      "path": "tests/ingest.rs",
+      "bytes": 8622,
+      "sha256": "39d951c52bc0e9cdba2c465590ee16bc857be8126b09ad6d6d03b424df09ade2"
+    },
+    {
+      "path": "tests/maintenance_preparation.rs",
+      "bytes": 10083,
+      "sha256": "5215ab3ba0ff6598dc9fbaa35f9c0df800778f78772899dd2b3a3aab09148b9f"
+    },
+    {
+      "path": "tests/maintenance_work.rs",
+      "bytes": 15858,
+      "sha256": "2bec89e0a87da3294aad7d5cfc01fd4f3924e2b4304e53b88ea34a568579f9bb"
+    },
+    {
+      "path": "tests/metadata_longevity.rs",
+      "bytes": 5603,
+      "sha256": "5b1a182d013245baca9b8a4601e3ca6a17cd2f2c82234517a640a98b395bd575"
+    },
+    {
+      "path": "tests/model.rs",
+      "bytes": 5346,
+      "sha256": "11c229e8868fcdcade1d25e32977822f85ac2e740433fb5f7832f0b88dc382b0"
+    },
+    {
+      "path": "tests/plan_nested.rs",
+      "bytes": 8531,
+      "sha256": "ec8a86e64d6a8a477699d55f2b014fa4b2d24dbf572b2a426c2f3059286a7591"
+    },
+    {
+      "path": "tests/prefix_admission.rs",
+      "bytes": 43747,
+      "sha256": "6e7cba07816a9208575d6c69e4ad494f4e5fd3705e96a7db9b6b133203ad3ab0"
+    },
+    {
+      "path": "tests/prefix_checkpoint.rs",
+      "bytes": 29483,
+      "sha256": "f1391c2c2026f45190b590ff47562e3869bd5dff29d2612bcc6d303e36739a79"
+    },
+    {
+      "path": "tests/prepared_publication.rs",
+      "bytes": 11773,
+      "sha256": "eb9963989c6c1fccc02995d2004554f028b42a1ab915fb94e17bfca861ec7818"
+    },
+    {
+      "path": "tests/publication.rs",
+      "bytes": 17077,
+      "sha256": "9ee6bdbc0d37b5175a2fbed45ef1bb45998ac76e3375d127e61045d4376668af"
+    },
+    {
+      "path": "tests/query.rs",
+      "bytes": 16579,
+      "sha256": "06da927b63b60d555c9ad926a1b542951d2d393f6b37ac302670d77b220cb87f"
+    },
+    {
+      "path": "tests/query_catalog_exposure.rs",
+      "bytes": 10445,
+      "sha256": "f31bdb56bf76c338aa06a0109ece000a882fb40e8e65339958c237eda1057c34"
+    },
+    {
+      "path": "tests/query_projection.rs",
+      "bytes": 7647,
+      "sha256": "6c7a982a6246df012193565357f31d9187b8990564d917a4751bd2adc0db9170"
+    },
+    {
+      "path": "tests/query_residency.rs",
+      "bytes": 5947,
+      "sha256": "962795c61f5a0ff1ce735f6d3b0359a282baac48b3010ed214b0e9c4e9423147"
+    },
+    {
+      "path": "tests/query_security.rs",
+      "bytes": 11036,
+      "sha256": "b407906b26c9c34c8b02cdc61417ac11b08d7f0702e2e876e845f6019e761a08"
+    },
+    {
+      "path": "tests/query_typed_inputs.rs",
+      "bytes": 11650,
+      "sha256": "43c154f9383cc04bc2ac27ad617343338ca3c06ad44c6aea4b27ce91371e3f2d"
+    },
+    {
+      "path": "tests/query_workers.rs",
+      "bytes": 32855,
+      "sha256": "2b394391bf7852f25d83200f6c51813f72e3c1d398264881e03abd33a81858c7"
+    },
+    {
+      "path": "tests/remote_store.rs",
+      "bytes": 17598,
+      "sha256": "e673f21c04375ee6d584e87435657763d5dcd0758f8c9a1af388674ed6daedfa"
+    },
+    {
+      "path": "tests/residency.rs",
+      "bytes": 9667,
+      "sha256": "7ea9a127566c694c38de7b82be8dc650b0620db68dd32e97e3468dae9bee5545"
+    },
+    {
+      "path": "tests/resident_pruning.rs",
+      "bytes": 9363,
+      "sha256": "a5750d71d07f6423a190f16053e31bcc90749fdcc7ab451d23b1a9c6f4a847a9"
+    },
+    {
+      "path": "tests/scheduler.rs",
+      "bytes": 8972,
+      "sha256": "e2d9dbde03aeb5e36771e2b53dfb92263a1edd9a00869e119e8ca8dcfe32b729"
+    },
+    {
+      "path": "tests/security.rs",
+      "bytes": 12382,
+      "sha256": "0964811159d5ede5a3514d5d057952d6003631b0b81b93f99b1eb32c65b2337d"
+    },
+    {
+      "path": "tests/service.rs",
+      "bytes": 24450,
+      "sha256": "e0da4a335a345ce173d24abc555acd73a2e1031bfbf43584f6386699cc23028d"
+    },
+    {
+      "path": "tests/transports.rs",
+      "bytes": 32229,
+      "sha256": "89ebfce04f1dcf4c0b921702a14b53771c8d81f7c6cd9e3f3782f77933e314c6"
+    }
+  ],
+  "logs": [
+    {
+      "path": "local-qualification.log",
+      "sha256": "a4ae7cbbcb2cbdbc6927c16ce09a9121d27fe1ef68a0bad4342faacbe78fb874"
+    },
+    {
+      "path": "typescript-unit.log",
+      "sha256": "e2d3e64c712e42e159b175640828e090346b088cea424cc955ed15736ae7158d"
+    }
+  ],
+  "rust_passed": 400,
+  "ignored": 1,
+  "typescript_unit": 18,
+  "typescript_real_service": 1,
+  "format": true,
+  "strict_workspace_clippy": true,
+  "live_s3": false,
+  "performance_qualified": false,
+  "source_unchanged_across_checks": true,
+  "note": "Full Rust library/binary/integration/doc gates and real clients rerun on the same pre/post source capture, including compile-time configuration documentation. Examples compiled, not executed. Prior TS unit log reused only after exact complete selected TS source/config set identity."
+}

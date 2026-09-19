@@ -36,6 +36,8 @@ struct WireRoot {
     format_version: u32,
     database_id: String,
     checkpoint_sequence: u64,
+    #[serde(default, skip_serializing_if = "engine::journal_disabled")]
+    segmented_journal: bool,
     tables: BTreeMap<String, WireTable>,
     continuous_aggregates: BTreeMap<String, ContinuousAggregate>,
     jobs: BTreeMap<String, JobDefinition>,
@@ -190,6 +192,7 @@ pub(crate) fn encode_control(
         format_version: 2,
         database_id: catalog.database_id.clone(),
         checkpoint_sequence,
+        segmented_journal: catalog.segmented_journal,
         tables,
         continuous_aggregates: catalog.continuous_aggregates.clone(),
         jobs: catalog.jobs.clone(),
@@ -283,6 +286,7 @@ pub(crate) fn decode(bytes: &[u8], config: &Config) -> Result<CheckpointRoot> {
             format_version: crate::model::FORMAT_VERSION,
             database_id: wire.database_id,
             checkpoint_sequence: wire.checkpoint_sequence,
+            segmented_journal: wire.segmented_journal,
             tables,
             continuous_aggregates: wire.continuous_aggregates,
             jobs: wire.jobs,
@@ -406,6 +410,15 @@ pub(crate) fn prepare(
             <= config.derived_max_bytes,
         "derived preparation resident and working budget exceeded"
     );
+    // Prepared publication does not run a separate projection pass. Preserve
+    // the same recovery workspace check as admission before emitting each page.
+    let mut checked_emit = |page: &PageRef, bytes: &[u8]| {
+        ensure!(
+            (page.bytes as usize).saturating_mul(64) <= config.derived_max_bytes,
+            "derived recovery working budget exceeded"
+        );
+        emit(page, bytes)
+    };
     let mut refs = BTreeMap::new();
     let mut encoded = 0usize;
     for (name, table) in &catalog.tables {
@@ -413,13 +426,13 @@ pub(crate) fn prepare(
             name,
             &table.rollups,
             limits(config, false, config.derived_max_bytes),
-            &mut emit,
+            &mut checked_emit,
         )?;
         let receipts = derived::encode_receipts(
             name,
             &table.receipts,
             limits(config, true, config.derived_max_bytes),
-            &mut emit,
+            &mut checked_emit,
         )?;
         encoded = encoded
             .saturating_add(usize::try_from(rollups.encoded_bytes)?)

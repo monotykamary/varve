@@ -1,0 +1,15 @@
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+const root='/tmp/varve-diagnostic.KOUrtH/retry-config/s13-monitor',prior=root+'/../s13-pilot';
+const sha=data=>createHash('sha256').update(data).digest('hex'),read=name=>JSON.parse(readFileSync(root+'/'+name,'utf8'));
+assert(!existsSync(root+'/prepared.json'),'Preparation already recorded; do not regenerate');
+execFileSync('node',[root+'/../s13-qualification/qualification.mjs','--check'],{stdio:'pipe'});
+for(const [copy,original]of Object.entries({'PRIOR-s13-runtime-varve.json':'runtime-varve.json','PRIOR-s13-staged.json':'staged.json','PRIOR-s13-prepared.json':'prepared.json','source-manifest.json':'source-manifest.json','source.tar.gz':'source.tar.gz','runtime-config.json':'runtime-config.json','benchmark-config.json':'benchmark-config.json','driver-scope.json':'driver-scope.json','driver-diagnostic-tests.log':'driver-diagnostic-tests.log','DIAGNOSTIC_REVIEW.md':'DIAGNOSTIC_REVIEW.md','REVIEW_RESOLUTION.md':'REVIEW_RESOLUTION.md'}))assert.equal(sha(readFileSync(root+'/'+copy)),sha(readFileSync(prior+'/'+original)),copy+' must be verbatim');
+const first=read('PRIOR-s13-runtime-varve.json'),previous=read('PRIOR-s13-prepared.json');
+assert.equal(first.binary_sha256,'9366f866b775d56ebf827d540b9fd62e845950f2f15004e6c7be62299ec3f628');
+assert.equal(first.source_manifest_sha256,'f57157e947995785f0d226b2dd80791b100d32527418898e579d07962edb8a9d');
+const result={...previous,database_source_changed:false,at:new Date().toISOString(),scope:'Offline exact-image reuse preparation; PRIOR files are first S13 evidence, not new runtime receipts',database_source_changed_vs_first_s13:false,database_source_changed_vs_v11:true,reuse_images:{varve:'a88e2c35-596f-41d4-b383-06857bf43108',timescale:'83232bed-bae0-4503-8195-23a6a527ca9e',driver:'f0bcb2d9-3faf-46c0-97bf-5b27807dc6ef'},prior_runtime_sha256:sha(readFileSync(root+'/PRIOR-s13-runtime-varve.json')),expected_binary_sha256:first.binary_sha256,installer_sha256:sha(readFileSync(root+'/install-driver.py')),installer_bytes:readFileSync(root+'/install-driver.py').length,compute_started:false};
+writeFileSync(root+'/prepared.json',JSON.stringify(result,null,2)+'\n',{mode:0o600,flag:'wx'});
+console.log(JSON.stringify({prepared:true,rebuild:false,qualified_source:result.varve_source_digest,expected_binary_sha256:result.expected_binary_sha256}));

@@ -1,0 +1,12 @@
+{
+  "id": "eb7616132c5c48deadce0f70ead5fe5f",
+  "scope": "/tmp/varve-diagnostic.KOUrtH/retry-config/s13-pilot",
+  "mode": "offline preparation only",
+  "mainOwns": [
+    "CONTRACT.md",
+    "OWNER.json",
+    "PROGRESS.md"
+  ],
+  "network": false,
+  "repositoryEdits": false
+}

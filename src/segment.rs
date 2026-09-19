@@ -187,14 +187,40 @@ pub fn write_with_limit(path: &Path, rows: &[StoredRow], max_bytes: u64) -> Resu
 }
 
 pub fn read(path: &Path) -> Result<Vec<StoredRow>> {
+    read_with_limit(path, usize::MAX)
+}
+
+pub(crate) fn read_with_limit(path: &Path, logical_limit: usize) -> Result<Vec<StoredRow>> {
     let file = File::open(path).with_context(|| format!("open segment {}", path.display()))?;
     let builder = ParquetRecordBatchReaderBuilder::try_new(file).context("open Parquet reader")?;
     ensure!(
         builder.schema().as_ref() == schema().as_ref(),
         "unexpected segment Arrow schema"
     );
+    let count = usize::try_from(builder.metadata().file_metadata().num_rows())
+        .context("invalid Parquet row count")?;
+    ensure!(
+        count <= logical_limit / 128,
+        "segment row count exceeds decoded-size bound"
+    );
+    let uncompressed = builder
+        .metadata()
+        .row_groups()
+        .iter()
+        .try_fold(0u64, |n, g| {
+            n.checked_add(u64::try_from(g.total_byte_size()).ok()?)
+        })
+        .context("invalid Parquet uncompressed size")?;
+    ensure!(
+        uncompressed
+            <= logical_limit
+                .saturating_mul(16)
+                .saturating_add(8 * 1024 * 1024) as u64,
+        "Parquet workspace exceeds decoded-size bound"
+    );
     let reader = builder.build().context("build Parquet batch reader")?;
     let mut rows = Vec::new();
+    let mut decoded = 0usize;
 
     for batch in reader {
         let batch = batch.context("read Parquet record batch")?;
@@ -223,6 +249,13 @@ pub fn read(path: &Path) -> Result<Vec<StoredRow>> {
                     .context("decode segment tags JSON")?,
             };
             row.validate().context("validate decoded segment row")?;
+            decoded = decoded
+                .checked_add(row.estimated_bytes())
+                .context("decoded-size overflow")?;
+            ensure!(
+                decoded <= logical_limit && rows.len() < count,
+                "segment exceeds decoded-size bound"
+            );
             rows.push(StoredRow {
                 row,
                 sequence: sequences.value(index),

@@ -1,0 +1,30 @@
+{
+  "scope": "Static source-delta assertions, not additional behavioral fixtures",
+  "reference_gate_includes_varve": true,
+  "normalized_helpers": 18,
+  "timed_workload_unchanged": true,
+  "campaign_order_deadlines_retries_unchanged": true,
+  "obsolete_build_flow_absent": true,
+  "helpers": {
+    "analyze-phases.mjs": "91a19a6dd8f216f0a808b2a656f40b383c9b73238ad0cc9be18512d767b19960",
+    "check-driver.mjs": "2df86a4db205b42b986d6f1600621ee2465219f1ebed7170dff5f5f33e4857aa",
+    "check-recovery.mjs": "602d9f5f14d04064d534a6baf5a7a6a5866e56cf9b18a508ea317b942bda4e56",
+    "collect.py": "9a0a789d322aed130e6af828ea07dda82337714ab3f2b228b808c12c2bfed899",
+    "install-driver.py": "913e9230bda12a2e6350f766a19a2c4cff8dea4a01481d5cc334b1eb4af52867",
+    "install-driver.py.template": "f7e682ccb90bbdf148b3e89ab5f21f0b5ba2870fc9a97c3f429f2dd415d0a0a9",
+    "launch.py": "e0da1977e465998831f872c4ee5fe109356df8f68a168fb755f38fed8411d11e",
+    "metrics.py": "59a46219473ff40261c0ae5f967711332c5d78f6755e4a0dc928700e44fcda79",
+    "probe-driver.py": "0dd524f4fee5233cd656c8ae3b736c6665c8d3f343a6b5b63ba3f54dd6287228",
+    "probe-varve.py": "6c095ac80bcd6000b1330f2e2b465583a49d8e0c8ff096915452d099a7e7c3e9",
+    "recovery.py": "140473f89e8a7992a94ea378f8bcfcc5cc96b4ec1c8760a0946b764333c19833",
+    "redeploy.mjs": "3830d8ffb81be1f486afb5a74762a66a7b25123950ef3f81d8abe15f308f06a7",
+    "resources.sh": "b47ae01d506056a82a218733e9e309771de3871baedc842e603ee2f41bd71e22",
+    "restart.mjs": "c6d05750aa22cea59b9310d81dd0c167a77e8abed3fbe67b071f356d97fa8e29",
+    "ssh.mjs": "0573ec91c68a39e19b6bb341005033bb46fe81a19aa48afb257d2d6805c1ab29",
+    "stop-attempt.mjs": "eca90b597d11b192362a4f3597dc8fc5e424121bccec5fcd1841fbc8bfe655ed",
+    "unpack.mjs": "3a57c4cfd8a8693bd3660509f3911f4c0f0e50cb058fc2a244503c859870eacb",
+    "verify-stop.mjs": "a9846a1b62daf3e8cb6338e4b6aa641f45f10290fde7355277a74f9de28317a2",
+    "run-campaign.mjs": "7ecd9a296ad85ecfc899d7e6d0dee114054a030ba6191c2ee2a4a629142bb0ca",
+    "verify-stage.mjs": "8da8284d9d0f231122820ed6c7be3744e5fdc0864455d225ede491ab3c7c98eb"
+  }
+}

@@ -1,0 +1,15 @@
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+const root='/tmp/varve-scoped.0bj4bw';
+const read=name=>JSON.parse(readFileSync(root+'/'+name,'utf8'));
+const sha=data=>createHash('sha256').update(data).digest('hex');
+execFileSync('node',[root+'/qualification.mjs','--check'],{stdio:'pipe'});
+const tests=read('helper-tests.json'),qualified=read('qualification.json'),manifest=read('stage/SOURCE_MANIFEST.json');
+assert.equal(tests.source_digest,qualified.source_digest);assert.equal(manifest.local_qualified_source,qualified.source_digest);
+for(const [name,hash]of Object.entries(tests.helpers))assert.equal(sha(readFileSync(root+'/'+name)),hash,'Helper changed after fixture checks: '+name);
+for(const file of manifest.files)assert.equal(sha(readFileSync(root+'/stage/'+file.path)),file.sha256,'Staged source changed: '+file.path);
+assert.equal(sha(readFileSync(root+'/stage/SOURCE_MANIFEST.json')),read('staged.json').manifest_sha256);
+assert.equal(sha(readFileSync(root+'/runtime-config.json')),read('staged.json').runtime_config_sha256);
+console.log(JSON.stringify({source_and_helpers_unchanged:true,source_digest:qualified.source_digest,stage_files:manifest.files.length,helper_files:Object.keys(tests.helpers).length,performance_qualified:false}));

@@ -1,0 +1,28 @@
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {gzipSync} from 'node:zlib';
+import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+const root='/tmp/varve-diagnostic.KOUrtH/retry-config',repo='/Users/monotykamary/VCS/working-remote/open-source/varve',base=repo+'/docs/evidence/frontier/v10';
+const sha=data=>createHash('sha256').update(data).digest('hex'),read=path=>JSON.parse(readFileSync(path,'utf8'));
+assert(!existsSync(root+'/prepared.json'),'Preparation already recorded; inspect existing state');
+execFileSync('node',['/tmp/varve-scoped.0bj4bw/qualification.mjs','--check'],{stdio:'pipe'});
+const scopeBytes=readFileSync(root+'/driver-scope.json'),scope=JSON.parse(scopeBytes);
+assert(scope.normal_workload_ast_unchanged&&scope.offline_tests===21);
+for(const [name,expected]of Object.entries(scope.files))assert.equal(sha(readFileSync(repo+'/benchmarks/timescale/'+name)),expected);
+assert.equal(sha(readFileSync(root+'/driver-diagnostic-tests.log')),scope.test_log_sha256);
+const names=['benchmark.py','core.py','requirements.txt','Dockerfile'];
+const original=Object.fromEntries(names.map(name=>[name,sha(readFileSync(base+'/driver/'+name))]));
+const effective=Object.fromEntries(names.map(name=>[name,scope.files[name]]));
+for(const name of names.filter(name=>name!=='benchmark.py'))assert.equal(effective[name],original[name]);
+assert.equal(original['benchmark.py'],scope.baseline_driver_sha256);
+let installer=readFileSync(root+'/install-driver.py.template','utf8');
+for(const [anchor,value]of Object.entries({'__BASE_FILES__':JSON.stringify(original),'__EFFECTIVE_FILES__':JSON.stringify(effective),'__PAYLOAD__':gzipSync(readFileSync(repo+'/benchmarks/timescale/benchmark.py')).toString('base64'),'__SCOPE_SHA256__':sha(scopeBytes)})){assert.equal(installer.split(anchor).length,2);installer=installer.replace(anchor,value);}
+assert(Buffer.byteLength(installer)<70000,'SSH payload must remain bounded');
+writeFileSync(root+'/install-driver.py',installer,{mode:0o600});
+const config=readFileSync(base+'/varve-config.json');assert.equal(sha(config),'215f100b13ba1ba3d012d39117fa1895ed7978657434057a93390c6f359aa089');
+writeFileSync(root+'/runtime-config.json',config,{mode:0o600});
+writeFileSync(root+'/benchmark-config.json',config.toString()+'\n',{mode:0o600});
+writeFileSync(root+'/source-manifest.json',readFileSync(base+'/source-manifest.json'),{mode:0o600});
+const result={at:new Date().toISOString(),varve_source_digest:read(base+'/local-qualification.json').source_digest,varve_source_manifest_sha256:sha(readFileSync(root+'/source-manifest.json')),runtime_config_sha256:sha(config),base_driver_files:original,effective_driver_files:effective,driver_scope_sha256:sha(scopeBytes),installer_sha256:sha(installer),installer_bytes:Buffer.byteLength(installer),database_source_changed:false,driver_reporting_only:true,normal_workload_ast_unchanged:true,compute_started:false};
+writeFileSync(root+'/prepared.json',JSON.stringify(result,null,2)+'\n',{mode:0o600});console.log(JSON.stringify(result));
