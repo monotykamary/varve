@@ -1,0 +1,1 @@
+cargo test --offline --locked -p varve-storage --lib engine::control_admission_tests::empty_new_table_aggregate_near_budget -- --exact --nocapture --test-threads=1

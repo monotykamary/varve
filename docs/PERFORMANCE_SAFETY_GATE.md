@@ -12,7 +12,7 @@ Improve durable single-row ingestion, batched ingestion and hot/cold SQL without
 | WAL improvement | Preserve v1; exact durable authority and independent inner validation; two ordered barriers before ACK; fail closed on unknown/corrupt suffix; seal and remote exact bytes; crash/reopen matrix | Conservative recovery and migration contract amended; isolated opt-in implementation underway, unqualified |
 | Partition preparation | Reserve before allocation, cover live clone/overlay lifetimes, avoid repeated-key overreservation; explicit error-order compatibility; concurrent owner and quota regressions | Isolated candidate unqualified; admission redesign required |
 | Native SQL reuse | Bounded reusable native runtime, exact per-query authority/data, no stale callbacks/snapshots, cancellation/teardown safety, budget admission, output parity | Default-off implementation qualified and9c82b0f CI green; owned benchmark opt-in7cbd207 deployed with all151 source hashes matched; see live failure boundary below |
-| Control admission | Admit catalog/backfill/index/accounting ownership before WAL; genuine budget rejection must not commit or fence; recovery and all acknowledged state preserved | New live setup failure reproduced operationally; source repair underway, not yet qualified |
+| Control admission | Admit catalog/backfill/index/accounting ownership before WAL; genuine budget rejection must not commit or fence; recovery and all acknowledged state preserved | Live failure also reproduced by an unchanged native-independent baseline test; repair remains unqualified; work paused at a safe checkpoint |
 | Sustained comparison | Matched declared resources/durability; repeated single/batched and mixed hot/cold/maintenance workloads; exact conservation; throughput, latency, failures, backlog and resource evidence | New native comparison failed before measurement; both retained datasets passed exact checks after upgrade and recovery; no new performance result |
 | Release checkpoint | Source-bound tests, direct probes, strict lint/format, independent review, exact committed artifact scope, commit and push verification | 192562d,9c82b0f and7cbd207 pushed; hosted CI green; live control-admission defect blocks the next performance/release gate |
 
@@ -21,6 +21,8 @@ Prior baseline (before native reuse): four writers, database limits 2 CPUs/~2 GB
 No dropped/ambiguous rows were observed in the short conservation checks; that does not establish arbitrary-crash, distributed or production guarantees. Local fsync ACK does not promise S3 durability. Full coordinated storage rollback requires independent monotonic authority.
 
 The [native live follow-up](evidence/performance-safety-20260919/native-live/README.md) preserved an important failure: schema setup committed a control WAL operation before a later derived-index working reservation failed. The engine fenced; the same image/config reopened successfully after a bounded copied-recovery probe. Exact checks passed again for the two retained datasets. Recovery does not fix control admission or make the original HTTP400 a definitive rejection. No limits were raised and no namespaces were deleted.
+
+The [native-independent negative control](evidence/performance-safety-20260919/control-admission-negative/README.md) now reproduces the exact post-commit budget failure on the unchanged baseline. This diagnoses the defect; it does not qualify the candidate repair. At the user's requested wrap-up, the recovered service remains healthy and remote Cargo is idle.
 
 ## Execution order
 

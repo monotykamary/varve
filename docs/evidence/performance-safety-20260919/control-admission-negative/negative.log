@@ -1,0 +1,22 @@
+   Compiling varve-storage v0.1.0 (/workspace/varve-rebuild/performance-safety-20260919/control-negative-v1)
+    Finished `test` profile [unoptimized] target(s) in 21.51s
+     Running unittests src/lib.rs (/workspace/varve-rebuild/target/debug/deps/varve-db641abfaaebb2d6)
+
+running 1 test
+test engine::control_admission_tests::empty_new_table_aggregate_near_budget ... 
+thread 'engine::control_admission_tests::empty_new_table_aggregate_near_budget' (495053) panicked at src/control_admission_tests.rs:138:13:
+empty aggregate must fit: Err(apply committed control WAL; reopen for recovery
+
+Caused by:
+    derived resident/working byte budget exceeded); status=Ok(Status { database_id: "22917d57-e98a-4a4e-9d98-2c31277f6cc2", sequence: 40, checkpoint_sequence: 39, remote_sequence: 0, segmented_journal: false, native_query: None, unshipped_batches: 40, hot_rows: 0, hot_bytes: 0, raw_memory: RawMemoryStatus { limit_bytes: 134217728, working_limit_bytes: 536870912, reserved_bytes: 0, live_bytes: 0, working_bytes: 0, pinned_bytes: 0, peak_bytes: 6116, rejections: 0 }, wal_bytes: 316, disk_bytes: 48674, metadata_bytes: 45428, control_root_bytes: 45428, derived_encoded_bytes: 0, derived_resident_bytes: 230164, derived_working_bytes: 0, decoded_cache_bytes: 0, disk_cache_bytes: 0, tables: 2, segments: 1, rollup_groups: 128, idempotency_keys: 37, active_queries: 0, active_snapshots: 0, fenced: Some("committed control WAL could not be applied: derived resident/working byte budget exceeded"), last_maintenance_error: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    engine::control_admission_tests::empty_new_table_aggregate_near_budget
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 304 filtered out; finished in 0.75s
+
+error: test failed, to rerun pass `-p varve-storage --lib`

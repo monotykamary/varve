@@ -3,3 +3,4 @@ docs/evidence/**/*.diff whitespace=-blank-at-eol
 docs/evidence/**/*.patch whitespace=-blank-at-eol
 docs/evidence/**/*.command.txt whitespace=-blank-at-eol
 docs/evidence/performance-safety-20260919/native-live/*runtime.txt whitespace=-blank-at-eol
+docs/evidence/performance-safety-20260919/control-admission-negative/negative.log whitespace=-blank-at-eol
