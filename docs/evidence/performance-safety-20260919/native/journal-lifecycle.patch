@@ -1,0 +1,161 @@
+--- a/src/journal.rs
++++ b/src/journal.rs
+@@ -243,6 +243,17 @@
+     fault: Fault,
+ }
+ 
++impl Drop for Journal {
++    fn drop(&mut self) {
++        // Close our writable handle before another logical owner can acquire
++        // the directory. Teardown must not seal, sync or acknowledge new data.
++        drop(self.active.take());
++        // Duplicated or fork-inherited descriptions can outlive this owner.
++        // Explicitly release its lock; on error, descriptor close is the fallback.
++        let _ = FileExt::unlock(&self._lock);
++    }
++}
++
+ // Instance-local injection, absent in production; never global environment state.
+ #[derive(Default)]
+ struct Fault {
+--- a/src/journal_tests.rs
++++ b/src/journal_tests.rs
+@@ -578,6 +578,138 @@
+     run_ownership_child(dir.path(), true);
+     drop(journal);
+     run_ownership_child(dir.path(), false);
++}
++
++#[test]
++fn logical_owner_drop_releases_lock_despite_surviving_duplicate() {
++    let dir = fixture();
++    let mut journal = Journal::open(dir.path(), config()).unwrap();
++    assert_eq!(
++        journal.append_group(&[b"before"]).unwrap().first_sequence(),
++        1
++    );
++    assert!(journal.active.is_some());
++    let duplicate = journal._lock.try_clone().unwrap();
++    let error = Journal::open(dir.path(), config())
++        .err()
++        .expect("live owner excluded");
++    assert!(error.to_string().contains("already owned"), "{error:#}");
++    let before_drop = snapshot(dir.path());
++    drop(journal);
++    assert_eq!(
++        snapshot(dir.path()),
++        before_drop,
++        "drop must not seal or change durable bytes"
++    );
++
++    let mut successor = Journal::open(dir.path(), config())
++        .expect("logical owner drop must release the lock despite a surviving duplicate");
++    assert_eq!(replay(&successor), vec![vec![(1, b"before".to_vec())]]);
++    assert_eq!(
++        successor
++            .append_group(&[b"after"])
++            .unwrap()
++            .first_sequence(),
++        2
++    );
++    drop(duplicate);
++    let error = Journal::open(dir.path(), config())
++        .err()
++        .expect("successor owns a distinct lock description");
++    assert!(error.to_string().contains("already owned"), "{error:#}");
++    drop(successor);
++    let recovered = Journal::open(dir.path(), config()).unwrap();
++    assert_eq!(recovered.stats().durable_sequence, 2);
++    assert_eq!(
++        replay(&recovered),
++        vec![vec![(1, b"before".to_vec())], vec![(2, b"after".to_vec())]]
++    );
++}
++
++#[cfg(unix)]
++#[test]
++fn logical_owner_drop_releases_lock_despite_live_child_descriptor() {
++    use std::io::{Read, Write};
++    use std::os::fd::OwnedFd;
++    use std::os::unix::net::UnixStream;
++    use std::process::{Child, Stdio};
++    use std::time::Duration;
++
++    struct ReapChild(Child);
++    impl Drop for ReapChild {
++        fn drop(&mut self) {
++            let _ = self.0.kill();
++            let _ = self.0.wait();
++        }
++    }
++
++    let dir = fixture();
++    let mut journal = Journal::open(dir.path(), config()).unwrap();
++    assert_eq!(
++        journal.append_group(&[b"before"]).unwrap().first_sequence(),
++        1
++    );
++    assert!(journal.active.is_some());
++    let (mut control, child_control) = UnixStream::pair().unwrap();
++    control
++        .set_read_timeout(Some(Duration::from_secs(10)))
++        .unwrap();
++    control
++        .set_write_timeout(Some(Duration::from_secs(10)))
++        .unwrap();
++    // stdin keeps the journal's open-file description alive in a real child.
++    // The duplex stderr socket gates its lifetime without sleeps or unsafe code.
++    let mut child = ReapChild(
++        Command::new("sh")
++            .args([
++                "-c",
++                "printf R >&2; IFS= read -r release <&2; test \"$release\" = release",
++            ])
++            .stdin(Stdio::from(journal._lock.try_clone().unwrap()))
++            .stdout(Stdio::null())
++            .stderr(Stdio::from(OwnedFd::from(child_control)))
++            .spawn()
++            .unwrap(),
++    );
++    let mut ready = [0];
++    control.read_exact(&mut ready).unwrap();
++    assert_eq!(ready, *b"R");
++    assert!(child.0.try_wait().unwrap().is_none());
++    let error = Journal::open(dir.path(), config())
++        .err()
++        .expect("live owner excluded");
++    assert!(error.to_string().contains("already owned"), "{error:#}");
++    let before_drop = snapshot(dir.path());
++    drop(journal);
++    assert_eq!(snapshot(dir.path()), before_drop);
++
++    let mut successor = Journal::open(dir.path(), config())
++        .expect("logical owner drop must release the lock while the child retains stdin");
++    assert!(child.0.try_wait().unwrap().is_none());
++    assert_eq!(replay(&successor), vec![vec![(1, b"before".to_vec())]]);
++    assert_eq!(
++        successor
++            .append_group(&[b"after"])
++            .unwrap()
++            .first_sequence(),
++        2
++    );
++    control.write_all(b"release\n").unwrap();
++    let mut remaining = Vec::new();
++    control.read_to_end(&mut remaining).unwrap();
++    assert!(remaining.is_empty());
++    assert!(child.0.wait().unwrap().success());
++    let error = Journal::open(dir.path(), config())
++        .err()
++        .expect("child exit must not unlock the successor");
++    assert!(error.to_string().contains("already owned"), "{error:#}");
++    drop(successor);
++    let recovered = Journal::open(dir.path(), config()).unwrap();
++    assert_eq!(recovered.stats().durable_sequence, 2);
++    assert_eq!(
++        replay(&recovered),
++        vec![vec![(1, b"before".to_vec())], vec![(2, b"after".to_vec())]]
++    );
+ }
+ 
+ fn run_ownership_child(path: &Path, locked: bool) {

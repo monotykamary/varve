@@ -265,6 +265,8 @@ pub struct Config {
     pub query_executable: PathBuf,
     /// Native DuckDB v2 library; distinct from the legacy CLI executable.
     pub duckdb_library: Option<PathBuf>,
+    /// Opt in to bounded, exclusive native sessions with fresh scoped inputs.
+    pub query_native_reuse: bool,
     pub query_memory_mb: usize,
     pub query_threads: usize,
     pub query_timeout_ms: u64,
@@ -313,6 +315,7 @@ impl Default for Config {
             maintenance_interval_ms: 1000,
             query_executable: PathBuf::from("duckdb"),
             duckdb_library: None,
+            query_native_reuse: false,
             query_memory_mb: 128,
             query_threads: 2,
             query_timeout_ms: 30_000,

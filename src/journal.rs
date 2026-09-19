@@ -243,6 +243,17 @@ pub struct Journal {
     fault: Fault,
 }
 
+impl Drop for Journal {
+    fn drop(&mut self) {
+        // Close our writable handle before another logical owner can acquire
+        // the directory. Teardown must not seal, sync or acknowledge new data.
+        drop(self.active.take());
+        // Duplicated or fork-inherited descriptions can outlive this owner.
+        // Explicitly release its lock; on error, descriptor close is the fallback.
+        let _ = FileExt::unlock(&self._lock);
+    }
+}
+
 // Instance-local injection, absent in production; never global environment state.
 #[derive(Default)]
 struct Fault {

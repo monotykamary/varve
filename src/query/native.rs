@@ -1,5 +1,6 @@
 mod ffi;
 mod output;
+mod pool;
 mod scan;
 #[cfg(test)]
 mod startup;
@@ -15,7 +16,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -25,14 +26,19 @@ const STOP_NONE: u8 = 0;
 const STOP_CANCELLED: u8 = 1;
 const STOP_TIMEOUT: u8 = 2;
 
-/// In-process DuckDB v2 runtime. Every execution gets a fresh private database.
+/// In-process DuckDB v2 runtime. Reuse is explicit and exclusively leased.
 /// The caller must retain selected-file pins until `execute` returns.
 pub(crate) struct NativeRuntime {
     api: Arc<Api>,
     capacity: usize,
-    active: AtomicUsize,
+    reuse: bool,
+    pool: Mutex<pool::Pool>,
     #[cfg(test)]
     before_execute: Mutex<Option<BeforeExecuteHook>>,
+    #[cfg(test)]
+    phase_hook: Mutex<Option<(u8, BeforeExecuteHook)>>,
+    #[cfg(test)]
+    fail_reset: AtomicBool,
     #[cfg(test)]
     last_scratch_usage: Mutex<Option<scan::ScratchUsage>>,
 }
@@ -52,7 +58,14 @@ struct NativeSession {
     connection: OwnedHandle,
     _database: OwnedHandle,
     _environment: OwnedHandle,
+    configured: bool,
+    leases: usize,
 }
+
+// A session is moved only while quiescent, never shared. All execution is on
+// its exclusive lease; the sole cross-thread operation is the pinned ABI's
+// connection_interrupt, whose watcher is joined before the lease can return.
+unsafe impl Send for NativeSession {}
 
 impl NativeRuntime {
     pub(crate) fn new(library_path: &Path, capacity: usize) -> Result<Self> {
@@ -61,16 +74,37 @@ impl NativeRuntime {
         Ok(Self {
             api,
             capacity,
-            active: AtomicUsize::new(0),
+            reuse: false,
+            pool: Mutex::new(pool::Pool::default()),
             #[cfg(test)]
             before_execute: Mutex::new(None),
+            #[cfg(test)]
+            phase_hook: Mutex::new(None),
+            #[cfg(test)]
+            fail_reset: AtomicBool::new(false),
             #[cfg(test)]
             last_scratch_usage: Mutex::new(None),
         })
     }
 
+    pub(crate) fn with_reuse(mut self, enabled: bool) -> Self {
+        self.reuse = enabled;
+        self
+    }
+
+    pub(crate) fn reuse_enabled(&self) -> bool {
+        self.reuse
+    }
+
+    pub(crate) fn stats(&self) -> super::QueryWorkerStats {
+        self.pool
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .stats()
+    }
+
     pub(crate) fn active_queries(&self) -> usize {
-        self.active.load(Ordering::Acquire)
+        self.stats().active
     }
 
     pub(crate) fn identity(&self) -> NativeIdentity {
@@ -163,6 +197,8 @@ impl NativeRuntime {
             connection,
             _database: database,
             _environment: environment,
+            configured: false,
+            leases: 0,
         })
     }
 
@@ -177,12 +213,22 @@ impl NativeRuntime {
         raw_memory: &RawMemoryBudget,
         cancelled: &AtomicBool,
     ) -> Result<Value> {
-        let _admission = self.admit()?;
-        super::validate_options(options)?;
-        super::validate_read_only_statement(sql)?;
         let deadline = Instant::now()
             .checked_add(Duration::from_millis(options.timeout_ms))
             .context("query timeout is too large")?;
+        let mut admission = self.admit(|| {
+            super::validate_options(options)?;
+            super::validate_read_only_statement(sql)?;
+            check_deadline(deadline, cancelled)?;
+            let eligible = self.reuse && super::pooling_eligible(sql, catalog);
+            // Unprovable/oversized reuse authority selects the existing fresh
+            // path, not a new SQL rejection. PreparedQuery still validates it.
+            Ok(if eligible {
+                snapshot.and_then(|snapshot| pool::Key::new(tables, snapshot, options).ok())
+            } else {
+                None
+            })
+        })?;
         check_deadline(deadline, cancelled)?;
         let scratch_lease = ScannerScratch::reserve(
             ScratchPlan::for_query(tables, snapshot, catalog, options.threads)?,
@@ -202,9 +248,15 @@ impl NativeRuntime {
         )?;
         check_deadline(deadline, cancelled)?;
 
-        // Keep opaque environment/database handles query-private. The pinned
-        // API explicitly permits cross-thread interrupt, not shared opens.
-        let session = self.open_private_session(options)?;
+        // Declare the executing handle AFTER its borrowed owners. Unwind drops
+        // it before prepared/scratch, even if configuration or a callback panics.
+        let mut session = if let Some(session) = admission.session.take() {
+            session
+        } else {
+            let session = self.open_private_session(options)?;
+            admission.opened();
+            session
+        };
         let connection = session.connection.get();
 
         let abort = Arc::new(AtomicBool::new(false));
@@ -230,12 +282,13 @@ impl NativeRuntime {
                 })
             };
             let completion = WatchCompletion(&done);
-            // SAFETY: prepared borrows this execute call's inputs. Connection,
-            // database and environment guards are destroyed before prepared,
-            // after the watcher and every callback have finished.
+            // SAFETY: prepared borrows this execute call's inputs. The session
+            // is closed before they expire unless acknowledged rollback AND
+            // the per-query owner ledger prove all callbacks were destroyed.
             let execution = unsafe {
                 self.configure_and_execute(
-                    connection,
+                    &mut session,
+                    admission.reusable(),
                     &prepared,
                     sql,
                     options,
@@ -256,10 +309,28 @@ impl NativeRuntime {
                 _ => execution,
             }
         });
-        // The watcher is joined and every result/chunk is gone before teardown.
-        // Closing the private session destroys every dynamically leased callback
-        // owner before PreparedQuery and the fixed scanner lease are released.
-        drop(session);
+        #[cfg(test)]
+        self.run_phase_hook(3);
+        let result = result.and_then(|value| {
+            check_deadline(deadline, cancelled)?;
+            Ok(value)
+        });
+        // No cancellation thread may survive into another lease. Rollback is
+        // adapter-owned and runs only after result destruction and watcher join.
+        // A successful SQL rollback alone is NOT a lifetime/reclamation proof.
+        let reset = admission.reusable()
+            && result.is_ok()
+            && check_deadline(deadline, cancelled).is_ok()
+            && self.rollback_session(connection).is_ok()
+            && scratch.is_none_or(|scratch| scratch.detached());
+        if reset {
+            admission.reset(session);
+        } else {
+            // Includes partial bind, output overflow, cancel, reset failure and
+            // runtimes retaining catalog callback versions after rollback. No
+            // retry of user SQL, and no release of source credit before close.
+            drop(session);
+        }
         #[cfg(test)]
         let scratch_usage = scratch.as_ref().map(|scratch| scratch.usage());
         drop(prepared);
@@ -275,10 +346,11 @@ impl NativeRuntime {
     }
 
     #[allow(clippy::too_many_arguments)]
-    /// SAFETY: close the connection/database before any prepared source expires.
+    /// SAFETY: close or prove complete callback destruction before sources expire.
     unsafe fn configure_and_execute(
         &self,
-        connection: Handle,
+        session: &mut NativeSession,
+        transactional: bool,
         prepared: &PreparedQuery<'_>,
         sql: &str,
         options: &QueryOptions,
@@ -286,6 +358,7 @@ impl NativeRuntime {
         cancelled: &AtomicBool,
         abort: Arc<AtomicBool>,
     ) -> Result<Value> {
+        let connection = session.connection.get();
         let statements = settings_sql(prepared)?;
         let mut generated_bytes = sql.len();
         for statement in &statements {
@@ -297,9 +370,21 @@ impl NativeRuntime {
                 "DuckDB SQL script exceeds {} bytes",
                 super::MAX_QUERY_SCRIPT_BYTES
             );
-            execute_no_rows(&self.api, connection, statement)?;
+            if !session.configured {
+                execute_no_rows(&self.api, connection, statement)?;
+            }
             check_deadline(deadline, cancelled)?;
         }
+        if !session.configured {
+            execute_no_rows(&self.api, connection, "SET lock_configuration = true")?;
+            session.configured = true;
+        }
+        if transactional {
+            execute_no_rows(&self.api, connection, "BEGIN TRANSACTION")?;
+        }
+        #[cfg(test)]
+        self.run_phase_hook(1);
+        check_deadline(deadline, cancelled)?;
 
         // SAFETY: inherited from this function's scoped-teardown contract.
         unsafe {
@@ -330,6 +415,9 @@ impl NativeRuntime {
             }
         }
 
+        #[cfg(test)]
+        self.run_phase_hook(2);
+        check_deadline(deadline, cancelled)?;
         for statement in prepared.relation_sql()? {
             generated_bytes = generated_bytes
                 .checked_add(statement.len())
@@ -342,7 +430,6 @@ impl NativeRuntime {
             execute_no_rows(&self.api, connection, &statement)?;
             check_deadline(deadline, cancelled)?;
         }
-        execute_no_rows(&self.api, connection, "SET lock_configuration = true")?;
         check_deadline(deadline, cancelled)?;
 
         let explain = super::lex_sql(sql)?
@@ -359,6 +446,7 @@ impl NativeRuntime {
                 hook();
             }
         }
+        check_deadline(deadline, cancelled)?;
         let mut result = execute_statement(&self.api, connection, sql)?;
         output::consume(
             &self.api,
@@ -370,19 +458,51 @@ impl NativeRuntime {
         )
     }
 
-    fn admit(&self) -> Result<Admission<'_>> {
-        let mut active = self.active.load(Ordering::Acquire);
-        loop {
-            ensure!(active < self.capacity, "query worker capacity exhausted");
-            match self.active.compare_exchange_weak(
-                active,
-                active + 1,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => return Ok(Admission { runtime: self }),
-                Err(observed) => active = observed,
+    fn rollback_session(&self, connection: Handle) -> Result<()> {
+        #[cfg(test)]
+        if self.fail_reset.swap(false, Ordering::AcqRel) {
+            // Exercise the real failed-statement path with an open transaction.
+            return execute_no_rows(
+                &self.api,
+                connection,
+                "SELECT error('injected reset failure')",
+            );
+        }
+        execute_no_rows(&self.api, connection, "ROLLBACK")
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fail_next_reset(&self) {
+        self.fail_reset.store(true, Ordering::Release);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_phase_hook(&self, phase: u8, hook: impl FnOnce() + Send + 'static) {
+        assert!((1..=3).contains(&phase));
+        *self
+            .phase_hook
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some((phase, Box::new(hook)));
+    }
+
+    #[cfg(test)]
+    fn run_phase_hook(&self, phase: u8) {
+        let hook = {
+            let mut slot = self
+                .phase_hook
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            if slot
+                .as_ref()
+                .is_some_and(|(selected, _)| *selected == phase)
+            {
+                slot.take()
+            } else {
+                None
             }
+        };
+        if let Some((_, hook)) = hook {
+            hook();
         }
     }
 
@@ -410,16 +530,6 @@ impl NativeRuntime {
     #[cfg(test)]
     pub(crate) fn live_callback_owners(&self) -> usize {
         scan::live_owners()
-    }
-}
-
-struct Admission<'a> {
-    runtime: &'a NativeRuntime,
-}
-
-impl Drop for Admission<'_> {
-    fn drop(&mut self) {
-        self.runtime.active.fetch_sub(1, Ordering::AcqRel);
     }
 }
 

@@ -805,7 +805,10 @@ impl Database {
         let native_runtime = config
             .duckdb_library
             .as_deref()
-            .map(|path| query::NativeRuntime::new(path, config.query_workers))
+            .map(|path| {
+                query::NativeRuntime::new(path, config.query_workers)
+                    .map(|runtime| runtime.with_reuse(config.query_native_reuse))
+            })
             .transpose()?;
         let db = Self {
             inner: Arc::new(Inner {
@@ -2160,6 +2163,14 @@ impl Database {
         stats
     }
 
+    /// Native session counts, distinct from compatibility CLI process counters.
+    pub fn native_query_worker_stats(&self) -> Option<query::QueryWorkerStats> {
+        self.inner
+            .native_runtime
+            .as_ref()
+            .map(|runtime| runtime.stats())
+    }
+
     /// Persistence diagnostics after the current writer operation. This may wait
     /// for journal I/O; normal status and query snapshots do not take this lock.
     pub fn journal_stats(&self) -> Result<Option<crate::journal::JournalStats>> {
@@ -2195,7 +2206,7 @@ impl Database {
                 segmented_journal: s.catalog.segmented_journal,
                 native_query: self.inner.native_runtime.as_ref().map(|runtime| {
                     let identity = runtime.identity();
-                    json!({"library_path":identity.library_path,"library_sha256":identity.library_sha256,"header_sha256":identity.header_sha256,"version":identity.version})
+                    json!({"library_path":identity.library_path,"library_sha256":identity.library_sha256,"header_sha256":identity.header_sha256,"version":identity.version,"reuse_enabled":runtime.reuse_enabled(),"workers":runtime.stats()})
                 }),
                 unshipped_batches: s.sequence.saturating_sub(remote_sequence),
                 hot_rows: hot_count(&s),

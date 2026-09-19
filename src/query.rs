@@ -20,6 +20,8 @@ pub(crate) use native::NativeRuntime;
 #[cfg(test)]
 mod native_race_tests;
 #[cfg(test)]
+mod native_reuse_tests;
+#[cfg(test)]
 mod native_tests;
 pub(crate) use resident_types::{
     ResidentBatch, ResidentFile, ResidentLineage, ResidentSnapshot, ResidentTable,

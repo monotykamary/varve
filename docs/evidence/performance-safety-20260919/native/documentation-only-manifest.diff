@@ -1,0 +1,11 @@
+--- docs/evidence/performance-safety-20260919/native/source-files-qualified.sha256	2026-09-19 21:51:19
++++ docs/evidence/performance-safety-20260919/native/source-files-integrated.sha256	2026-09-19 21:51:21
+@@ -16,7 +16,7 @@
+ 4963d859d9a0ad348c62b1a274b7d1932f942e9a0ab4e1e86a742df122a7c8c9  clients/rust/tests/types.rs
+ 7f0727caac57a9270621dab8e03c29d1f4e24c0ae2ad232593299fd67d05e48b  docs/CONFIGURATION.md
+ 5a8d1a0be8f3e166d9b976947cbdd7214ae3711e667dd66f544269e77ff5d17a  docs/METRICS.md
+-e60d94b42f9b4211d09df881da54c6bc0e47aa7ab07df52c383c9b07af6e7f31  docs/NATIVE_REUSE.md
++b38dba8419f8f1a11c8c5784ce2b49931a0a579a3e2287fa3c648331698cc915  docs/NATIVE_REUSE.md
+ ee1dc763836064d7f37cd5345e67b6dadfc4eb3e8e5b362d4b3eb28e9e4519fb  examples/boundary_bench.rs
+ 87fe8b9d9b0b377ddba61ac7a1f50f5389bb48f7ce6eb4449524cd40162a6d0b  examples/cloud_probe.rs
+ 33e24a5ea335ead9af43fdbd94c219708c2e4c5fb427b2cb7a4c098373e0b7c9  examples/flow_journal_probe.rs

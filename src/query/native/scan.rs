@@ -315,8 +315,9 @@ pub(super) struct ScannerScratch {
 
 /// Stack-scoped fixed credit. ScannerScratch must not carry this lease inside its
 /// Arc: a last field is still destroyed BEFORE the enclosing Arc block is freed.
-/// execute declares this before all specs/session handles and joins/closes them
-/// before dropping it. No ScannerScratch Arc may escape that execution scope.
+/// execute declares this before all specs/session handles and joins/detaches
+/// every callback (or closes the session) before dropping it. No ScannerScratch
+/// Arc may escape that execution scope.
 pub(super) struct ScannerLease {
     scratch: Arc<ScannerScratch>,
     _fixed: RawReservation,
@@ -439,6 +440,12 @@ impl ScannerScratch {
 
     fn record_tags(&self, bytes: usize) {
         update_max(&self.max_tag_json_bytes, bytes);
+    }
+
+    pub(super) fn detached(&self) -> bool {
+        self.owner_live.load(Ordering::Acquire) == 0
+            && self.owner_bytes.load(Ordering::Acquire) == 0
+            && self.active_callbacks.load(Ordering::Acquire) == 0
     }
 
     #[cfg(test)]
@@ -907,8 +914,9 @@ enum Cell<'a> {
 /// Registers callbacks that borrow immutable Rust sources.
 ///
 /// # Safety
-/// The connection/database must be fully torn down, including all callback
-/// owners, before the source lifetime `'a` ends. No callback may outlive it.
+/// Before `'a` ends, close the database or roll back registration and observe
+/// `ScannerScratch::detached()` after all result destruction and watcher join.
+/// A successful rollback alone is insufficient. No callback may outlive `'a`.
 pub(super) unsafe fn register<'a>(
     api: &Arc<Api>,
     connection: Handle,
