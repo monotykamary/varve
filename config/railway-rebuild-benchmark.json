@@ -23,5 +23,6 @@
   "segmented_journal": true,
   "checkpoint_frozen_prefix": true,
   "derived_pages": true,
-  "duckdb_library": "/usr/local/lib/varve/libduckdb.so"
+  "duckdb_library": "/usr/local/lib/varve/libduckdb.so",
+  "query_native_reuse": true
 }
