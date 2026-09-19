@@ -1,0 +1,8 @@
+{
+  "failure": "RuntimeError: source report lacks manifest/configuration",
+  "finished_at": "2026-09-19T15:22:51.806546+00:00",
+  "format_version": 1,
+  "kind": "supplemental_exact_verification",
+  "started_at": "2026-09-19T15:22:51.806191+00:00",
+  "state": "failed"
+}

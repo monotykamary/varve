@@ -1,0 +1,2 @@
+{"event":"phase","at":"2026-09-19T15:22:50.016624+00:00","name":"preflight","state":"passed"}
+{"event":"final","at":"2026-09-19T15:22:50.457918+00:00","state":"failed","output":"/results/native-live-0919/native01_b128_01.json","error":"VarveHttpError: Varve HTTP 400: apply committed control WAL; reopen for recovery: derived resident/working byte budget exceeded"}

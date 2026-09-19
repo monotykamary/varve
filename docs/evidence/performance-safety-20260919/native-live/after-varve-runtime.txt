@@ -1,0 +1,44 @@
+2026-09-19T15:18:50Z
+process=varve --data /data/varve --config /app/config-rebuild-benchmark.json serve --bind :: --port 8080 --allow-remote 
+0::/
+200000 100000
+1999998976
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+9549ee493f4403e975d6bf4222ad8b2b035174779b3069c7250ca5ae110594bb  /usr/local/bin/varve
+69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d  /usr/local/lib/varve/libduckdb.so
+a99b37cca5c7e834d4431fe04ab6e48ef0730d3a2593b012af3cc397b226fa2b  /app/config-rebuild-benchmark.json
+2099a88eed611d3092402b7b3a9923dc9184dcbabe099b6cf86c878f259730f5  /usr/share/doc/varve/source-manifest.sha256
+{
+  "hot_max_bytes": 134217728,
+  "metadata_max_bytes": 67108864,
+  "hot_max_rows": 500000,
+  "wal_max_bytes": 536870912,
+  "max_disk_bytes": 4294967296,
+  "decoded_cache_bytes": 67108864,
+  "disk_cache_bytes": 134217728,
+  "max_batch_rows": 10000,
+  "max_batch_bytes": 4194304,
+  "max_idempotency_keys": 200000,
+  "max_rollup_groups": 200000,
+  "segment_rows": 65536,
+  "flush_interval_us": 5000000,
+  "ship_interval_us": 2000000,
+  "maintenance_interval_ms": 1000,
+  "query_executable": "/usr/local/bin/duckdb",
+  "query_memory_mb": 256,
+  "query_threads": 2,
+  "query_workers": 2,
+  "query_timeout_ms": 30000,
+  "query_max_output_bytes": 16777216,
+  "segmented_journal": true,
+  "checkpoint_frozen_prefix": true,
+  "derived_pages": true,
+  "duckdb_library": "/usr/local/lib/varve/libduckdb.so",
+  "query_native_reuse": true
+}
+{"database_id":"1e006339-802c-4ed7-ac03-cced48430e15","sequence":1555,"checkpoint_sequence":1555,"remote_sequence":0,"segmented_journal":true,"native_query":{"header_sha256":"62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544","library_path":"/usr/local/lib/varve/libduckdb.so","library_sha256":"69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d","reuse_enabled":true,"version":"v2.0.0-alpha41533","workers":{"active":0,"discarded":0,"idle":0,"resets":0,"resident_delta_loads":0,"resident_dynamic_loads":0,"resident_dynamic_staged_bytes":0,"resident_full_loads":0,"resident_hits":0,"resident_idle_bytes":0,"resident_idle_materialized_bytes":0,"resident_idle_rows":0,"resident_invalidations":0,"resident_raw_staged_bytes":0,"resident_raw_staged_rows":0,"reused":0,"spawned":0}},"unshipped_batches":1555,"hot_rows":0,"hot_bytes":0,"raw_memory":{"limit_bytes":134217728,"working_limit_bytes":536870912,"reserved_bytes":0,"live_bytes":0,"working_bytes":0,"pinned_bytes":0,"peak_bytes":24934,"rejections":0},"wal_bytes":0,"disk_bytes":6101482,"metadata_bytes":5678614,"control_root_bytes":32171,"derived_encoded_bytes":5683730,"derived_resident_bytes":22679768,"derived_working_bytes":0,"decoded_cache_bytes":0,"disk_cache_bytes":0,"tables":6,"segments":80,"rollup_groups":12076,"idempotency_keys":3504,"active_queries":0,"active_snapshots":0,"fenced":null,"last_maintenance_error":null}

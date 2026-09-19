@@ -1,0 +1,118 @@
+{
+  "data": {
+    "driver": {
+      "activeDeployments": [
+        {
+          "id": "410fc8c7-562e-479d-af26-785ea632cef2",
+          "status": "SUCCESS"
+        }
+      ],
+      "latestDeployment": {
+        "id": "410fc8c7-562e-479d-af26-785ea632cef2",
+        "status": "SUCCESS"
+      },
+      "region": null,
+      "startCommand": null
+    },
+    "driverLimits": {
+      "containers": {
+        "cpu": 2,
+        "memoryBytes": 1000000000,
+        "pidLimit": 1000
+      }
+    },
+    "project": {
+      "id": "8caffa15-0158-4822-a6c2-cb405bddc62d",
+      "name": "varve-evaluation",
+      "services": {
+        "edges": [
+          {
+            "node": {
+              "id": "0aff95bb-3f5a-45fe-bda0-195aa742938a",
+              "name": "varve-benchmark"
+            }
+          },
+          {
+            "node": {
+              "id": "64ddd834-6732-4582-bf4a-d86bbd0317fa",
+              "name": "varve"
+            }
+          },
+          {
+            "node": {
+              "id": "76fdbde0-4296-46a4-a6f2-4026432fd4a3",
+              "name": "benchmark-driver"
+            }
+          },
+          {
+            "node": {
+              "id": "acc76115-5c5f-4be4-901d-fde4adbcbacf",
+              "name": "timescale-benchmark"
+            }
+          },
+          {
+            "node": {
+              "id": "cadd532a-e09a-4bfb-b825-089a3a175ce9",
+              "name": "rebuild-driver-0918"
+            }
+          },
+          {
+            "node": {
+              "id": "ee0a45c2-7d9e-4952-9de1-edda32064a46",
+              "name": "rebuild-timescale-0918"
+            }
+          },
+          {
+            "node": {
+              "id": "f0faf99c-c9af-4a31-b0ec-133430f75696",
+              "name": "rebuild-varve-0918"
+            }
+          }
+        ]
+      },
+      "workspaceId": "18857f84-0af6-4379-9217-e62e2d14b48f"
+    },
+    "timescale": {
+      "activeDeployments": [
+        {
+          "id": "39f1403f-5bd0-4a37-8784-981d2f86bb6d",
+          "status": "SUCCESS"
+        }
+      ],
+      "latestDeployment": {
+        "id": "39f1403f-5bd0-4a37-8784-981d2f86bb6d",
+        "status": "SUCCESS"
+      },
+      "region": null,
+      "startCommand": "sh -c 'grep -qs \" /var/lib/postgresql/data \" /proc/mounts || { echo \"Refusing ephemeral PostgreSQL storage\" >&2; exit 78; }; exec /usr/local/bin/docker-entrypoint.sh postgres -c shared_buffers=512MB -c work_mem=32MB -c maintenance_work_mem=128MB -c max_parallel_workers_per_gather=2 -c max_parallel_workers=2 -c max_worker_processes=8 -c timescaledb.max_background_workers=4 -c fsync=on -c synchronous_commit=on -c full_page_writes=on -c timescaledb.telemetry_level=off'"
+    },
+    "timescaleLimits": {
+      "containers": {
+        "cpu": 2,
+        "memoryBytes": 2000000000,
+        "pidLimit": 1000
+      }
+    },
+    "varve": {
+      "activeDeployments": [
+        {
+          "id": "cb0fca35-a170-4192-a4ba-d43b41a75443",
+          "status": "SUCCESS"
+        }
+      ],
+      "latestDeployment": {
+        "id": "cb0fca35-a170-4192-a4ba-d43b41a75443",
+        "status": "SUCCESS"
+      },
+      "region": null,
+      "startCommand": "/usr/local/bin/varve-entrypoint varve --data /data/varve --config /app/config-rebuild-benchmark.json serve --bind :: --port 8080 --allow-remote"
+    },
+    "varveLimits": {
+      "containers": {
+        "cpu": 2,
+        "memoryBytes": 2000000000,
+        "pidLimit": 1000
+      }
+    }
+  }
+}

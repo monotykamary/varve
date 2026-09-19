@@ -1,0 +1,355 @@
+{
+  "actual_varve_preflight_status": {
+    "active_queries": 0,
+    "active_snapshots": 0,
+    "checkpoint_sequence": 1555,
+    "control_root_bytes": 32171,
+    "database_id": "1e006339-802c-4ed7-ac03-cced48430e15",
+    "decoded_cache_bytes": 0,
+    "derived_encoded_bytes": 5683730,
+    "derived_resident_bytes": 22679768,
+    "derived_working_bytes": 0,
+    "disk_bytes": 6101482,
+    "disk_cache_bytes": 0,
+    "fenced": null,
+    "hot_bytes": 0,
+    "hot_rows": 0,
+    "idempotency_keys": 3504,
+    "last_maintenance_error": null,
+    "metadata_bytes": 5678614,
+    "native_query": {
+      "header_sha256": "62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544",
+      "library_path": "/usr/local/lib/varve/libduckdb.so",
+      "library_sha256": "69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d",
+      "reuse_enabled": true,
+      "version": "v2.0.0-alpha41533",
+      "workers": {
+        "active": 0,
+        "discarded": 2,
+        "idle": 2,
+        "resets": 11,
+        "resident_delta_loads": 0,
+        "resident_dynamic_loads": 0,
+        "resident_dynamic_staged_bytes": 0,
+        "resident_full_loads": 0,
+        "resident_hits": 0,
+        "resident_idle_bytes": 0,
+        "resident_idle_materialized_bytes": 0,
+        "resident_idle_rows": 0,
+        "resident_invalidations": 0,
+        "resident_raw_staged_bytes": 0,
+        "resident_raw_staged_rows": 0,
+        "reused": 7,
+        "spawned": 4
+      }
+    },
+    "raw_memory": {
+      "limit_bytes": 134217728,
+      "live_bytes": 0,
+      "peak_bytes": 42157,
+      "pinned_bytes": 0,
+      "rejections": 0,
+      "reserved_bytes": 0,
+      "working_bytes": 0,
+      "working_limit_bytes": 536870912
+    },
+    "remote_sequence": 0,
+    "rollup_groups": 12076,
+    "segmented_journal": true,
+    "segments": 80,
+    "sequence": 1555,
+    "tables": 6,
+    "unshipped_batches": 1555,
+    "wal_bytes": 0
+  },
+  "artifact": {
+    "files": {
+      "Dockerfile": "579d48eb1e14fa6efaae0d1179b0146490aefa8bef9f444f2bd8214e12cea277",
+      "benchmark.py": "082e871f53797759ea8e658ac460788b7308cb9bc13b4143794957a3ab2e8ed9",
+      "core.py": "cc0049651b6e767c401ebdbb065e41c6e178b51fc8209c4c490cdd52f4d8da7e",
+      "requirements.txt": "6233eae178fe4a77b4974c85a41fb813b73991d8fbae6cb11e37d263d664e948"
+    },
+    "format_version": 1,
+    "sha256": "7d2ce4fa1d4cebb7121aa99b964a0db36b0d6a73af7299cacc6857f3fe14ef00"
+  },
+  "claim_boundary": "Generic synthetic single-node capability evidence only; not user workload compatibility, distributed behavior, high availability, or production certification. Short-run percentiles are observational and are not p99 qualification.",
+  "configuration": {
+    "automatic_retries_after_ambiguous_ack": 0,
+    "batch": 128,
+    "drain_seconds": 60,
+    "mixed_read_interval_seconds": 1.0,
+    "mixed_readers": 1,
+    "mixed_seconds": 60,
+    "offered_rate_rows_per_second": 512.0,
+    "outer_wall_clock_seconds": 900,
+    "per_call_timeout_seconds": 35.0,
+    "query_samples": 50,
+    "require_rebuilt": true,
+    "rows": 8192,
+    "writers": 4
+  },
+  "database_versions": {
+    "durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "extension_preinstalled": true,
+    "postgresql_version": "17.11",
+    "rebuilt": {
+      "actual": {
+        "checkpoint_sequence": 1555,
+        "database_id": "1e006339-802c-4ed7-ac03-cced48430e15",
+        "native_query": {
+          "header_sha256": "62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544",
+          "library_path": "/usr/local/lib/varve/libduckdb.so",
+          "library_sha256": "69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d",
+          "reuse_enabled": true,
+          "version": "v2.0.0-alpha41533",
+          "workers": {
+            "active": 0,
+            "discarded": 2,
+            "idle": 2,
+            "resets": 11,
+            "resident_delta_loads": 0,
+            "resident_dynamic_loads": 0,
+            "resident_dynamic_staged_bytes": 0,
+            "resident_full_loads": 0,
+            "resident_hits": 0,
+            "resident_idle_bytes": 0,
+            "resident_idle_materialized_bytes": 0,
+            "resident_idle_rows": 0,
+            "resident_invalidations": 0,
+            "resident_raw_staged_bytes": 0,
+            "resident_raw_staged_rows": 0,
+            "reused": 7,
+            "spawned": 4
+          }
+        },
+        "segmented_journal": true,
+        "sequence": 1555
+      },
+      "checks": {
+        "native_header_sha256": true,
+        "native_library_sha256": true,
+        "native_version": true,
+        "persisted_segmented_journal": true
+      },
+      "evidence": "measured from Varve /v1/status; segmented_journal is the persisted catalog marker",
+      "expected": {
+        "native_query": {
+          "header_sha256": "62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544",
+          "library_sha256": "69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d",
+          "version": "v2.0.0-alpha41533"
+        },
+        "segmented_journal": true
+      },
+      "passed": true
+    },
+    "timescale_database_identity": {
+      "database_name": "postgres",
+      "database_oid": 5
+    },
+    "timescaledb_version": "2.30.0",
+    "varve_status": {
+      "active_queries": 0,
+      "active_snapshots": 0,
+      "checkpoint_sequence": 1555,
+      "control_root_bytes": 32171,
+      "database_id": "1e006339-802c-4ed7-ac03-cced48430e15",
+      "decoded_cache_bytes": 0,
+      "derived_encoded_bytes": 5683730,
+      "derived_resident_bytes": 22679768,
+      "derived_working_bytes": 0,
+      "disk_bytes": 6101482,
+      "disk_cache_bytes": 0,
+      "fenced": null,
+      "hot_bytes": 0,
+      "hot_rows": 0,
+      "idempotency_keys": 3504,
+      "last_maintenance_error": null,
+      "metadata_bytes": 5678614,
+      "native_query": {
+        "header_sha256": "62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544",
+        "library_path": "/usr/local/lib/varve/libduckdb.so",
+        "library_sha256": "69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d",
+        "reuse_enabled": true,
+        "version": "v2.0.0-alpha41533",
+        "workers": {
+          "active": 0,
+          "discarded": 2,
+          "idle": 2,
+          "resets": 11,
+          "resident_delta_loads": 0,
+          "resident_dynamic_loads": 0,
+          "resident_dynamic_staged_bytes": 0,
+          "resident_full_loads": 0,
+          "resident_hits": 0,
+          "resident_idle_bytes": 0,
+          "resident_idle_materialized_bytes": 0,
+          "resident_idle_rows": 0,
+          "resident_invalidations": 0,
+          "resident_raw_staged_bytes": 0,
+          "resident_raw_staged_rows": 0,
+          "reused": 7,
+          "spawned": 4
+        }
+      },
+      "raw_memory": {
+        "limit_bytes": 134217728,
+        "live_bytes": 0,
+        "peak_bytes": 42157,
+        "pinned_bytes": 0,
+        "rejections": 0,
+        "reserved_bytes": 0,
+        "working_bytes": 0,
+        "working_limit_bytes": 536870912
+      },
+      "remote_sequence": 0,
+      "rollup_groups": 12076,
+      "segmented_journal": true,
+      "segments": 80,
+      "sequence": 1555,
+      "tables": 6,
+      "unshipped_batches": 1555,
+      "wal_bytes": 0
+    }
+  },
+  "external_attestation": {
+    "measured_runtime_proof": false,
+    "provenance": "client-supplied by Main; retained verbatim and not measured by this process",
+    "supplied": false,
+    "value": null
+  },
+  "failure": "VarveHttpError: Varve HTTP 400: apply committed control WAL; reopen for recovery: derived resident/working byte budget exceeded",
+  "finished_at": "2026-09-19T15:22:50.456712+00:00",
+  "generator": {
+    "cpu_delta": {
+      "system_seconds": 0.010577000000000003,
+      "user_seconds": 0.07774400000000004
+    },
+    "cpu_end": {
+      "system_seconds": 0.082254,
+      "user_seconds": 1.258113
+    },
+    "cpu_start": {
+      "system_seconds": 0.07167699999999999,
+      "user_seconds": 1.180369
+    },
+    "platform": {
+      "cgroup_v2": {
+        "cpu.max": "200000 100000",
+        "memory.max": "999997440"
+      },
+      "logical_cpus": 48,
+      "platform": "Linux-6.12.12+bpo-cloud-amd64-x86_64-with-glibc2.36",
+      "python": "3.12.14"
+    },
+    "scope": "driver process/driver cgroup only; database platform metrics and process identities are external"
+  },
+  "infrastructure_assumptions": {
+    "generator": "2 vCPU / 1,000,000,000 bytes; externally supplied",
+    "ownership": "database CPU/memory/disk metrics, database process identities, infrastructure, secrets, and cleanup are external; runtime snapshots expose timestamps for Main to join",
+    "region": "Singapore; supplied by infrastructure owner, not independently detected",
+    "timescale_database": "2 vCPU / 2,000,000,000 bytes; externally supplied",
+    "timescale_image": "timescale/timescaledb:2.30.0-pg17 (official full/non-oss)",
+    "timescale_image_digest": "sha256:3113d12b78392c064aa7475caf7a52b447b29ddd4f9bfd23526733fcb03e3459",
+    "varve_benchmark_config": {
+      "hot_max_bytes": 134217728,
+      "max_batch_bytes": 4194304,
+      "max_batch_rows": 10000,
+      "max_idempotency_keys": 200000,
+      "metadata_max_bytes": 67108864,
+      "query_memory_bytes_per_worker": 268435456,
+      "query_threads": 2,
+      "query_timeout_seconds": 30,
+      "query_workers": 2
+    },
+    "varve_database": "2 vCPU / 2,000,000,000 bytes; externally supplied"
+  },
+  "matched_durability": {
+    "scope": "single-node local durable acknowledgement; no replicated durability claim",
+    "timescale": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "varve": "every write receipt is checked for local_fsync, rows, duplicate=false, and positive sequence"
+  },
+  "mode": "benchmark",
+  "namespaces": {
+    "checkpoint_job": "vc_native01_b128_01_9e2a6fee",
+    "compact_job": "vm_native01_b128_01_9e2a6fee",
+    "pg_aggregate": "minute_rollup",
+    "pg_receipts": "batch_receipts",
+    "pg_schema": "vb_native01_b128_01_9e2a6fee",
+    "pg_table": "measurements",
+    "varve_aggregate": "va_native01_b128_01_9e2a6fee",
+    "varve_table": "vb_native01_b128_01_9e2a6fee"
+  },
+  "phases": [
+    {
+      "duration_seconds": 0.3104354813694954,
+      "elapsed_seconds": 0.3104354813694954,
+      "finished_at": "2026-09-19T15:22:50.015363+00:00",
+      "name": "preflight",
+      "require_rebuilt": true,
+      "started_at": "2026-09-19T15:22:49.701526+00:00",
+      "state": "passed"
+    }
+  ],
+  "rebuilt_preflight": {
+    "actual": {
+      "checkpoint_sequence": 1555,
+      "database_id": "1e006339-802c-4ed7-ac03-cced48430e15",
+      "native_query": {
+        "header_sha256": "62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544",
+        "library_path": "/usr/local/lib/varve/libduckdb.so",
+        "library_sha256": "69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d",
+        "reuse_enabled": true,
+        "version": "v2.0.0-alpha41533",
+        "workers": {
+          "active": 0,
+          "discarded": 2,
+          "idle": 2,
+          "resets": 11,
+          "resident_delta_loads": 0,
+          "resident_dynamic_loads": 0,
+          "resident_dynamic_staged_bytes": 0,
+          "resident_full_loads": 0,
+          "resident_hits": 0,
+          "resident_idle_bytes": 0,
+          "resident_idle_materialized_bytes": 0,
+          "resident_idle_rows": 0,
+          "resident_invalidations": 0,
+          "resident_raw_staged_bytes": 0,
+          "resident_raw_staged_rows": 0,
+          "reused": 7,
+          "spawned": 4
+        }
+      },
+      "segmented_journal": true,
+      "sequence": 1555
+    },
+    "checks": {
+      "native_header_sha256": true,
+      "native_library_sha256": true,
+      "native_version": true,
+      "persisted_segmented_journal": true
+    },
+    "evidence": "measured from Varve /v1/status; segmented_journal is the persisted catalog marker",
+    "expected": {
+      "native_query": {
+        "header_sha256": "62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544",
+        "library_sha256": "69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d",
+        "version": "v2.0.0-alpha41533"
+      },
+      "segmented_journal": true
+    },
+    "passed": true
+  },
+  "run_id": "native01_b128_01",
+  "started_at": "2026-09-19T15:22:49.701526+00:00",
+  "state": "failed",
+  "workload_stage": "bounded_custom_synthetic_capability"
+}

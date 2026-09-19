@@ -1,0 +1,11 @@
+2026-09-19T15:09:52Z
+process=postgres -c shared_buffers=512MB -c work_mem=32MB -c maintenance_work_mem=128MB -c max_parallel_workers_per_gather=2 -c max_parallel_workers=2 -c max_worker_processes=8 -c timescaledb.max_background_workers=4 -c fsync=on -c synchronous_commit=on -c full_page_writes=on -c timescaledb.telemetry_level=off 
+0::/
+200000 100000
+1999998976
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0

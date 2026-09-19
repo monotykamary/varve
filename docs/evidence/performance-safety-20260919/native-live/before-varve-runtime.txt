@@ -1,0 +1,16 @@
+2026-09-19T15:06:50Z
+process=varve --data /data/varve --config /app/config-rebuild-benchmark.json serve --bind :: --port 8080 --allow-remote 
+0::/
+200000 100000
+1999998976
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+b2afd70b0c96f514475995cbc30715f4a59bcdd337061a382aa4faed7a324a79  /usr/local/bin/varve
+69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d  /usr/local/lib/varve/libduckdb.so
+104354a8d7b99343fe3c3add7e1c656100dfefdae180106b673b08ba84e00c42  /app/config-rebuild-benchmark.json
+e4b18e0c638b5a4aeaae1aa349ae7238eda4d669f80771184452ba1f2b5e4d3c  /usr/share/doc/varve/source-manifest.sha256
+{"database_id":"1e006339-802c-4ed7-ac03-cced48430e15","sequence":1555,"checkpoint_sequence":1555,"remote_sequence":0,"segmented_journal":true,"native_query":{"header_sha256":"62ad0df66b9f4193a657540d2429ba23cb32c41c5c98ea9f3f4e7a3b64e30544","library_path":"/usr/local/lib/varve/libduckdb.so","library_sha256":"69bdd44e0d2426e7ba44ed14644b54d8bd99a9703e5cbb4aec3f8beef40f817d","version":"v2.0.0-alpha41533"},"unshipped_batches":1555,"hot_rows":0,"hot_bytes":0,"raw_memory":{"limit_bytes":134217728,"working_limit_bytes":536870912,"reserved_bytes":11206064,"live_bytes":11206064,"working_bytes":0,"pinned_bytes":0,"peak_bytes":309396176,"rejections":0},"wal_bytes":0,"disk_bytes":6101482,"metadata_bytes":5678614,"control_root_bytes":32171,"derived_encoded_bytes":5683730,"derived_resident_bytes":22679768,"derived_working_bytes":0,"decoded_cache_bytes":1399734,"disk_cache_bytes":0,"tables":6,"segments":80,"rollup_groups":12076,"idempotency_keys":3504,"active_queries":0,"active_snapshots":0,"fenced":null,"last_maintenance_error":null}

@@ -1,5 +1,7 @@
 # Performance and safety checkpoint — 2026-09-19
 
+The results below describe the **original fence checkpoint**. Later checkpoints: [native qualification](native/README.md) and the [native live setup failure, exact conservation and recovery](native-live/README.md). The latter records the explicit benchmark-only opt-in and does not claim a new performance result.
+
 **Qualified safety checkpoint, not a new performance result or production certification.** All builds, tests and fixtures ran in one Railway sandbox. No local build/load ran and no database-service configuration was changed. The three-file remote-fence fix is integrated into the repository; deployment and sustained comparison are separate gates.
 
 ## Final results
@@ -41,7 +43,7 @@ Retained failures explain the progression rather than being hidden:
 - Broad CLI tests initially lacked their hardcoded runtime path.
 - A shared Cargo target reused a test binary with `CARGO_MANIFEST_DIR` from a negative-control tree. That filtered attempt is NOT final-candidate evidence. Only our package artifacts were invalidated; final storage library and all integrations were rebuilt/rerun, with dep-info showing the correct source directory. Future worktree changes must not trust source hashes alone as binary identity.
 - A forced-stop transport fixture left an orphaned gated shell holding inherited lock FD9. Its exact PID/command/descriptor were verified before terminating it. The supervisor now closes that FD in child commands. This harness cleanup does not establish general descendant-process cleanup guarantees.
-- Python 3.14 lacked wheels for pinned requirements; Python 3.13 matching the driver minor was used instead of changing dependencies.
+- Python 3.14 lacked wheels for pinned requirements; Python 3.13.15 was used without changing dependencies. Correction: this did **not** match the deployed driver, which uses Python 3.12.14. The 57-test result above belongs to the additional sandbox runtime, not the driver runtime; actual-driver qualification is recorded separately.
 
 The decisive final logs are `fence/storage-lib-final.log`, `integrations-all-final.log`, `rust-client-service-final.log`, the two `clippy-*-final.log` files and `fmt-final.log`. `final-status.txt` records completion after the retained earlier failed matrices. Each operation's command, exit and source gates remain alongside its log. `fence/runtime-SHA256SUMS` and `clients-benchmark/SHA256SUMS` authenticate their complete archived artifact sets. Large compiled binaries are not committed.
 
